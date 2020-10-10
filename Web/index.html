@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <title>tiny plant</title>
+        <meta charset="UTF-8" />
+        <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1"> 
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <link rel="stylesheet" type="text/css" media="screen" title="main">
+        <link rel="stylesheet" type="text/css" href="css/preloader.css" />
+        <link rel="stylesheet" href="css/igrowl.css" />
+        <link rel="stylesheet" href="css/roundslider.css" />
+        <link rel="shortcut icon" href="favicon.ico" />
+        <script src="js/jquery.core.js"></script>
+        <script src="js/preloader.js"></script>
+        <script src="js/roundslider.js"></script>
+        <script src="js/igrowl.js"></script>
+        <script src="js/index.js"></script>
+    </head>
+    <body class="preloader">
+        <div id="preloader"></div>
+        <div class="container">
+            <div class="main row h-100">
+                <div id="svgInteractive" class="col-sm-12 svglayer bg-light">
+                    <div id="captive-portal hidden" align="center">
+                        <h3>Visit from Web-Browser</h3>
+                        <h1>http://192.168.8.8</h1>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="modalDialog" id="moisture-Settings">
+	        <div class="modal-dialog modal-lg modal-dialog-centered">
+	            <div class="modal-content" style="background-color: transparent !important;">
+	                <div id="moisture-Slider"></div>
+	            </div>
+	        </div>
+        </div>
+        <div class="modalDialog" id="pot-size-Settings">
+	        <div class="modal-dialog modal-lg modal-dialog-centered">
+	            <div class="modal-content" style="background-color: transparent !important;">
+	                <div id="pot-size-Slider"></div>
+	            </div>
+	        </div>
+        </div>
+        <div class="modalDialog" id="power-Settings">
+            <div class="modal-dialog modal-lg modal-dialog-centered">
+                <div class="modal-content" style="background-color: transparent !important;">
+                    <div id="power-Slider"></div>
+                </div>
+            </div>
+        </div>
+        <div class="modalDialog" id="soil-Settings">
+            <div class="modal-dialog modal-xl modal-dialog-centered">
+                <div class="modal-content">
+                        <div id="svgSoil" class="svglayer"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="modalDialog" id="wirelessSettings" tabindex="-1" role="dialog" aria-hidden="true">
+            <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable" role="document" >
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title">WiFi Settings</h5>
+                        <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                            <span aria-hidden="true">&times;</span>
+                        </button>
+                    </div>
+                    <div class="modal-body">
+                        <form method="POST" action="/update" enctype="multipart/form-data" id="formLittleFS">
+                            <input type="file" accept=".bin" name="filesystem" id="fileLittleFS" hidden />
+                            <input type="submit" hidden />
+                        </form>
+                        <form method="POST" action="/update" enctype="multipart/form-data" id="formFirmware">
+                            <input type="file" accept=".bin" name="firmware" id="fileFirmware" hidden />
+                            <input type="submit" hidden />
+                        </form>
+                        <div class="container">
+                            <div class="row">
+                                <div class="col">
+                                    <button class="btn btn-primary" type="button" id="browseLittleFS"> Flash LittleFS</button>
+                                    <button class="btn btn-primary" type="button" id="browseFirmware"> Flash Firmware</button>
+                                </div>
+                                <div class="col">
+                                    <small>LittleFS Version: 1.00</small><br/>
+                                    <small id="firmwareVersion">Firmware Version: 1.0</small>
+                                </div>
+                            </div>
+                            <div class="row">
+                            	<div class="col">
+                            		<div class="progress progress-striped active">
+    									<div class="progress-bar" style="width:0%"></div>
+    								</div>
+                            	</div>
+                            </div>
+                        </div>
+                        <form method="POST" action="/nvram" id="wirelessSettingsForm" oninput="formValidate()">
+                            <fieldset class="form-group">
+                                <div class="form-check">
+                                    <label class="form-check-label">
+                                    <input type="radio" class="form-check-input" id="WiFiModeAP" name="WiFiMode" value="0">
+                                        WiFi Access Point
+                                    </label>
+                                </div>
+                                <div class="form-check">
+                                    <label class="form-check-label">
+                                    <input type="radio" class="form-check-input" id="WiFiModeClient" name="WiFiMode" value="1">
+                                        WiFi Client
+                                    </label>
+                                </div>
+                                <div class="form-check">
+                                  <label class="form-check-label">
+                                    <input type="hidden" id="WiFiHidden" name="WiFiHidden" value="0">
+                                    <input type="checkbox" id="WiFiHiddenCheckbox" class="form-check-input" onclick="HiddenCheck('WiFiHidden',this)">
+                                        Hidden SSID
+                                  </label>
+                                </div>
+                            </fieldset>
+                            <div class="form-group">
+                                <label for="WiFiPhyMode">Physical</label>
+                                <div class="input-group">
+                                    <div class="input-group-addon"><i class="icons icon-wifi p-3"></i></div>
+                                    <select id="WiFiPhyMode" class="form-control" name="WiFiPhyMode">
+                                        <option value="1">802.11 b</option>
+                                        <option value="2">802.11 g</option>
+                                        <option value="3">802.11 n</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="form-group">
+                                <div class="input-group">
+                                    <div class="input-group-addon"><i class="icons icon-power p-3"></i></div>
+                                    <select id="WiFiPower" class="form-control" name="WiFiPower">
+                                        <option value="1">1 dBm (1mW)</option>
+                                        <option value="2">2 dBm (1mW)</option>
+                                        <option value="3">3 dBm (1mW)</option>
+                                        <option value="4">4 dBm (2mW)</option>
+                                        <option value="5">5 dBm (3mW)</option>
+                                        <option value="6">6 dBm (3mW)</option>
+                                        <option value="7">7 dBm (5mW)</option>
+                                        <option value="8">8 dBm (6mW)</option>
+                                        <option value="9">9 dBm (7mW)</option>
+                                        <option value="10">10 dBm (10mW)</option>
+                                        <option value="11">11 dBm (12mW)</option>
+                                        <option value="12">12 dBm (15mW)</option>
+                                        <option value="13">13 dBm (19mW)</option>
+                                        <option value="14">14 dBm (25mW)</option>
+                                        <option value="15">15 dBm (31mW)</option>
+                                        <option value="16">16 dBm (39mW)</option>
+                                        <option value="17">17 dBm (50mW)</option>
+                                        <option value="18">18 dBm (63mW)</option>
+                                        <option value="19">19 dBm (79mW)</option>
+                                        <option value="20">20 dBm (100mW)</option>
+                                        <option value="21">21 dBm (125mW)</option>
+                                        <option value="22">22 dBm (158mW)</option>
+                                        <option value="23">23 dBm (199mW)</option>
+                                        <option value="24">24 dBm (251mW)</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="form-group">
+                                <label for="WiFiChannel">Channel</label>
+                                <div class="input-group">
+                                    <div class="input-group-addon"><i class="icons icon-graph-bar p-3"></i></div>
+                                    <select id="WiFiChannel" class="form-control" name="WiFiChannel">
+                                        <option>1</option>
+                                        <option>2</option>
+                                        <option>3</option>
+                                        <option>4</option>
+                                        <option>5</option>
+                                        <option>6</option>
+                                        <option>7</option>
+                                        <option>8</option>
+                                        <option>9</option>
+                                        <option>10</option>
+                                        <option>11</option>
+                                    </select>
+                                </div>
+                            </div> 
+                            <div class="form-group">
+                                <div class="input-group">
+                                    <div class="input-group-addon"><i class="icons icon-wifi p-3"></i></div>
+                                    <input type="text" id="WiFiSSID" name="WiFiSSID" class="form-control" placeholder="SSID" required>
+                                </div>
+                            </div>
+                            <div class="form-group">
+                                <div class="input-group">
+                                    <div class="input-group-addon"><i class="icons icon-password p-3"></i></div>
+                                    <input type="password" id="WiFiPassword" name="WiFiPassword" class="form-control" placeholder="Password" required>
+                                </div>
+                            </div>
+                            <div class="form-group">
+                                <div class="input-group">
+                                    <div class="input-group-addon"><i class="icons icon-password p-3"></i></div>
+                                    <input type="password" id="WiFiPasswordConfirm" name="WiFiPasswordConfirm" class="form-control" placeholder="Password Confirm">
+                                </div>
+                            </div>
+                            <div class="form-group">
+                                <div class="form-check">
+                                  <label class="form-check-label">
+                                        <input type="hidden" id="EnableLOG" name="EnableLOG" value="0">
+                                        <input type="checkbox" id="EnableLOGCheckbox" class="form-check-input" onclick="HiddenCheck('EnableLOG',this)"> Enable Graph
+                                  </label>
+                                </div>
+                                <div class="input-group">
+                                    <input type="text" id="EnableLOGInterval" name="EnableLOGInterval" class="form-control" placeholder="Graph Interval (seconds)">
+                                </div>
+                            </div>
+                            <fieldset class="form-group">
+                                <div class="form-check">
+                                  <label class="form-check-label">
+                                    <input type="hidden" id="WiFiDHCP" name="WiFiDHCP" value="0">
+                                    <input type="checkbox" id="WiFiDHCPCheckbox" class="form-check-input" onclick="HiddenCheck('WiFiDHCP',this)">
+                                        Enable DHCP
+                                  </label>
+                                </div>
+                            </fieldset>
+                            <div class="form-group">
+                                <div class="input-group">
+                                    <div class="input-group-addon"><i class="icons icon-wifi p-3"></i></div>
+                                    <input type="text" id="WiFiIP" name="WiFiIP" class="form-control" placeholder="IPv4 Address (192.168.0.2)" required>
+                                </div>
+                            </div>
+                            <div class="form-group">
+                                <div class="input-group">
+                                    <div class="input-group-addon"><i class="icons icon-wifi p-3"></i></div>
+                                    <input type="text" id="WiFiSubnet" name="WiFiSubnet" class="form-control" placeholder="Subnet Mask (255.255.255.0)" required>
+                                </div>
+                            </div>
+                            <div class="form-group">
+                                <div class="input-group">
+                                    <div class="input-group-addon"><i class="icons icon-wifi p-3"></i></div>
+                                    <input type="text" id="WiFiGateway" name="WiFiGateway" class="form-control" placeholder="Gateway Address (192.168.0.1)" required>
+                                </div>
+                            </div>
+                            <div class="form-group">
+                                <div class="input-group">
+                                    <div class="input-group-addon"><i class="icons icon-wifi p-3"></i></div>
+                                    <input type="text" id="WiFiDNS" name="WiFiDNS" class="form-control" placeholder="DNS Address (8.8.8.8)" required>
+                                </div>
+                            </div>
+                        </form>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancel</button>
+                        <button type="submit" class="btn btn-success" id="wireless-settings-ok">Save</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </body>
+</html>
