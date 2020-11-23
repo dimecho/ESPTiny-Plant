@@ -10,7 +10,7 @@
 #include "version.h"
 
 #define DEBUG                       false
-#define EEPROM_ID                   0x3BDAB900 //Identify Sketch by EEPROM
+#define EEPROM_ID                   0x3BDAB901 //Identify Sketch by EEPROM
 
 //ESP-01
 //Pin 1 = Rx = GPIO3
@@ -61,7 +61,14 @@ uint32_t webTimer = 0; //Timer to track last webpage access
 uint32_t wifiTimer = 0; //Timer to track SSID broadcast time
 
 Ticker blinkTick;
-volatile uint8_t blinkDuration;
+struct _blink {
+  uint8_t toggle;
+  uint16_t timer;
+  uint16_t duration;
+};
+byte blinkEmpty = 0;
+volatile uint16_t blinkDuration = 0;
+void ICACHE_RAM_ATTR blinkThread();
 
 AsyncWebServer server(80);
 DNSServer dnsServer;
@@ -73,23 +80,23 @@ char ACCESS_POINT_SSID[] = "Plant";
 char ACCESS_POINT_PASSWORD[] = "";
 uint8_t ACCESS_POINT_CHANNEL = 7;
 uint8_t ACCESS_POINT_HIDE = 0;
-uint8_t DATA_LOG = 0; //Enable data logger
-uint32_t LOG_INTERVAL = 30; //Seconds between data collection and write to Filesystem
+uint8_t DATA_LOG = 0; //data logger (enable/disable)
+uint32_t LOG_INTERVAL = 60; //filesystem data collection - seconds as microseconds
 uint8_t NETWORK_DHCP = 0;
 char NETWORK_IP[] = "192.168.8.8";
 char NETWORK_SUBNET[] = "255.255.255.0";
 char NETWORK_GATEWAY[] = "192.168.8.8";
 char NETWORK_DNS[] = "192.168.8.8";
-uint8_t PLANT_POT_SIZE = 2; //Seconds of pump
-uint16_t PLANT_SOIL_MOISTURE = 640; //ADC value
-uint32_t PLANT_MANUAL_TIMER = 0; //Hours
+uint8_t PLANT_POT_SIZE = 4; //seconds of pump
+uint16_t PLANT_SOIL_MOISTURE = 700; //ADC value
+uint32_t PLANT_MANUAL_TIMER = 0; //hours as microseconds
 uint8_t PLANT_SOIL_TYPE = 2; //['Sand', 'Clay', 'Dirt', 'Loam', 'Moss'];
 uint8_t PLANT_LED = 0; //LED
-uint32_t DEEP_SLEEP = 8; //8 seconds
-int8_t ADC_ERROR_OFFSET = 0; //Wire length, resistance, etc - unit individual, not changed by user
+uint32_t DEEP_SLEEP = 30; //seconds
+int8_t ADC_ERROR_OFFSET = 0; //wire resistance - unit individual
 //=============================
-uint32_t WIFI_SLEEP = 4; //4 minutes
-uint32_t WEB_SLEEP = 5; //5 minutes
+uint32_t WIFI_SLEEP = 4; //minutes
+uint32_t WEB_SLEEP = 5; //minutes
 //=============================
 bool restartRequired = false;  // Set this flag in the callbacks to restart ESP in the main loop
 
@@ -111,10 +118,6 @@ void setup()
 
   pinMode(sensorPin, OUTPUT);
   digitalWrite(sensorPin, LOW);
-
-  pinMode(ledPin, OUTPUT);
-  digitalWrite(ledPin, HIGH);
-  //digitalWrite(ledPin, LOW);
 
   /*
     REANSON_DEFAULT_RST = 0, // normal startup by power on
@@ -162,7 +165,7 @@ void setup()
   //======================
   //NVRAM type of Settings
   //======================
-  EEPROM.begin(1024);
+  EEPROM.begin(512);
   long e = NVRAM_Read(0).toInt();
 #if DEBUG
   Serial.print("EEPROM CRC Stored: 0x");
@@ -378,10 +381,10 @@ void setup()
       //request->send(200, text_plain, String(moisture) + " (" + String(PLANT_SOIL_MOISTURE) + ")");
     });
     server.on("/adc2", HTTP_GET, [](AsyncWebServerRequest * request) {
-     //CapacitiveSensor cs = CapacitiveSensor(sensorPin, moistureSensorPin);
-     //cs.set_CS_AutocaL_Millis(0xFFFFFFFF); // turn off autocalibrate
-     uint16_t moisture = 0; // cs.capacitiveSensor(30);
-     
+      //CapacitiveSensor cs = CapacitiveSensor(sensorPin, moistureSensorPin);
+      //cs.set_CS_AutocaL_Millis(0xFFFFFFFF); // turn off autocalibrate
+      uint16_t moisture = 0; // cs.capacitiveSensor(30);
+
       request->send(200, text_plain, String(moisture));
     });
     server.on("/adc-offset", HTTP_GET, [](AsyncWebServerRequest * request) {
@@ -514,7 +517,7 @@ void setup()
     server.begin(); // Web server start
 
     //ArduinoOTA.begin();
-    blinky(500, 2, 0); //Alive blink
+    blinky(400, 2, 0); //Alive blink
   }
 }
 
@@ -522,7 +525,7 @@ void loop()
 {
   dnsServer.processNextRequest();
 
-  yield();
+  //yield();
 
   if (restartRequired) {
 #if DEBUG
@@ -547,12 +550,7 @@ void loop()
     //=======================
     //LED MORSE CODE
     //=======================
-    //for (uint16_t i = 1000 ; i >= 1; i=div10(i)) {
-    for (uint8_t i = 100 ; i >= 1; i /= 10) {
-      uint8_t d = (moisture / i) % 10;
-      blinky(400, d, 0); //blink a zero with a quick pulse
-      delay(1200);
-    }
+    blinkTick.once(1, blinkMorse, moisture);
   }
 
   if (PLANT_MANUAL_TIMER == 0 && moisture > 10) {
@@ -587,12 +585,13 @@ void loop()
         runPump();
         rtcData.emptyBottle++; //Sensorless Empty Detection
       } else {
-        dataLog("O:" + String(rtcData.emptyBottle));
+        dataLog("e:" + String(rtcData.emptyBottle));
       }
       //}else if(moisture == 1024) { //Emergency reset (short two sensor electrodes)
       //  NVRAM_Erase();
       //  ESP.restart();
     } else {
+      blinkEmpty = 0;
       rtcData.syncTimer = 0;
       rtcData.emptyBottle = 0;
       rtcData.moistureLog = 0;
@@ -605,28 +604,37 @@ void loop()
 
   if (millis() - wifiTimer > WIFI_SLEEP)
   {
-    int clientCount = 0;
-    if (WIFI_SLEEP != 0) {
-      clientCount = WiFi.softAPgetStationNum();
-    }
+    /*
+      int clientCount = 0;
+      if (WIFI_SLEEP != 0) {
+      clientCount = WiFi.softAPgetStationNum(); //counts all client attempts
+      }
+    */
+    struct station_info *clientCount  = wifi_softap_get_station_info(); //more accurate counts only authenticated clients
+
     //Note: default station inactivity timer for soft-AP is set to 5 minutes
-    if (clientCount == 0)
+    if (clientCount == NULL || clientCount == 0)
     {
       if (rtcData.emptyBottle >= 3) { //Low Water LED
-        blinky(900, 254, 1);
-        return;
 
+        if(blinkEmpty == 0) {
+          blinkEmpty = 1;
+          blinky(900, 254, 1);
+        }
         if ((rtcData.emptyBottle > 10 && (rtcData.syncTimer + millis()) > delayBetweenRefillReset) || (rtcData.emptyBottle < 10 && (rtcData.syncTimer + millis()) > delayBetweenOverfloodReset)) {
-          blinkDuration = 0;
           rtcData.syncTimer = 0;
           rtcData.emptyBottle = 0;
           rtcData.moistureLog = 0;
-        } else {
+          dataLog("e:0");
+        } else if (blinkDuration == 0) { //skip if blinking but go to sleep when 0
+          dataLog("e:sleep");
           uint32_t halfhour = 30 * 60 * 1000000; //30 minutes in millis
           rtcData.syncTimer += millis() + halfhour; //when it wakes up it will have proper time to compare
           rtcData.sleepReason = 0;
           ESP.rtcUserMemoryWrite(0, (uint32_t*) &rtcData, sizeof(rtcData));
           ESP.deepSleep(halfhour, WAKE_RF_DISABLED);
+        }else{
+          return; //while blinking
         }
       }
 
@@ -642,7 +650,7 @@ void loop()
           //WiFi.setSleepMode(WIFI_MODEM_SLEEP); //wifi_set_sleep_type(MODEM_SLEEP_T); //woken up automatically
           //WiFi.mode(WIFI_OFF);
           //WiFi.forceSleepBegin();
-
+          
           rtcData.sleepReason = 1;
           //system_rtc_mem_write(0, &rtcData, sizeof(rtcData));
           ESP.rtcUserMemoryWrite(0, (uint32_t*) &rtcData, sizeof(rtcData));
@@ -670,6 +678,7 @@ void loop()
         ESP.deepSleep(DEEP_SLEEP, WAKE_NO_RFCAL); //Will wake up with radio
       }
     }
+    wifi_softap_free_station_info();
   }
 
   syncTimer = millis();
@@ -690,7 +699,7 @@ uint16_t div3(uint16_t n) {
 }
 
 /*
-uint16_t getAnalog() {
+  uint16_t getAnalog() {
 
   uint16_t result = 0;
 
@@ -722,7 +731,7 @@ uint16_t getAnalog() {
   }
 
   return result;
-}
+  }
 */
 
 void dataLog(String text)
@@ -755,15 +764,15 @@ void runPump()
     duration--;
   } while (duration > 0);
   digitalWrite(pumpPin, LOW); //OFF
- 
- dataLog("T:" + String(PLANT_MANUAL_TIMER) + ",M:" + String(PLANT_SOIL_MOISTURE));
+
+  dataLog("T:" + String(PLANT_MANUAL_TIMER) + ",M:" + String(PLANT_SOIL_MOISTURE));
 }
 
 uint16_t sensorRead(uint8_t enablePin)
 {
   //A0 conflicts with WiFi Module.
   //-----------------
-  if(ADC_ERROR_OFFSET == -1) { //Use WiFi with A0 (20k resistor required)
+  if (ADC_ERROR_OFFSET == -1) {
     WiFi.disconnect();
     WiFi.setSleepMode(WIFI_NONE_SLEEP);
   }
@@ -776,7 +785,7 @@ uint16_t sensorRead(uint8_t enablePin)
     analogSetAttenuation(ADC_6db);
   */
   analogRead(moistureSensorPin); //Discharge any capacitance
-  
+
   digitalWrite(enablePin, HIGH); //ON
   //uint16_t result = analogRead(moistureSensorPin) + ADC_ERROR_OFFSET;
   //uint16_t result  = getAnalog() + ADC_ERROR_OFFSET;
@@ -796,7 +805,7 @@ uint16_t readADC()
 {
   //0.1uF (103 or 104) cap between ADC and GND
   //A0 sensitivity is different for ESP-Modules
-  //ADC conversions in about 6-10 microseconds 
+  //ADC conversions in about 6-10 microseconds
 
   /*
     A0 -> 10K to GND (20k for NodeMCU)
@@ -804,31 +813,27 @@ uint16_t readADC()
   //=============
   //Take Lowest
   //=============
-
-  uint16_t result = 1024;
-  for (uint8_t i = 0; i < 8; i++) {
-    //delay(1);
-    int a = analogRead(moistureSensorPin);
-    if (a < result) {
-      result = a;
+  /*
+    uint16_t result = 1024;
+    for (uint8_t i = 0; i < 8; i++) {
+      //delay(1);
+      int a = analogRead(moistureSensorPin);
+      if (a < result) {
+        result = a;
+      }
     }
-  }
-
+  */
   //=============
   //Average
   //=============
-  /*
-    uint16_t result = 0;
-    for (uint8_t i = 0; i < 8; i++) {
-    //if (i < 8) { //throw away first 8 conversions
-     //   analogRead(moistureSensorPin);
-    //} else { //average the other 8 conversions
-      result += analogRead(moistureSensorPin);
-    //}
-    }
-    //result = (result >> 4); //Average 16 using Shift 4
-    result = (result >> 3); //Average 8 using Shift 3
-  */
+
+  uint16_t result = 0;
+  for (uint8_t i = 0; i < 8; i++) {
+    result += analogRead(moistureSensorPin);
+  }
+  result = result / 8; //Average 8
+  //result = (result >> 4); //Average 16 using Shift 4
+  //result = (result >> 3); //Average 8 using Shift 3
 
   return result;
 }
@@ -845,40 +850,67 @@ void blinkThread()
 {
   //All variables that are used by interrupt service routine declared as "volatile"
 
-  digitalWrite(ledPin, !digitalRead(ledPin));
-  blinkDuration--;
-
   if (blinkDuration == 0) {
+    digitalWrite(ledPin, HIGH); //OFF
     blinkTick.detach();
+  }else{
+    digitalWrite(ledPin, !digitalRead(ledPin));
+  }
+  blinkDuration--;
+}
+
+void blinkLoop(_blink* src)
+{
+    blinky(src->timer, src->duration, 1);
+}
+
+void blinkMorse(uint16_t moisture)
+{
+  if (blinkDuration == 0) { //skip if already blinking
+    //for (uint16_t i = 1000 ; i >= 1; i=div10(i)) {
+    for (uint8_t i = 100 ; i >= 1; i /= 10) {
+      uint8_t d = (moisture / i) % 10;
+      blinky(400, d, 0); //blink a zero with a quick pulse
+      delay(1200);
+      //_blink arg = {1, 400, d};
+      //blinkTick.once(1200, blinkLoop, &arg);
+    }
   }
 }
 
-void blinky(uint16_t timer, uint8_t duration, uint8_t threaded)
+void blinky(uint16_t timer, uint16_t duration, uint8_t threaded)
 {
-  if (duration == 0) {
-    duration = 2;
-    timer = 1000;
-  }
+  if (blinkDuration == 0) { //skip if already blinking
 
-  if (threaded > 0 && blinkDuration == 0) { //skip if already blinking
-    blinkDuration = duration * 2; //toggle style
-    blinkTick.attach(timer, blinkThread);
-  } else {
+    if (duration == 0) {
+      duration = 2;
+      timer = 1000;
+    }
 
-    /*
+    pinMode(ledPin, OUTPUT);
+
+    if (threaded > 0) {
+      blinkDuration = duration * 2; //toggle style
+      blinkTick.attach_ms(timer, blinkThread);
+    } else {
+      //_blink arg = {1, timer, duration};
+      //blinkLoop(&arg);
+      //blinkTick.once(1, blinkLoop, &arg);
+
+      /*
         LED swapped HIGH with LOW
         LED is shared with GPIO2. ESP will need GPIO2 on HIGH level in order to boot.
-    */
-
-    do  {
-      //digitalWrite(ledPin, HIGH); //ON
-      digitalWrite(ledPin, LOW); //ON
-      delay(timer);
-      //digitalWrite(ledPin, LOW); //OFF
-      digitalWrite(ledPin, HIGH); //OFF
-      delay(timer);
-      duration--;
-    } while (duration);
+      */
+      do {
+        //digitalWrite(ledPin, HIGH); //ON
+        digitalWrite(ledPin, LOW); //ON
+        delay(timer);
+        //digitalWrite(ledPin, LOW); //OFF
+        digitalWrite(ledPin, HIGH); //OFF
+        delay(timer);
+        duration--;
+      } while (duration);
+    }
   }
 }
 //=============
@@ -914,7 +946,7 @@ void NVRAM_Erase()
 
 void NVRAM_Write(uint32_t address, String txt)
 {
-  char arrayToStore[32];
+  char arrayToStore[16];
   memset(arrayToStore, 0, sizeof(arrayToStore));
   txt.toCharArray(arrayToStore, sizeof(arrayToStore)); // Convert string to array.
 
@@ -924,7 +956,7 @@ void NVRAM_Write(uint32_t address, String txt)
 
 String NVRAM_Read(uint32_t address)
 {
-  char arrayToStore[32];
+  char arrayToStore[16];
   EEPROM.get(address * sizeof(arrayToStore), arrayToStore);
 
   return String(arrayToStore);
@@ -958,6 +990,7 @@ void WebUpload(AsyncWebServerRequest *request, String filename, size_t index, ui
       Serial.printf("Free Filesystem Space: %u\n", fsSize);
       Serial.printf("Filesystem Flash Offset: %u\n", U_FS);
 #endif
+      blinkDuration = 0;
       close_all_fs();
 
       Update.begin(fsSize, U_FS); //start with max available size
