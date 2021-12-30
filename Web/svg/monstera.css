@@ -240,11 +240,11 @@ body {
   transform-origin: 300px 500px; }
 
 #power-badge {
-  -webkit-transform-origin: 900px 488px;
-  -moz-transform-origin: 900px 488px;
-  -ms-transform-origin: 900px 488px;
-  -o-transform-origin: 900px 488px;
-  transform-origin: 900px 488px; }
+  -webkit-transform-origin: 910px 680px;
+  -moz-transform-origin: 910px 680px;
+  -ms-transform-origin: 910px 680px;
+  -o-transform-origin: 910px 680px;
+  transform-origin: 910px 680px; }
 
 #power-title {
   -webkit-transform-origin: 820px 400px;
@@ -284,11 +284,11 @@ body {
   transform-origin: 311px 480px; }
 
 #graph-badge {
-  -webkit-transform-origin: 800px 0px;
-  -moz-transform-origin: 800px 0px;
-  -ms-transform-origin:800px 0px;
-  -o-transform-origin: 800px 0px;
-  transform-origin: 800px 0px; }
+  -webkit-transform-origin: 650px 50px;
+  -moz-transform-origin: 650px 50px;
+  -ms-transform-origin: 650px 50px;
+  -o-transform-origin: 650px 50px;
+  transform-origin: 650px 50px; }
 
 #graph-title {
   -webkit-transform-origin: 800px 40px;
@@ -328,40 +328,40 @@ body {
   transform-origin: 710px 620px; }
 
 #timer-badge {
-  -webkit-transform-origin: 80px 470px;
-  -moz-transform-origin: 80px 470px;
-  -ms-transform-origin: 80px 470px;
-  -o-transform-origin: 80px 470px;
-  transform-origin: 80px 470px; }
+  -webkit-transform-origin: 100px 280px;
+  -moz-transform-origin: 100px 280px;
+  -ms-transform-origin: 100px 280px;
+  -o-transform-origin: 100px 280px;
+  transform-origin: 100px 280px; }
 
 #timer-title {
-  -webkit-transform-origin: 215px 360px;
-  -moz-transform-origin: 215px 360px;
-  -ms-transform-origin: 215px 360px;
-  -o-transform-origin: 215px 360px;
-  transform-origin: 215px 360px; }
+  -webkit-transform-origin: 240px 340px;
+  -moz-transform-origin: 240px 340px;
+  -ms-transform-origin: 240px 360px;
+  -o-transform-origin: 240px 340px;
+  transform-origin: 240px 340px; }
 
 /* flying origin */
 #timer-details {
-  -webkit-transform-origin: 30px 800px;
-  -moz-transform-origin: 30px 800px;
-  -ms-transform-origin: 30px 800px;
-  -o-transform-origin: 30px 800px;
-  transform-origin: 30px 800px; }
+  -webkit-transform-origin: 300px 800px;
+  -moz-transform-origin: 300px 800px;
+  -ms-transform-origin: 300px 800px;
+  -o-transform-origin: 300px 800px;
+  transform-origin: 300px 800px; }
 
 #moisture-badge {
-  -webkit-transform-origin: 10px 400px;
-  -moz-transform-origin: 10px 400px;
-  -ms-transform-origin: 10px 400px;
-  -o-transform-origin: 10px 400px;
-  transform-origin: 10px 400px; }
+  -webkit-transform-origin: 150px 620px;
+  -moz-transform-origin: 150px 620px;
+  -ms-transform-origin: 150px 620px;
+  -o-transform-origin: 150px 620px;
+  transform-origin: 150px 620px; }
 
 #moisture-title {
-  -webkit-transform-origin: 80px 450px;
-  -moz-transform-origin: 80px 450px;
-  -ms-transform-origin: 80px 450px;
-  -o-transform-origin: 80px 450px;
-  transform-origin: 80px 450px; }
+  -webkit-transform-origin: 100px 450px;
+  -moz-transform-origin: 100px 450px;
+  -ms-transform-origin: 100px 450px;
+  -o-transform-origin: 100px 450px;
+  transform-origin: 100px 450px; }
 
 /* flying origin */
 #moisture-details {
@@ -372,11 +372,11 @@ body {
   transform-origin: 700px 1000px; }
 
 #pot-size-badge {
-  -webkit-transform-origin: 960px 893px;
-  -moz-transform-origin: 960px 893px;
-  -ms-transform-origin: 960px 893px;
-  -o-transform-origin: 960px 893px;
-  transform-origin: 960px 893px; }
+  -webkit-transform-origin: 850px 893px;
+  -moz-transform-origin: 850px 893px;
+  -ms-transform-origin: 850px 893px;
+  -o-transform-origin: 850px 893px;
+  transform-origin: 850px 893px; }
 
 #pot-size-title {
   -webkit-transform-origin: 860px 800px;

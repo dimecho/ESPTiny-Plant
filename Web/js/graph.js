@@ -1,11 +1,9 @@
-var theme = detectTheme();
-
-var roundEdges = (getCookie('graph.roundedges') == 'true') || true;
-var showDataLabels = (getCookie('graph.datalabels') == 'true') || true;
-var showAnimation = (getCookie('graph.animation') == 'true') || false;
-var graphDivision = getCookie('graph.division') || 60;
-var lineWidth = getCookie('graph.border') || 3;
-var pageLimit = getCookie('graph.pages') || 4;
+var roundEdges = true;
+var showDataLabels = true;
+var showAnimation = false;
+var graphDivision = 60;
+var lineWidth = 3;
+var pageLimit = 4;
 
 var chart_datasets = [{
 	type: 'line',
@@ -72,28 +70,7 @@ document.addEventListener("DOMContentLoaded", function(event)
     ctx.mozImageSmoothingEnabled = false;
     ctx.imageSmoothingEnabled = false;
     */
-
-     $(".modalDialog").click(function( event ) {
-		//event.preventDefault();
-        if (event.target !== this)
-            return;
-        //console.log(event.target);
-        this.style.display = 'none';
-    });
-
-    document.querySelector('.close').addEventListener('click', function(event) {
-        //event.preventDefault();
-        this.parentElement.parentElement.parentElement.parentElement.style.display = 'none';
-    });
 });
-
-function graphTheme() {
-
-	if(theme == '.slate') {
-        ctxFontColor = 'white';
-        ctxGridColor = '#707070';           
-    }
-};
 
 function graphSettings(save) {
 
@@ -146,8 +123,8 @@ function buildGraphMenu() {
     btn_start.click(function() {
         btn_start.prop('disabled', true);
         if(chart.data.datasets[0].data.length > 0) {
-            window.location.href = '#graphStartConfirm';
-		    document.getElementById('graphStartConfirm').style.display = 'block';
+            var modal = new bootstrap.Modal(document.getElementById('graphStartConfirm'));
+            modal.show();
         }else{
         	updateChart();
         }
@@ -189,10 +166,10 @@ function buildGraphMenu() {
             if(btn_start[0].disabled == true) {
 
             	var xhr = new XMLHttpRequest();
-    			//xhr.open('GET', '/nvram?offset=9&value=10', true);
+    			//xhr.open('GET', 'nvram?offset=9&value=10', true);
     			//xhr.send();
 
-    			xhr.open('GET', '/nvram?offset=20&value=' + (e.from * 60), true);
+    			xhr.open('GET', 'nvram?offset=20&value=' + (e.from * 60), true);
     			xhr.send();
 
                 //if (xhr) xhr.abort();
@@ -408,6 +385,8 @@ function initChart() {
             	}
             }
             chart.update();
+
+            resizeChart();
         }
     }
     xhr.open('GET', 'data.log', true);
@@ -455,7 +434,7 @@ function startChart() {
             chart.data.datasets[0].data = [];
             chart.data.datasets[1].data = [];
             chart.update();
-
+           
             updateChart();
         }
     }
@@ -521,16 +500,7 @@ function updateChart() {
             //Scroll
             if (l == data.labels.length) {
                 initTimeAxis(graphDivision, data.labels);
-                var newwidth = $('.chartAreaWrapper').width() + chart.width;
-                $('.chartAreaWrapper2').width(newwidth);
-                $('.chartAreaWrapper').animate({scrollLeft:newwidth}, 1000);
-                
-                var copyWidth = chart.scales['y-axis-0'].width - 10;
-                var copyHeight = chart.scales['y-axis-0'].height + chart.scales['y-axis-0'].top + 10;
-                ctxAxis.canvas.height = copyHeight;
-                ctxAxis.canvas.width = copyWidth;
-                ctxAxis.drawImage(chart.chart.canvas, 0, 0, copyWidth, copyHeight, 0, 0, copyWidth, copyHeight);
-
+				resizeChart();
             }else if (l > pageLimit) {
                 //console.log('Max scroll pages ...reset');
                 for (var x = 0; x <= last; x++) {
@@ -563,53 +533,17 @@ function updateChart() {
     xhr.send();
 };
 
-function detectTheme()
+function resizeChart()
 {
-    var t = getCookie('theme');
-    if(t == undefined) {
-        if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
-            return '.slate';
-        }else{
-            return '';
-        }
-    }
-    return t;
-};
-
-function switchTheme(element,dark,light) {
-     if(theme == '') {
-        var e = $(element + '.' + dark);
-        e.removeClass(dark);
-        e.addClass(light);
-    }else{
-        var e = $(element + '.' + light);
-        e.removeClass(light);
-        e.addClass(dark);
-    }
-};
-
-function setTheme() {
-    if(theme == '.slate') {
-        theme = '';
-    }else{
-        theme = '.slate';
-    }
-    setCookie('theme', theme, 1);
-    loadTheme();
-};
-
-function loadTheme() {
-    if(theme == '.slate') {
-        $('link[title="main"]').attr('href', 'css/bootstrap.slate.css');
-        $('.icon-day-and-night').attr('data-original-title', '<h6 class="text-white">Light Theme</h6>');
-    }else{
-        $('link[title="main"]').attr('href', 'css/bootstrap.css');
-        $('.icon-day-and-night').attr('data-original-title', '<h6 class="text-white">Dark Theme</h6>');
-    }
-    switchTheme('i.icons','text-white','text-dark');
-    switchTheme('div','bg-primary','bg-light');
-    switchTheme('div','text-white','text-dark');
-    switchTheme('img','bg-secondary','bg-light');
+    var newwidth = $('.chartAreaWrapper').width() + chart.width;
+    $('.chartAreaWrapper2').width(newwidth);
+    $('.chartAreaWrapper').animate({scrollLeft:newwidth}, 1000);
+    
+    var copyWidth = chart.scales['y-axis-0'].width - 10;
+    var copyHeight = chart.scales['y-axis-0'].height + chart.scales['y-axis-0'].top + 10;
+    ctxAxis.canvas.height = copyHeight;
+    ctxAxis.canvas.width = copyWidth;
+    ctxAxis.drawImage(chart.chart.canvas, 0, 0, copyWidth, copyHeight, 0, 0, copyWidth, copyHeight);
 };
 
 function isEmpty( el ){
@@ -622,40 +556,4 @@ Array.prototype.max = function() {
 
 Array.prototype.min = function() {
   return Math.min.apply(null, this);
-};
-
-
-function deleteCookie(name, path, domain) {
-
-  if(getCookie(name)) {
-    document.cookie = name + '=' +
-      ((path) ? ';path='+path:'')+
-      ((domain)?';domain='+domain:'') +
-      ';expires=Thu, 01 Jan 1970 00:00:01 GMT';
-  }
-};
-
-function setCookie(name, value, exdays) {
-
-    var exdate = new Date();
-    exdate.setDate(exdate.getDate() + exdays);
-    var c_value = escape(value) + (exdays == null ? '' : '; expires=' + exdate.toUTCString());
-    document.cookie = name + '=' + c_value + '; SameSite=Lax';
-};
-
-function getCookie(name) {
-    
-    var i,
-        x,
-        y,
-        ARRcookies = document.cookie.split(';');
-
-    for (var i = 0; i < ARRcookies.length; i++) {
-        x = ARRcookies[i].substr(0, ARRcookies[i].indexOf('='));
-        y = ARRcookies[i].substr(ARRcookies[i].indexOf('=') + 1);
-        x = x.replace(/^\s+|\s+$/g, '');
-        if (x == name) {
-            return unescape(y);
-        }
-    }
 };

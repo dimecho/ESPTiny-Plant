@@ -1,5 +1,3 @@
-var theme = detectTheme();
-
 var refreshTimer;
 var refreshSpeed = 10000;
 var saveReminder;
@@ -25,21 +23,9 @@ var soil_type_color = ['#3d9919', '#000000', '#58280c', '#7b4626', '#e39356', '#
 
 var timerUploadCounter = 0;
 
-document.addEventListener("DOMContentLoaded", function(event)
+document.addEventListener('DOMContentLoaded', function(event)
 {
-    if((window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
-        $('link[title="main"]').attr('href', 'css/bootstrap.slate.css');
-        $('.icon-day-and-night').attr('data-original-title', '<h6 class="text-white">Light Theme</h6>');
-        $('h1').addClass('text-white');
-    }else{
-        $('link[title="main"]').attr('href', 'css/bootstrap.css');
-        $('.icon-day-and-night').attr('data-original-title', '<h6 class="text-white">Dark Theme</h6>');
-        $('h1').removeClass('text-white');
-    }
-    switchTheme('i.icons','text-white','text-dark');
-    switchTheme('div','bg-primary','bg-light');
-    switchTheme('div','text-white','text-dark');
-    switchTheme('img','bg-secondary','bg-light');
+	loadTheme();
 
     console.log(navigator.appCodeName);
 	console.log(navigator.appName);
@@ -50,74 +36,140 @@ document.addEventListener("DOMContentLoaded", function(event)
 	if(navigator.platform == 'MacIntel' && navigator.appVersion.indexOf('AppleWebKit') != -1 && navigator.appVersion.indexOf('Safari') == -1) {
 		document.getElementById('captive-portal').classList.remove('hidden');
 	}else{
-	    var target = document.querySelector('#svgInteractive');
+	    loadSVG();
+	}
+});
+
+function loadSVG(svgfile) {
+
+	var nvram = new XMLHttpRequest();
+    nvram.responseType = 'json';
+    //nvram.overrideMimeType('application/json');
+    nvram.open('GET', 'nvram', true);
+    nvram.send();
+    nvram.onload = function(e) {
+
+		var svg = document.getElementById('svgInteractive');
+		var index = new XMLHttpRequest();
 
 	    // If SVG is supported
-	    if (typeof SVGRect != "undefined")
+	    if (typeof SVGRect != undefined)
 	    {
-	    	$('head link[rel="stylesheet"]').last().after('<link rel="stylesheet" href="svg/bonsai.css" type="text/css">');
+	    	if(nvram.response != undefined) {
 
+ 				//var index = new XMLHttpRequest();
+				index.open('GET', 'svg', true);
+				index.send();
+				index.onload = function(e) {
+					if(index.response != undefined) {
+						var s = index.responseText.split('\n');
+						svgfile = s[nvram.response['nvram'][20]]; //match index # to file name
+					}
+				}
+	    	}else if (svgfile == undefined) {
+	    		svgfile = 'bonsai.svg';
+	    	}
+	    	
+			document.getElementById('cssSVG').href = 'svg/' + svgfile.replace('.svg', '.css');
+	   
 		    // Request the SVG file
-		    var ajax = new XMLHttpRequest();
-		    ajax.open('GET', 'svg/bonsai.svg', true);
-		    ajax.send();
+		    var xhr = new XMLHttpRequest();
+		    xhr.open('GET', 'svg/' + svgfile, true);
+		    xhr.send();
 
 		    // Append the SVG to the target
-		    ajax.onload = function(e) {
-	            target.innerHTML = ajax.responseText;
+		    xhr.onload = function(e) {
+	            svg.innerHTML = xhr.responseText;
 	            document.getElementById('timer-enabled').classList.add('hidden');
 
-	            var nvram = new XMLHttpRequest();
-	            nvram.responseType = 'json';
-	            //nvram.overrideMimeType('application/json');
-	            nvram.open('GET', '/nvram', true);
-	            nvram.send();
-	            nvram.onload = function(e) {
-	                if(nvram.response != null) {
-	                    NVRAMtoSVG(nvram.response);
-	                }
-	                var adc = new XMLHttpRequest();
-	                adc.open('GET', '/adc', true);
-	                adc.send();
-	                adc.onload = function(e) {
-	                    if(adc.responseText > 1010 && adc.responseText < 1024)
-	                    {
-	                        $.iGrowl({ type: 'error', message: 'Detecting Excess Moisture!' });
-	                        if(nvram.response['nvram'][14] > 12) {
-	                            $.iGrowl({ type: 'info', message: 'Lower Pot Size value'  });
-	                            $.iGrowl({ type: 'info', message: 'Adjust sensor to soil height' });
-	                        }else{
-	                            $.iGrowl({ type: 'info', message: 'Compact soil water channels' });
-	                            $.iGrowl({ type: 'info', message: 'Move sensor away from water' });
-	                        }
-	                    //}else{
-	                    	//$.iGrowl({ type: 'info', message: 'Current Moisture: ' + adc.responseText  });
-	                    }
-	                }
+	            if(nvram.response != undefined) {
+	                NVRAMtoSVG(nvram.response);
 	            }
-		            
-	            $('#graph').on('click',function () {
-	                window.location.href = 'graph.html';
-	            });
+	            var adc = new XMLHttpRequest();
+	            adc.open('GET', 'adc', true);
+	            adc.send();
+	            adc.onloadend = function() {
+				    if(xhr.status == 200) {
+				    	var a = adc.responseText;
+				    	//console.log(adc.responseText);
+				    	
+				    	if(Number.isInteger(a)) {
+					    	if(a > 1010 && a < 1024)
+		                    {
+		                        notify('', 'Detecting Excess Moisture!', 'danger');
+		                        if(nvram.response['nvram'][14] > 12) {
+		                            notify('', 'Lower Pot Size value', 'info');
+		                            notify('', 'Adjust sensor to soil height', 'info');
+		                        }else{
+		                            notify('', 'Compact soil water channels', 'info');
+		                            notify('', 'Move sensor away from water', 'info');
+		                        }
+		                    //}else{
+		                    	//notify('', 'Current Moisture: ' + a, 'info');
+		                    }
+		                    document.getElementById('moisture-adc').textContent = a;
+					    }
+					}
+				}
+		        
+		        document.getElementById('background').onclick = function() {
+			    	var modal = new bootstrap.Modal(document.getElementById('plant-Type'));
+		            modal.show();
 
-	            $('#led').on('click',function () {
+		            var svgPlant = document.getElementById('svgPlant');
+				    svgPlant.innerHTML = '';
+				    
+		            var xhr = new XMLHttpRequest();
+				    xhr.open('GET', 'svg', true);
+				    xhr.send();
+				    xhr.onload = function(e) {
+			        	var s = xhr.responseText.split('\n');
+
+			        	var index = [];
+				        for (var i = 0; i < s.length; i++) {
+                        	(function(i) {
+	                        	index[i] = new XMLHttpRequest();
+				                index[i].open('GET', 'svg/' + s[i], true);
+				                index[i].send();
+				                index[i].onload = function(e) {
+									var parser = new DOMParser();
+									var htmlDoc = parser.parseFromString(index[i].responseText, 'text/html');
+									htmlDoc.getElementById('timeline').remove();
+
+									var div = htmlDoc.getElementsByTagName('svg')[0];
+									div.id = s[i];
+									div.className = 'row w-50';
+									div.onclick = function() {
+										var id = this.id;
+										saveSetting(20, i, function() { loadSVG(id); modal.hide(); });
+						            }
+				                	svgPlant.appendChild(div);
+				                }
+			                })(i);
+                        }
+				    }
+			    }
+
+	            document.getElementById('graph').onclick = function() {
+	                window.location.href = 'graph.html';
+	            }
+
+	            document.getElementById('led').onclick = function() {
 	                var x = document.getElementById('led-enabled');
 				  	if (x.style.display === 'block') {
 				  		x.style.display = 'none';
-				   		saveSetting(19, 0);
+				   		saveSetting(21, 0);
 				  	} else {
 				   		x.style.display = 'block';
 				    	document.getElementById('power-text').textContent = 8;
-				    	saveSetting(19, 1);
-	                	saveSetting(20, 8);
+				    	saveSetting(21, 1);
+	                	saveSetting(22, 8);
 				  	}
-	            });
+	            }
 
-		        $('#timer').on('click',function () {
-		            //var timerModal = new bootstrap.Modal(document.getElementById('moisture-Settings'), {backdrop: true});
-		            //timerModal.show();
-		            window.location.href = '#moisture-Settings';
-		            document.getElementById('moisture-Settings').style.display = 'block';
+		        document.getElementById('timer').onclick = function() {
+		            var modal = new bootstrap.Modal(document.getElementById('moisture-Settings'));
+		            modal.show();
 
 		            $("#moisture-Slider").roundSlider({
 		                value: document.getElementById('timer-text').textContent,
@@ -138,21 +190,21 @@ document.addEventListener("DOMContentLoaded", function(event)
 		                        $('#timer-disabled').hide();
 		                        $('#timer-enabled').show();
 
-		                        $.iGrowl({ type: 'error', message:  'Timer disables Soil Sensor' });
+		                        notify('', 'Timer disables Soil Sensor', 'danger');
 		                        if(args.value < 8) //less than 8 hours
-		                            $.iGrowl({ type: 'notice', message:  'Timer is Low! No Overwater protection'});
-		                        $.iGrowl({ type: 'info', message:  'Enable when issues with Sensor'});
+		                        	notify('', 'Timer is Low! No Overwater protection', 'warning');
+		                        notify('', 'Enable when issues with Sensor', 'info');
 		                    }
-		                    saveSetting(17, args.value);
+		                    saveSetting(18, args.value);
 		                }
 		            });
 		            //$('#timer-enabled').toggle('slow');
 		            //$('#timer-disabled').toggle('slow');
-		        });
+		        }
 		        
-		        $('#moisture').on('click',function () {
-		            window.location.href = '#moisture-Settings';
-		            document.getElementById('moisture-Settings').style.display = 'block';
+		        document.getElementById('moisture').onclick = function() {
+		        	var modal = new bootstrap.Modal(document.getElementById('moisture-Settings'));
+		            modal.show();
 
 		            $("#moisture-Slider").roundSlider({
 		                value: document.getElementById('moisture-text').textContent,
@@ -166,14 +218,14 @@ document.addEventListener("DOMContentLoaded", function(event)
 		                max: 1000,
 		                change: function (args) {
 		                    document.getElementById('moisture-text').textContent = args.value;
-		                    saveSetting(16, args.value);
+		                    saveSetting(17, args.value);
 		                }
 		            });
-		        });
-		        
-		        $('#pot-size').on('click',function () {
-		            window.location.href = '#pot-size-Settings';
-		            document.getElementById('pot-size-Settings').style.display = 'block';
+		        }
+
+		        document.getElementById('pot-size').onclick = function() {
+		        	var modal = new bootstrap.Modal(document.getElementById('pot-size-Settings'));
+		            modal.show();
 
 		            $("#pot-size-Slider").roundSlider({
 		                value: document.getElementById('pot-size-text').textContent,
@@ -187,14 +239,14 @@ document.addEventListener("DOMContentLoaded", function(event)
 		                max: 40,
 		                change: function (args) {
 		                    document.getElementById('pot-size-text').textContent = args.value;
-		                    saveSetting(15, args.value);
+		                    saveSetting(16, args.value);
 		                }
-		            });
-		        });
+		            })
+		        }
 
-		        $('#power').on('click',function () {
-		            window.location.href = '#power-Settings';
-		            document.getElementById('power-Settings').style.display = 'block';
+				document.getElementById('power').onclick = function() {
+		        	var modal = new bootstrap.Modal(document.getElementById('power-Settings'));
+		            modal.show();
 
 		            $("#power-Slider").roundSlider({
 		                value: document.getElementById('power-text').textContent,
@@ -208,102 +260,102 @@ document.addEventListener("DOMContentLoaded", function(event)
 		                max: 60,
 		                change: function (args) {
 		                	if(args.value == 0) {
-		                		$.iGrowl({ type: 'error', message: 'Sleep Disabled!' });
-		                		$.iGrowl({ type: 'notice', message: 'Battery Will Discharge Quickly!' });
+		                		notify('', 'Sleep Disabled!', 'danger');
+		                		notify('', 'Battery Will Discharge Quickly!', 'warning');
 		                	}else if(args.value < 10) {
-		                		$.iGrowl({ type: 'notice', message: 'Low Sleep = High Power Consumption!' });
-		                		$.iGrowl({ type: 'success', message: 'Sleep > 10 Seconds Recommended' });
+		                		notify('', 'Low Sleep = High Power Consumption!', 'warning');
+		                		notify('', 'Sleep > 10 Seconds Recommended', 'success');
 		                	}
 		                    document.getElementById('power-text').textContent = args.value;
-		                    saveSetting(20, args.value);
+		                    saveSetting(22, args.value);
 		                }
-		            });
-		        });
+		            })
+		        }
 
-		        $('#soil').on('click',function () {
-		            window.location.href = '#soil-Settings';
-		            document.getElementById('soil-Settings').style.display = 'block';
+		        document.getElementById('soil').onclick = function() {
+		        	var modal = new bootstrap.Modal(document.getElementById('soil-Settings'));
+		            modal.show();
 		            
-		            var svgSoil = document.querySelector('#svgSoil');
+		            var svgSoil = document.getElementById('svgSoil');
 
-		            if (typeof SVGRect != "undefined") {
-		                var ajax = new XMLHttpRequest();
-		                ajax.open('GET', 'svg/soil.svg', true);
-		                ajax.send();
-		                ajax.onload = function(e) {
-		                	svgSoil.innerHTML = ajax.responseText;
+		            if (typeof SVGRect != undefined) {
+		                var xhr = new XMLHttpRequest();
+		                xhr.open('GET', 'svg/soil.svg', true);
+		                xhr.send();
+		                xhr.onload = function(e) {
+		                	svgSoil.innerHTML = xhr.responseText;
 
 		                	//$('#svgSoil').width($('#soil-Settings div').clientWidth);
-							$('#soil-moss').on('click',function () {
+		                	document.getElementById('soil-moss').onclick = function() {
 								var moss_color = $('#soil-moss-badge')[0].firstElementChild.attributes.fill.value;
 								document.getElementById('soil-type-color').style.fill = moss_color;
-						        document.getElementById('soil-text').textContent = soil_type_labels[0];
-						        saveSetting(18, 0);
-						    });
-						    $('#soil-loam').on('click',function () {
+						        document.getElementById('soil-text').style.fill = moss_color;
+						        document.getElementById('soil-type-text').textContent = soil_type_labels[0];
+						        saveSetting(19, 0, function() { modal.hide(); });
+						    }
+						    document.getElementById('soil-loam').onclick = function() {
 						    	var loam_color = $('#soil-loam-badge')[0].firstElementChild.attributes.fill.value;
 								document.getElementById('soil-type-color').style.fill = loam_color;
-						        document.getElementById('soil-text').textContent = soil_type_labels[1];
-						        saveSetting(18, 1);
-						    });
-						    $('#soil-dirt').on('click',function () {
+						        document.getElementById('soil-text').style.fill = loam_color; //
+						        document.getElementById('soil-type-text').textContent = soil_type_labels[1];
+						        saveSetting(19, 1, function() { modal.hide(); });
+						    }
+						    document.getElementById('soil-dirt').onclick = function() {
 								var dirt_color = $('#soil-dirt-badge')[0].firstElementChild.attributes.fill.value;
 								document.getElementById('soil-type-color').style.fill = dirt_color;
-						        document.getElementById('soil-text').textContent = soil_type_labels[2];
-						        saveSetting(18, 2);
-						    });
-						    $('#soil-clay').on('click',function () {
+						        document.getElementById('soil-text').style.fill = dirt_color;
+						        document.getElementById('soil-type-text').textContent = soil_type_labels[2];
+						        saveSetting(19, 2, function() { modal.hide(); });
+						    }
+						    document.getElementById('soil-clay').onclick = function() {
 						    	var clay_color = $('#soil-clay-badge')[0].firstElementChild.attributes.fill.value;
 						    	document.getElementById('soil-type-color').style.fill = clay_color;
-						        document.getElementById('soil-text').textContent = soil_type_labels[3];
-						        saveSetting(18, 3);
-						    });
-						    $('#soil-sand').on('click',function () {
+						        document.getElementById('soil-text').style.fill = clay_color;
+						        document.getElementById('soil-type-text').textContent = soil_type_labels[3];
+						        saveSetting(19, 3, function() { modal.hide(); });
+						    }
+						    document.getElementById('soil-sand').onclick = function() {
 						    	var sand_color = $('#soil-sand-badge')[0].firstElementChild.attributes.fill.value;
 						    	document.getElementById('soil-type-color').style.fill = sand_color;
-						        document.getElementById('soil-text').textContent = soil_type_labels[4];
-						        saveSetting(18, 4);
-						    });
-						    $('#soil-rock').on('click',function () {
+						        document.getElementById('soil-text').style.fill = sand_color;
+						        document.getElementById('soil-type-text').textContent = soil_type_labels[4];
+						        saveSetting(19, 4, function() { modal.hide(); });
+						    }
+						    document.getElementById('soil-rock').onclick = function() {
 						    	var rock_color = $('#soil-rock-badge')[0].firstElementChild.attributes.fill.value;
 						    	document.getElementById('soil-type-color').style.fill = rock_color;
-						        document.getElementById('soil-text').textContent = soil_type_labels[5];
-						        saveSetting(18, 5);
-						    });
+						        document.getElementById('soil-text').style.fill = rock_color;
+						        document.getElementById('soil-type-text').textContent = soil_type_labels[5];
+						        saveSetting(19, 5, function() { modal.hide(); });
+						    }
 		                }
 		            }
-		        });
-
-		        $(".modalDialog").click(function( event ) {
-		            //event.preventDefault();
-		            if (event.target !== this)
-		                return;
-		            //console.log(event.target);
-		            this.style.display = 'none';
-		        });
-
-		        document.querySelector(".close").addEventListener("click", function(event) {
-		            //event.preventDefault();
-		            this.parentElement.parentElement.parentElement.parentElement.style.display = 'none';
-		        });
+		        }
 		        
-		        $('#wireless').on('click',function () {
-		            window.location.href = '#wirelessSettings';
-		            document.getElementById('wirelessSettings').style.display = 'block';
+		        document.getElementById('wireless').onclick = function() {
+		        	var modal = new bootstrap.Modal(document.getElementById('wirelessSettings'));
+		            modal.show();
 
 		            var nvram = new XMLHttpRequest();
 		            nvram.responseType = 'json';
 		            //nvram.overrideMimeType('application/json');
-		            nvram.open('GET', '/nvram', true);
+		            nvram.open('GET', 'nvram', true);
 		            nvram.send();
 		            nvram.onload = function(e) {
-		                try{
+		                try {
 		                    var data = nvram.response; //nvram.responseText;
-		                    document.getElementById('firmwareVersion').textContent = 'Firmware Version: ' + data['nvram'][0];
+		                    document.getElementById('sdkVersion').textContent = 'Bootloader Version: ' + data['nvram'][0].split('|')[0];
+		                    document.getElementById('firmwareVersion').textContent = 'Firmware Version: ' + data['nvram'][0].split('|')[1];
 		                    if(data['nvram'][1] == '0') {
 		                        $('#WiFiModeAP').prop('checked', true);
-		                    }else{
+		                       	document.getElementById('AlertInfo').classList.add('d-none');
+		                    }else if(data['nvram'][1] == '1') {
 		                        $('#WiFiModeClient').prop('checked', true);
+		                        document.getElementById('AlertInfo').classList.remove('d-none');
+		                    }else if(data['nvram'][1] == '2') {
+		                        $('#WiFiModeClientEnt').prop('checked', true);
+		                        document.getElementById('AlertInfo').classList.remove('d-none');
+		                        document.getElementById('WiFiUsername').removeAttribute('disabled');
 		                    }
 		                    var bool_value = data['nvram'][2] == '1' ? true : false;
 		                    $('#WiFiHidden').val(data['nvram'][2]);
@@ -312,12 +364,13 @@ document.addEventListener("DOMContentLoaded", function(event)
 		                    $("#WiFiPower").val(data["nvram"][4]);
 		                    $('#WiFiChannel').val(data['nvram'][5]);
 		                    $('#WiFiSSID').val(data['nvram'][6]);
-		                    bool_value = data['nvram'][7] == '1' ? true : false;
-		                    $('#EnableLOG').val(data['nvram'][7]);
-		                    $('#EnableLOGCheckbox').prop('checked', bool_value);
-		                    $('#EnableLOGInterval').val(data['nvram'][8]);
+		                    $('#WiFiUsername').val(data['nvram'][7]);
 		                    bool_value = data['nvram'][9] == '1' ? true : false;
-		                    $('#WiFiDHCP').val(data['nvram'][9]);
+		                    $('#EnableLOG').val(data['nvram'][9]);
+		                    $('#EnableLOGCheckbox').prop('checked', bool_value);
+		                    $('#EnableLOGInterval').val(data['nvram'][10]);
+		                    bool_value = data['nvram'][11] == '1' ? true : false;
+		                    $('#WiFiDHCP').val(data['nvram'][11]);
 		                    $('#WiFiDHCPCheckbox').prop('checked', bool_value);
 		                    if(bool_value == true) {
 		                        $('#WiFiIP').prop('disabled', false);
@@ -325,34 +378,55 @@ document.addEventListener("DOMContentLoaded", function(event)
 		                        $('#WiFiGateway').prop('disabled', false);
 		                        $('#WiFiDNS').prop('disabled', false);
 		                    }
-		                    $('#WiFiIP').val(data['nvram'][10]);
-		                    $('#WiFiSubnet').val(data['nvram'][11]);
-		                    $('#WiFiGateway').val(data['nvram'][12]);
-		                    $('#WiFiDNS').val(data['nvram'][13]);
+		                    $('#WiFiIP').val(data['nvram'][12]);
+		                    $('#WiFiSubnet').val(data['nvram'][13]);
+		                    $('#WiFiGateway').val(data['nvram'][14]);
+		                    $('#WiFiDNS').val(data['nvram'][15]);
+
+		                    bool_value = data['nvram'][23] == '1' ? true : false;
+		                    $('#AlertLowPower').val(data['nvram'][23]);
+		                    $('#AlertLowPowerCheckbox').prop('checked', bool_value);
+		                    bool_value = data['nvram'][24] == '1' ? true : false;
+		                    $('#AlertWater').val(data['nvram'][24]);
+		                    $('#AlertWaterCheckbox').prop('checked', bool_value);
+		                    bool_value = data['nvram'][25] == '1' ? true : false;
+		                    $('#AlertEmpty').val(data['nvram'][25]);
+		                    $('#AlertEmptyCheckbox').prop('checked', bool_value);
+
+		                    $('#AlertEmail').val(data['nvram'][26]);
+		                    $('#AlertPlantName').val(data['nvram'][27]);
+
+		                    bool_value = data['nvram'][28] == '1' ? true : false;
+		                    $('#AlertSMTPTLS').val(data['nvram'][28]);
+		                    $('#AlertSMTPTLSCheckbox').prop('checked', bool_value);
+
+		                    $('#AlertSMTPServer').val(data['nvram'][29]);
+		                    $('#AlertSMTPUsername').val(data['nvram'][30]);
 
 					        $('#EnableLOGInterval').on('input', function() {
 				                var v = parseInt(this.value);
 				                if(v < 10) {
-				                    notify('Log Interval ' + v + ' is low, Flash may fill up fast!', '', 'warning', 'toastWireless');
+				                    notify('','Log Interval ' + v + ' is low, Flash may fill up fast!', 'warning');
 				                }
 				            });
 
-				            $('#wireless-settings-ok').click(function() {
+					        document.getElementById('wireless-settings-ok').onclick = function() {
 				                if($('#EnableLOGCheckbox').prop('checked') == true) {
 				                	var loginterval = $('#EnableLOGInterval').val();
-				                	//console.log(loginterval  + " < " + data['nvram'][19]);
-					            	if(loginterval > 0 && loginterval < data['nvram'][19]) {
+				                	//console.log(loginterval  + " < " + data['nvram'][21]);
+					            	if(loginterval > 0 && loginterval < data['nvram'][21]) {
 					            		
-										var ajax = new XMLHttpRequest();
-									    ajax.open('GET', '/nvram?offset=20&value=' + loginterval, false);
-									    ajax.send();
-
-					            		$.iGrowl({ type: 'error', message:  'Deep Sleep is longer than Graph Interval'});
-										$.iGrowl({ type: 'success', message:  'Adjusting Deep Sleep ...'});
+									    saveSetting(20, loginterval);
+										notify('','Deep Sleep is longer than Graph Interval', 'danger');
+										notify('','Adjusting Deep Sleep ...', 'sucess');
 					            	}
 					            }
-				                $('#wirelessSettingsForm').submit();
-				            });
+				                document.getElementById('wirelessSettingsForm').submit();
+				            };
+
+				            document.getElementById('alert-settings-ok').onclick = function() {
+				                document.getElementById('alertSettingsForm').submit();
+				            };
 
 		                }catch{}
 		            }
@@ -361,54 +435,56 @@ document.addEventListener("DOMContentLoaded", function(event)
 		                $('#formLittleFS').attr('action', 'http://' + window.location.hostname + "/update"); //force HTTP
 		                progressTimer(80);
 		                document.getElementById('formLittleFS').submit();
-		            });
+		            })
 
 		            $('#fileFirmware').change(function() {
 		                $('#formFirmware').attr('action', 'http://' + window.location.hostname + "/update"); //force HTTP
 		                progressTimer(20);
 		                document.getElementById('formFirmware').submit();
-		            });
+		            })
 
 		            $('#browseLittleFS').click(function() {
 		                $('#fileLittleFS').trigger('click');
-		            });
+		            })
 
 		            $('#browseFirmware').click(function(){
 		                $('#fileFirmware').trigger('click');
-		            });
-		        });
+		            })
+		        }
 		    }
-	    //} else {  // Fallback to png
-	    //target.innerHTML = "<img src='" + url + ".png' />";
+
+	    } else {  // No SVG
+	    	notify('','The browser does not support SVG graphics', 'danger');
 	    }
-	}
-        
-    /*$('#svgInteractive').load('interactive.svg',function(response){
-        $(this).addClass('svgLoaded');
+    }
+};
 
-
-        if(!response){ // Error loading SVG
-            $(this).html('Error loading SVG. Be sure you are running from http protocol (not locally)');
-        }
-    });*/
-});
-
-function saveSetting(offset, value) {
+function saveSetting(offset, value, callback) {
 
     var xhr = new XMLHttpRequest();
-    xhr.open('GET', '/nvram?offset=' + offset + '&value=' + value, true);
+    xhr.open('GET', 'nvram?offset=' + offset + '&value=' + value, true);
     xhr.send();
+    xhr.onload = function(e) {
+    	if(callback) callback(e);
+    }
+    //notify('',request.responseText, 'danger');
+};
 
-    //notify(request.responseText , '', 'danger');
+function HiddenInput(id, value) {
+    if(value == true) {
+        document.getElementById(id).removeAttribute('disabled');
+    }else{
+       document.getElementById(id).setAttribute('disabled', 'disabled');
+    }
 };
 
 function HiddenCheck(id, element) {
     console.log(id);
 
     if(element.checked) {
-        $('#' + id).val(1);
+        document.getElementById(id).value = 1;
     }else{
-        $('#' + id).val(0);
+        document.getElementById(id).value = 0;
     }
 
     if(id == 'WiFiDHCP') {
@@ -418,30 +494,30 @@ function HiddenCheck(id, element) {
             var wifi_mode = document.getElementsByName('WiFiMode');
             console.log(wifi_mode[0].checked);
             if(wifi_mode[0].checked) {
-                notify('DHCP works only in WiFi Client mode' , '', 'warning', 'toastWireless');
+                notify('','DHCP works only in WiFi Client mode', 'warning');
             }
             b = true;
         }
-        $('#WiFiIP').prop('disabled',  b);
-        $('#WiFiSubnet').prop('disabled', b);
-        $('#WiFiGateway').prop('disabled', b);
-        $('#WiFiDNS').prop('disabled', b);
+        document.getElementById('WiFiIP').setAttribute('disabled', b);
+        document.getElementById('WiFiSubnet').setAttribute('disabled', b);
+        document.getElementById('WiFiGateway').setAttribute('disabled', b);
+        document.getElementById('WiFiDNS').setAttribute('disabled', b);
     }
 };
 
 function NVRAMtoSVG(data)
 {
-    if(data['nvram'][7] == '1') {
+    if(data['nvram'][9] == '1') {
         $('#graph-enabled').show();
     }else{
         $('#graph-enabled').hide();
     }
-    if(data['nvram'][18] == '1') {
+    if(data['nvram'][21] == '1') {
         $('#led-enabled').show();
     }else{
         $('#led-enabled').hide();
     }
-    if (data['nvram'][16] == '0') {
+    if (data['nvram'][18] == '0') {
         $('#timer-enabled').hide();
         $('#timer-disabled').show();
     }else{
@@ -449,75 +525,64 @@ function NVRAMtoSVG(data)
         $('#timer-enabled').show();
     }
     
-    document.getElementById('pot-size-text').textContent = data['nvram'][14];
-    document.getElementById('moisture-text').textContent = data['nvram'][15];
-    document.getElementById('timer-text').textContent = data['nvram'][16];
-    document.getElementById('power-text').textContent = data['nvram'][19];
-    document.getElementById('soil-text').textContent = soil_type_labels[data['nvram'][17]];
-    document.getElementById('soil-type-color').style.fill = soil_type_color[data['nvram'][17]];
+    document.getElementById('pot-size-text').textContent = data['nvram'][16];
+    document.getElementById('moisture-text').textContent = data['nvram'][17];
+    document.getElementById('timer-text').textContent = data['nvram'][18];
+    document.getElementById('power-text').textContent = data['nvram'][22];
+    document.getElementById('soil-type-color').style.fill = soil_type_color[data['nvram'][19]];
+    document.getElementById('soil-text').style.fill = soil_type_color[data['nvram'][19]];
+    document.getElementById('soil-type-text').textContent = soil_type_labels[data['nvram'][19]];
 };
-
-
 
 function formValidate() {
     WiFiPasswordConfirm.setCustomValidity(WiFiPasswordConfirm.value != WiFiPassword.value ? 'Passwords do not match.' : '');
 };
 
 function notify(messageHeader, messageBody, bg, id) {
-    //var myToast = document.getElementById('myToast');
-    //var toast = new bootstrap.Toast(myToast, {delay: 3000});
-    //toast.show();
-    var toastElList = [];
 
-    if(id != undefined) {
-        toastElList.push(document.getElementById(id));
-    }else{
-        toastElList = [].slice.call(document.querySelectorAll('.toast'));
-    }
-    toastElList[0].className = 'toast text-white ml-auto w-100';
-    toastElList[0].classList.add('bg-' + bg);
+    var toast = document.createElement('div');
+    toast.className = 'toast fade show text-white zindex-popover bg-' + bg;
+    toast.setAttribute('role', 'alert');
+    toast.setAttribute('aria-live', 'assertive');
+    toast.setAttribute('aria-atomic', 'true');
 
     if (messageHeader != '') {
-        toastElList[0].children[0].className = 'toast-header text-white';
-        toastElList[0].children[0].classList.add('bg-' + bg);
-        toastElList[0].children[0].children[0].textContent = messageHeader;
+    	var toastHeader = document.createElement('div');
+        toastHeader.className = 'toast-header text-white bg-' + bg;
+        toastHeader.textContent = messageHeader;
+        
+        var btnClose = document.createElement('button');
+        btnClose.className = 'btn-close';
+        btnClose.setAttribute('data-bs-dismiss', 'toast');
+		toastHeader.appendChild(btnClose);
+		
+    	toast.appendChild(toastHeader);
     }
 
     if (messageBody != '') {
         var toastBody = document.createElement('div');
         toastBody.className = 'toast-body';
         toastBody.textContent = messageBody;
-        toastElList[0].appendChild(div);
+        toast.appendChild(toastBody);
     }
 
-    var toastList = toastElList.map(function (toastEl) {
-      return new bootstrap.Toast(toastEl, {delay:5000})
-    })
-    toastList[0].show();
+    document.getElementById('notify').appendChild(toast);
+
+   	var toastNotify = new bootstrap.Toast(toast, {delay: 5000});
+   	toastNotify.show();
+
+	toast.addEventListener('hidden.bs.toast', function () {
+	  document.getElementById('notify').removeChild(this);
+	})
 };
 
 function sleep(ms) {
   return new Promise(resolve => setTimeout(resolve, ms));
-}
+};
 
-async function testPump()
+function testPump()
 {
-    $.ajax('usb.php?eeprom=write&offset=' + ee + ',' + e_deepSleep + '&value=' + parseInt(0xEB) + ',0', {
-        success: function(data) {
-            debug = 0xEB;
-            $.notify({ message: 'Pump Test Ready ...' }, { type: 'success' });
-            setTimeout(async function () {
-                for (var i = 8; i > 0; i--) {
-                    $.notify({ message: i }, { type: 'warning'});
-                    await sleep(1000);
-                }
-                setTimeout(async function () {
-                    $.notify({ message: 'Self Test Complete' }, { type: 'success'});
-                    sendStop();
-                }, refreshSpeed);
-            }, 4000);
-        }
-    });
+
 };
 
 function calcNextWaterCycle(start, stop, size)
@@ -553,31 +618,6 @@ function calcNextWaterCycle(start, stop, size)
 		console.log('Hours: ' + hours);
 	}
 	return days;
-};
-
-function detectTheme()
-{
-    var t; // = getCookie('theme');
-    if(t == undefined) {
-        if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
-            return '.slate';
-        }else{
-            return ''
-        }
-    }
-    return t;
-};
-
-function switchTheme(element,dark,light) {
-     if(theme == '') {
-        var e = $(element + '.' + dark);
-        e.removeClass(dark);
-        e.addClass(light);
-    }else{
-        var e = $(element + '.' + light);
-        e.removeClass(light);
-        e.addClass(dark);
-    }
 };
 
 function checkFirmwareUpdates(v)

@@ -83,10 +83,20 @@ var Preloader = {
             Preloader.overlay && (Preloader.overlay.remove(), Preloader.overlay = null)
         });
         this.overlay.addClass("complete");
-        $(document.body).removeClass("preloader");
+        document.body.classList.remove("preloader");
         this.on_complete && this.on_complete()
     }
 };
-setTimeout(function() {
-    $(document).ready(Preloader.init)
+
+function ready(callback) {
+    // in case the document is already rendered
+    if (document.readyState != 'loading') callback();
+    else if (document.addEventListener) document.addEventListener('DOMContentLoaded', callback);
+    else document.attachEvent('onreadystatechange', function(){
+        if (document.readyState == 'complete') callback();
+    });
+};
+
+ready(function() {
+    Preloader.init();
 });

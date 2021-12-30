@@ -6,7 +6,7 @@ Monitor soil moisture and water plant. Portable and high efficiency with lithium
 
 This is the next evolution from the original [ATtiny13 Plant](https://github.com/dimecho/ATtiny13-Plant).
 
-- WiFi (Web Interface)
+- WiFi (Web Interface) :seedling: [View Demo](https://dimecho.github.io/ESPTiny-Plant/Web/index.html)
 - Battery Deep Sleep (20μA)
 - Modular PCB (ESP-12E Module, TP4056)
 
@@ -78,17 +78,6 @@ Flashing Options:
 3. USB-Serial/TTL - Script "littlefs" (Mac)
 
 ![Flash](Web/img/flash.png?raw=true)
-
-## Bootloader (SDK)
-
-The ESP requires a bootloader, normally loaded by the manufacturer.
-
-Two Options:
-
-1. [Espressif NONOS SDK](https://www.espressif.com/en/support/download/sdks-demos) (Original)
-2. [NodeMCU with ADC](https://nodemcu-build.com) (Open-Source)
-
-Run "bootloader" (Mac)
 
 ## License
 

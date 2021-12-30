@@ -36,4 +36,5 @@ for f in $(find data -type f -name '*.*' ! -name '*.key' ! -name '*.cer'); do
     mv "$f.gz" "$f"
 done
 
-./tools/mklittlefs -c ./data/ -b 8192 -p 256 -s 680000 flash-littlefs.bin
+mkdir -p build
+./tools/mklittlefs -c ./data/ -b 8192 -p 256 -s 680000 ./build/flash-littlefs.bin
