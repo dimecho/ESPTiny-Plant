@@ -20,28 +20,28 @@ extern "C" {
 #include "version.h"
 
 #define DEBUG false
-#define EEPROM_ID 0x3BDAB904  //Identify Sketch by EEPROM
+#define EEPROM_ID 0x3BDAB905  //Identify Sketch by EEPROM
 
 //ESP-01
 //Pin 1 = Rx = GPIO3
 //Pin 8 = Tx = GPIO1
 
-#ifdef ARDUINO_ESP8266_NODEMCU
+#if defined ARDUINO_ESP8266_NODEMCU_ESP12 || defined ARDUINO_ESP8266_NODEMCU_ESP12E
 #define pumpPin 5  //Output (D1 NodeMCU)
 #else
 #define pumpPin 3  //RX Output
 #endif
-#ifdef ARDUINO_ESP8266_NODEMCU
+#if defined ARDUINO_ESP8266_NODEMCU_ESP12 || defined ARDUINO_ESP8266_NODEMCU_ESP12E
 #define sensorPin 4  //Output (D2 NodeMCU)
 #else
 #define sensorPin 1  //TX Output
 #endif
-#ifdef ARDUINO_ESP8266_NODEMCU
+#if defined ARDUINO_ESP8266_NODEMCU_ESP12 || defined ARDUINO_ESP8266_NODEMCU_ESP12E
 #define watersensorPin 12  //Output (D6 NodeMCU)
 #else
 #define watersensorPin 3  //RX Output
 #endif
-#ifdef ARDUINO_ESP8266_NODEMCU
+#if defined ARDUINO_ESP8266_NODEMCU_ESP12 || defined ARDUINO_ESP8266_NODEMCU_ESP12E
 #define ledPin 2  //Output (D4 NodeMCU)
 #else
 #define ledPin 1  //Output
@@ -49,18 +49,28 @@ extern "C" {
 #define moistureSensorPin A0  //Input
 //#define deepsleepPin                16  //GPIO16 to RESET (D0 NodeMCU)
 
-#define delayBetweenRefillReset 7200000000      //2 x 60 x 60 x 1000000 = 2 hours
-#define delayBetweenOverfloodReset 28800000000  //8 x 60 x 60 x 1000000 = 8 hours
+#define delayBetweenRefillReset 4      //2 hours = 2 x 60 = 120 minutes = x4 30 min loops
+#define delayBetweenOverfloodReset 16  //8 hours = 8 x 60 = 480 minutes = x16 30 min loops
 #define UART_BAUDRATE 115200
 
 #define text_html "text/html"
 #define text_plain "text/plain"
 #define text_json "application/json"
 
+/*
+----------------
+Integer Maximums
+----------------
+uint8 = 0 - 127
+uint16 = 0 - 32,767
+uint32 = 0 - 2,147,483,647
+*/
+
 //The total RTC memory of ESP8266 is 512 bytes
 struct {
   byte sleepReason;
-  uint32_t syncTimer;
+  uint16_t syncTimer;
+  uint16_t loopTimer;
   uint8_t emptyBottle;
   uint16_t moistureLog;
   uint16_t errorCode;
@@ -92,19 +102,19 @@ char ACCESS_POINT_PASSWORD[] = "";
 uint8_t ACCESS_POINT_CHANNEL = 7;
 uint8_t ACCESS_POINT_HIDE = 0;
 uint8_t DATA_LOG = 0;        //data logger (enable/disable)
-uint32_t LOG_INTERVAL = 60;  //filesystem data collection - seconds as microseconds
+uint32_t LOG_INTERVAL = 60;  //filesystem data collection - seconds
 uint8_t NETWORK_DHCP = 0;
 char NETWORK_IP[] = "192.168.8.8";
 char NETWORK_SUBNET[] = "255.255.255.0";
 char NETWORK_GATEWAY[] = "192.168.8.8";
 char NETWORK_DNS[] = "192.168.8.8";
-uint8_t PLANT_POT_SIZE = 4;          //seconds of pump
+uint8_t PLANT_POT_SIZE = 4;          //pump run timer - seconds
 uint16_t PLANT_SOIL_MOISTURE = 700;  //ADC value
-uint32_t PLANT_MANUAL_TIMER = 0;     //hours as microseconds
+uint8_t PLANT_MANUAL_TIMER = 0;      //manual sleep timer - hours
 uint8_t PLANT_SOIL_TYPE = 2;         //['Sand', 'Clay', 'Dirt', 'Loam', 'Moss'];
 uint8_t PLANT_TYPE = 0;              //['Bonsai', 'Monstera', 'Palm'];
 uint8_t PLANT_LED = 0;               //LED
-uint32_t DEEP_SLEEP = 30;            //seconds
+uint32_t DEEP_SLEEP = 30;            //auto sleep timer - seconds
 int ADC_ERROR_OFFSET = 0;            //wire resistance - unit individual
 //=============================
 uint8_t POWER_ALERT = 0;  //low port alert (enable/disable)
@@ -129,6 +139,7 @@ ADC_MODE(ADC_TOUT);
 //ADC_MODE(ADC_VCC);
 
 uint8_t wakeupReason = 0;
+bool testPump = false;
 
 uint16_t div3(uint16_t n);
 
@@ -176,10 +187,14 @@ void setup() {
 
 #if DEBUG
   Serial.begin(UART_BAUDRATE, SERIAL_8N1);
-  //Serial.setDebugOutput(true);
-  Serial.println("Wakeup Reason:");
-  Serial.println(wakeupReason);
+  Serial.setDebugOutput(true);
+  Serial.println("Wakeup Reason:" + wakeupReason);
   //printMemory();
+
+  //ESP8266 Core 2.2.2 Deep Sleep is 32bit about 2,147,483,647 = 35 min
+  //ESP8266 Core 2.4.1 Deep Sleep is 64bit about 12,731,80,9786 = 3h 30min
+
+  //Serial.println("deepSleepMax: " + uint64ToString(ESP.deepSleepMax()));
 #endif
 
   LittleFS.begin();
@@ -191,7 +206,6 @@ void setup() {
   String nvram;
   long e = NVRAM_Read(0).toInt();
 #if DEBUG
-  Serial.setDebugOutput(true);
   Serial.print("EEPROM CRC Stored: 0x");
   Serial.println(e, HEX);
   Serial.print("EEPROM CRC Calculated: 0x");
@@ -253,29 +267,13 @@ void setup() {
 
     LittleFS.format();
   } else {
-
-    DATA_LOG = NVRAM_Read(9).toInt();
-    LOG_INTERVAL = NVRAM_Read(10).toInt();
-    //==========
-    PLANT_POT_SIZE = NVRAM_Read(16).toInt();
-    PLANT_SOIL_MOISTURE = NVRAM_Read(17).toInt();
-    PLANT_MANUAL_TIMER = NVRAM_Read(18).toInt();
-    PLANT_SOIL_TYPE = NVRAM_Read(19).toInt();
-    PLANT_TYPE = NVRAM_Read(20).toInt();
-    PLANT_LED = NVRAM_Read(21).toInt();
-    DEEP_SLEEP = NVRAM_Read(22).toInt();
-    //==========
-    POWER_ALERT = NVRAM_Read(23).toInt();
-    WATER_ALERT = NVRAM_Read(24).toInt();
-    EMPTY_ALERT = NVRAM_Read(25).toInt();
-    //==========
-    ADC_ERROR_OFFSET = NVRAM_Read(33).toInt();
+    NVRAM_Read_Config();
   }
   //EEPROM.end();
 
-  PLANT_MANUAL_TIMER = PLANT_MANUAL_TIMER * 60 * 1000000;
   DEEP_SLEEP = DEEP_SLEEP * 1000000;
   LOG_INTERVAL = LOG_INTERVAL * 1000;
+  PLANT_MANUAL_TIMER = PLANT_MANUAL_TIMER * 2;  //ESP8266 Core 2.2.2 - 1 hour intervals to 30 min intervals (double)
 
   if (wakeupReason == 5 && rtcData.sleepReason == 0) {
     LOG_INTERVAL = 0;
@@ -319,7 +317,7 @@ void setup() {
     enableWiFiAtBootTime();
 #endif
     WiFi.persistent(false);
-    
+
     WIFI_PHY_MODE = NVRAM_Read(3).toInt();
     WiFi.setPhyMode((WiFiPhyMode_t)WIFI_PHY_MODE);
     WIFI_PHY_POWER = NVRAM_Read(4).toInt();
@@ -338,7 +336,7 @@ void setup() {
       //=====================
       //WiFi Access Point Mode
       //=====================
-      
+
       WiFi.mode(WIFI_AP);
       WiFi.softAPConfig(ip, gateway, subnet);
       WiFi.softAP(ACCESS_POINT_SSID, ACCESS_POINT_PASSWORD, ACCESS_POINT_CHANNEL, ACCESS_POINT_HIDE);
@@ -473,12 +471,20 @@ void setup() {
       LittleFS.info(fs_info);
       request->send(200, text_plain, "<b>Format " + result + "</b><br/>Total Flash Size: " + String(ESP.getFlashChipSize()) + "<br>Filesystem Size: " + String(fs_info.totalBytes) + "<br>Filesystem Used: " + String(fs_info.usedBytes));
     });
-    server.on("/svg", HTTP_GET, [](AsyncWebServerRequest * request) {
-      String out = indexSVG("/svg");
-      request->send(200, text_plain, out);
+    server.on("/svg", HTTP_GET, [](AsyncWebServerRequest *request) {
+      String file = request->url();
+      if (file.endsWith(".svg") || file.endsWith(".css")) {
+        String contentType = getContentType(file);
+        AsyncWebServerResponse *response = request->beginResponse(LittleFS, file, contentType);
+        response->addHeader("Content-Encoding", "gzip");
+        request->send(response);
+      } else {
+        String out = indexSVG("/svg");
+        request->send(200, text_plain, out);
+      }
     });
     server.on("/pump", HTTP_GET, [](AsyncWebServerRequest *request) {
-      runPump();
+      testPump = true;
       request->send(200, text_plain, String(PLANT_POT_SIZE));
     });
     server.on("/adc", HTTP_GET, [](AsyncWebServerRequest *request) {
@@ -507,14 +513,27 @@ void setup() {
       restartRequired = true;
       request->send(200, text_plain, "...");
     });
+    server.on("/data.log", HTTP_GET, [](AsyncWebServerRequest *request) {
+      if (!LittleFS.exists(request->url())) {
+        DATA_LOG = 1;
+        NVRAM_Write(9, "1");
+        request->send(200, text_plain, "...");
+      } else {
+        AsyncWebServerResponse *response = request->beginResponse(LittleFS, request->url(), text_plain);
+        request->send(response);
+      }
+    });
     server.on("/clearlog", HTTP_GET, [](AsyncWebServerRequest *request) {
       LittleFS.remove("data.log");
+      DATA_LOG = 0;
+      NVRAM_Write(9, "0");
       request->send(200, text_plain, "...");
     });
     server.on("/nvram", HTTP_GET, [](AsyncWebServerRequest *request) {
       if (request->params() > 0) {
         int i = request->getParam(0)->value().toInt();
         NVRAM_Write(i, request->getParam(1)->value());
+        NVRAM_Read_Config();
         request->send(200, text_plain, request->getParam(1)->value());
       } else {
         uint8_t mask[] = { 8, 31 };
@@ -644,6 +663,9 @@ void loop() {
     //WiFi.disconnect(true);  //Erases SSID/password
     //ESP.eraseConfig();
     ESP.restart();
+  } else if (testPump) {
+    testPump = false;
+    runPump();
   }
 
   if (millis() - syncTimer < LOG_INTERVAL) return;
@@ -702,6 +724,7 @@ void loop() {
     } else {
       blinkEmpty = 0;
       rtcData.syncTimer = 0;
+      //rtcData.loopTimer = 0;
       rtcData.emptyBottle = 0;
       rtcData.moistureLog = 0;
       rtcData.errorCode = 0;
@@ -728,18 +751,18 @@ void loop() {
           blinkEmpty = 1;
           blinky(900, 254, 1);
         }
-        if ((rtcData.emptyBottle > 10 && (rtcData.syncTimer + millis()) > delayBetweenRefillReset) || (rtcData.emptyBottle < 10 && (rtcData.syncTimer + millis()) > delayBetweenOverfloodReset)) {
+        //Use 30 min loops instead of millis() - 32bit not enough space to store millis()
+        if ((rtcData.emptyBottle > 10 && rtcData.syncTimer > delayBetweenRefillReset) || (rtcData.emptyBottle < 10 && rtcData.syncTimer > delayBetweenOverfloodReset)) {
           rtcData.syncTimer = 0;
           rtcData.emptyBottle = 0;
           rtcData.moistureLog = 0;
           dataLog("e:0");
         } else if (blinkDuration == 0) {  //skip if blinking but go to sleep when 0
           dataLog("e:sleep");
-          uint32_t halfhour = 30 * 60 * 1000000;     //30 minutes in millis
-          rtcData.syncTimer += millis() + halfhour;  //when it wakes up it will have proper time to compare
+          rtcData.syncTimer += 1;  //when it wakes up it will have proper 30 min loop to compare
           rtcData.sleepReason = 0;
           ESP.rtcUserMemoryWrite(0, (uint32_t *)&rtcData, sizeof(rtcData));
-          ESP.deepSleep(halfhour, WAKE_RF_DISABLED);
+          ESP.deepSleep(1800000000, WAKE_RF_DISABLED);  //30 minutes
         } else {
           return;  //while blinking
         }
@@ -769,8 +792,17 @@ void loop() {
           ESP.deepSleep(DEEP_SLEEP, WAKE_RF_DISABLED);  //Will wake up without radio
         }
       } else {
-        runPump();
-        ESP.deepSleep(PLANT_MANUAL_TIMER, WAKE_RF_DISABLED);  //Will wake up without radio
+        dataLog("t:" + String(rtcData.loopTimer));
+
+        //We need to split deep sleep as 32-bit unsigned integer is 4294967295 or 0xffffffff max ~71 minutes
+        if (rtcData.loopTimer >= PLANT_MANUAL_TIMER) {
+          rtcData.loopTimer = 0;
+          runPump();
+        } else {
+          rtcData.loopTimer += 1;
+        }
+        ESP.rtcUserMemoryWrite(0, (uint32_t *)&rtcData, sizeof(rtcData));
+        ESP.deepSleep(1800000000, WAKE_RF_DISABLED);  //Will wake up without radio - 30 min with loops
       }
 
     } else {
@@ -841,8 +873,7 @@ uint16_t div3(uint16_t n) {
   }
 */
 
-String indexSVG(String dir)
-{
+String indexSVG(String dir) {
   String out = "";
 
   Dir files = LittleFS.openDir(dir);
@@ -864,8 +895,8 @@ void dataLog(String text) {
       file.print(text);
       file.print('\n');
       file.close();
-      //} else {
-      //  LittleFS.remove("data.log");
+    } else {
+      LittleFS.remove("data.log");
     }
   }
 }
@@ -875,10 +906,41 @@ void runPump() {
   Serial.println("MOISTURE LIMIT:" + String(PLANT_SOIL_MOISTURE));
   Serial.println("TIMER:" + String(PLANT_MANUAL_TIMER));
 #endif
+  uint32_t duration = PLANT_POT_SIZE;
 
+  //Watering Map -  Different soils takes different time to soak the water
+  //===================
+  uint8_t moss[] = { 1, 0, 1, 0 };
+  uint8_t loam[] = { 1, 1, 0, 1 };
+  uint8_t sand[] = { 1, 1, 0, 0 };
+  uint8_t pulse[duration];
+  uint8_t arraymap = 0;
+
+  for (uint8_t x = 0; x <= sizeof(pulse); x++) {
+    if (arraymap == 4) {
+      arraymap = 0;
+    }
+    if (PLANT_SOIL_TYPE == 0) {
+      pulse[x] = moss[arraymap];
+    } else if (PLANT_SOIL_TYPE == 1) {
+      pulse[x] = loam[arraymap];
+    } else if (PLANT_SOIL_TYPE > 3) {
+      pulse[x] = sand[arraymap];
+    } else {
+      pulse[x] = 1;
+    }
+    arraymap++;
+  }
+  //===================
+
+  //pinMode(pumpPin, OUTPUT);
   digitalWrite(pumpPin, HIGH);  //ON
-  uint8_t duration = PLANT_POT_SIZE;
   do {
+    if (pulse[duration] == 1) {
+      digitalWrite(pumpPin, HIGH);  //ON
+    } else {
+      digitalWrite(pumpPin, LOW);  //OFF
+    }
     delay(1000);
     duration--;
   } while (duration > 0);
@@ -896,6 +958,7 @@ uint16_t sensorRead(uint8_t enablePin) {
   }
   //WiFi.mode(WIFI_OFF);
   //-----------------
+  //pinMode(enablePin, OUTPUT);
 
   /*
     adcAttachPin(moistureSensorPin);
@@ -1079,13 +1142,32 @@ void NVRAM_Write(uint32_t address, String txt) {
   EEPROM.commit();
 }
 
+void NVRAM_Read_Config() {
+  DATA_LOG = NVRAM_Read(9).toInt();
+  LOG_INTERVAL = NVRAM_Read(10).toInt();
+  //==========
+  PLANT_POT_SIZE = NVRAM_Read(16).toInt();
+  PLANT_SOIL_MOISTURE = NVRAM_Read(17).toInt();
+  PLANT_MANUAL_TIMER = NVRAM_Read(18).toInt();
+  PLANT_SOIL_TYPE = NVRAM_Read(19).toInt();
+  PLANT_TYPE = NVRAM_Read(20).toInt();
+  PLANT_LED = NVRAM_Read(21).toInt();
+  DEEP_SLEEP = NVRAM_Read(22).toInt();
+  //==========
+  POWER_ALERT = NVRAM_Read(23).toInt();
+  WATER_ALERT = NVRAM_Read(24).toInt();
+  EMPTY_ALERT = NVRAM_Read(25).toInt();
+  //==========
+  ADC_ERROR_OFFSET = NVRAM_Read(33).toInt();
+}
+
 String NVRAM_Read(uint32_t address) {
   char arrayToStore[32];
   EEPROM.get(address * sizeof(arrayToStore), arrayToStore);
 
   return String(arrayToStore);
 }
-
+/*
 char NVRAM_Read_Dynamic(uint32_t address) {
   char arrayToStore[32];
   EEPROM.get(address * sizeof(arrayToStore), arrayToStore);
@@ -1099,7 +1181,7 @@ char NVRAM_Read_Dynamic(uint32_t address) {
 
   return 0;
 }
-
+*/
 String getContentType(String filename) {
   if (filename.endsWith(".htm")) return text_html;
   else if (filename.endsWith(".html"))
@@ -1173,7 +1255,7 @@ void smtpSend(String subject, String body) {
 
   SMTPSession smtp;
 #if DEBUG
-    smtp.debug(1);
+  smtp.debug(1);
 #endif
 
   ESP_Mail_Session session;
@@ -1205,6 +1287,24 @@ void smtpSend(String subject, String body) {
   if (!MailClient.sendMail(&smtp, &message))
     Serial.println("Error sending Email, " + smtp.errorReason());
 }
+/*
+String uint64ToString(uint64_t input) {
+  String result = "";
+  uint8_t base = 10;
+
+  do {
+    char c = input % base;
+    input /= base;
+
+    if (c < 10)
+      c +='0';
+    else
+      c += 'A' - 10;
+    result = c + result;
+  } while (input);
+  return result;
+}
+*/
 //prints all rtcMemory, including the leading crc32
 /*
   void printMemory() {

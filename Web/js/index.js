@@ -66,7 +66,11 @@ function loadSVG(svgfile) {
 						svgfile = s[nvram.response['nvram'][20]]; //match index # to file name
 					}
 				}
-	    	}else if (svgfile == undefined) {
+				if(nvram.response['nvram'][9] == 1) {
+					notify('', 'Data collection is enabled.', 'info');
+				}
+			}
+			if (svgfile == undefined) {
 	    		svgfile = 'bonsai.svg';
 	    	}
 	    	
@@ -90,25 +94,22 @@ function loadSVG(svgfile) {
 	            adc.send();
 	            adc.onloadend = function() {
 				    if(xhr.status == 200) {
-				    	var a = adc.responseText;
-				    	//console.log(adc.responseText);
+				    	var a = parseInt(adc.responseText);
 				    	
-				    	if(Number.isInteger(a)) {
-					    	if(a > 1010 && a < 1024)
-		                    {
-		                        notify('', 'Detecting Excess Moisture!', 'danger');
-		                        if(nvram.response['nvram'][14] > 12) {
-		                            notify('', 'Lower Pot Size value', 'info');
-		                            notify('', 'Adjust sensor to soil height', 'info');
-		                        }else{
-		                            notify('', 'Compact soil water channels', 'info');
-		                            notify('', 'Move sensor away from water', 'info');
-		                        }
-		                    //}else{
-		                    	//notify('', 'Current Moisture: ' + a, 'info');
-		                    }
-		                    document.getElementById('moisture-adc').textContent = a;
-					    }
+				    	if(a > 1010 && a < 1024)
+	                    {
+	                        notify('', 'Detecting Excess Moisture!', 'danger');
+	                        if(nvram.response['nvram'][14] > 12) {
+	                            notify('', 'Lower Pot Size value', 'info');
+	                            notify('', 'Adjust sensor to soil height', 'info');
+	                        }else{
+	                            notify('', 'Compact soil water channels', 'info');
+	                            notify('', 'Move sensor away from water', 'info');
+	                        }
+	                    //}else{
+	                    	//notify('', 'Current Moisture: ' + a, 'info');
+	                    }
+	                    document.getElementById('moisture-adc').textContent = a;
 					}
 				}
 		        
@@ -418,7 +419,7 @@ function loadSVG(svgfile) {
 					            		
 									    saveSetting(20, loginterval);
 										notify('','Deep Sleep is longer than Graph Interval', 'danger');
-										notify('','Adjusting Deep Sleep ...', 'sucess');
+										notify('','Adjusting Deep Sleep ...', 'success');
 					            	}
 					            }
 				                document.getElementById('wirelessSettingsForm').submit();
@@ -433,13 +434,13 @@ function loadSVG(svgfile) {
 
 		            $('#fileLittleFS').change(function() {
 		                $('#formLittleFS').attr('action', 'http://' + window.location.hostname + "/update"); //force HTTP
-		                progressTimer(80);
+		                progressTimer(80, 1);
 		                document.getElementById('formLittleFS').submit();
 		            })
 
 		            $('#fileFirmware').change(function() {
 		                $('#formFirmware').attr('action', 'http://' + window.location.hostname + "/update"); //force HTTP
-		                progressTimer(20);
+		                progressTimer(20, 1);
 		                document.getElementById('formFirmware').submit();
 		            })
 
@@ -464,7 +465,7 @@ function saveSetting(offset, value, callback) {
     var xhr = new XMLHttpRequest();
     xhr.open('GET', 'nvram?offset=' + offset + '&value=' + value, true);
     xhr.send();
-    xhr.onload = function(e) {
+    xhr.onloadend = function(e) {
     	if(callback) callback(e);
     }
     //notify('',request.responseText, 'danger');
@@ -487,7 +488,23 @@ function HiddenCheck(id, element) {
         document.getElementById(id).value = 0;
     }
 
-    if(id == 'WiFiDHCP') {
+    if(id == 'WiFiHidden') {
+    	if(element.checked) {
+    		saveSetting(2, 1);
+    		notify('','WiFi SSID is now Hidden', 'danger');
+    	}else{
+        	saveSetting(2, 0);
+        	notify('','WiFi SSID is now Broadcasting', 'success');
+    	}
+	}else if(id == 'EnableLOG') {
+    	if(element.checked) {
+    		saveSetting(9, 1);
+    		notify('','Graph & Log Collection is ON', 'info');
+    	}else{
+        	saveSetting(9, 0);
+        	notify('','Graph & Log Collection is OFF', 'success');
+    	}
+    }else if(id == 'WiFiDHCP') {
         var b = false;
 
         if(element.checked){
@@ -541,7 +558,7 @@ function formValidate() {
 function notify(messageHeader, messageBody, bg, id) {
 
     var toast = document.createElement('div');
-    toast.className = 'toast fade show text-white zindex-popover bg-' + bg;
+    toast.className = 'toast fade show text-white bg-' + bg;
     toast.setAttribute('role', 'alert');
     toast.setAttribute('aria-live', 'assertive');
     toast.setAttribute('aria-atomic', 'true');
@@ -582,7 +599,31 @@ function sleep(ms) {
 
 function testPump()
 {
-
+	var xhr = new XMLHttpRequest();
+	xhr.open('GET', 'pump', true);
+    xhr.send();
+    xhr.onload = function() {
+        if (xhr.status == 200) {
+            notify('', 'Running Pump ...', 'warning');
+            progressTimer(32,0,function() {
+				//Check data log to confirm
+				var log = new XMLHttpRequest();
+				log.open('GET', 'data.log', true);
+			    log.send();
+			    log.onload = function() {
+			        if (log.status == 200) {
+			        	var s = log.responseText.split('\n');
+			        	if (s[s.length-2].indexOf('M:') != -1)
+			        	{
+			        		notify('', 'Pump OK', 'success');
+			        	}
+			        }
+			    };
+			});
+        }else{
+        	notify('', 'Pump Test Failed', 'danger');
+        }
+    };
 };
 
 function calcNextWaterCycle(start, stop, size)
@@ -664,12 +705,16 @@ function checkFirmwareUpdates(v)
     */
 };
 
-function progressTimer(speed) {
-    var timer = setInterval(function(){
+function progressTimer(speed, bar, callback) {
+
+	timerUploadCounter = 0;
+
+    var timer = setInterval(function() {
     	timerUploadCounter++;
     	if(timerUploadCounter == 100) {
 	        clearInterval(timer);
+	        if(callback) callback(timerUploadCounter);
 	    }
-	    document.getElementsByClassName('progress-bar')[0].style.width = timerUploadCounter + '%';
+	    document.getElementsByClassName('progress-bar')[bar].style.width = timerUploadCounter + '%';
     }, speed);
 };

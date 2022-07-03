@@ -15,8 +15,8 @@ cd $PSScriptRoot
 #Copy Files
 #==============
 Remove-Item -Recurse -Force .\data -ErrorAction SilentlyContinue
-New-Item -ItemType directory -Path .\data
-Copy-Item .\Web -Filter *.* -Destination .\data -Recurse
+Copy-Item -Path .\Web\ -Filter *.* -Destination .\data\ -Recurse -Force
+Remove-Item -Recurse -Force .\data\img -ErrorAction SilentlyContinue
 
 #====================
 #Download Compressors
@@ -69,4 +69,4 @@ if(!(Test-Path .\build -PathType Container)) {
   New-Item -ItemType directory -Path .\build
 }
 #Start-Process .\tools\mklittlefs.exe -ArgumentList "-c .\data -b 8192 -p 256 -s 643072 flash-littlefs.bin" -NoNewWindow -PassThru -Wait
-Start-Process .\tools\mklittlefs.exe -ArgumentList "-c .\data -b 8192 -p 256 -s 750000 .\build\flash-littlefs.bin" -NoNewWindow -PassThru -Wait
+Start-Process .\tools\mklittlefs.exe -ArgumentList "-c .\data -b 8192 -p 256 -s 680000 .\build\flash-littlefs.bin" -NoNewWindow -PassThru -Wait

@@ -62,6 +62,15 @@ Sketch (Firmware)
 4. Tools -> Boards -> NodeMCU 1.0 -> Flash Size -> 4M (3M SPIFFS)
 5. Sketch -> Export compiled Binary
 
+Additional Libraries
+
+https://github.com/me-no-dev/ESPAsyncWebServer
+https://github.com/devyte/ESPAsyncDNSServer
+https://github.com/me-no-dev/ESPAsyncTCP
+https://github.com/me-no-dev/ESPAsyncUDP
+https://github.com/mobizt/ESP-Mail-Client
+
+
 FileSystem (Web Interface)
 
 1. Run "littlefs-build-mac" (Mac) to build LittleFS "/data"
