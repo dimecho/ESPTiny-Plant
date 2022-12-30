@@ -10,24 +10,23 @@ This is the next evolution from the original [ATtiny13 Plant](https://github.com
 - Battery Deep Sleep (20μA)
 - Modular PCB (ESP-12E Module, TP4056)
 
+<p align="center">
+
 ![Photo](Web/img/photo.jpg?raw=true)
 
-![GUI](Web/img/interface.png?raw=true)
+![Diagram](Web/img/diagram.png?raw=true)
+
+</p>
 
 ## Download
 
-[ESP8266 Firmware](../../releases/download/1.0/ESPTiny-Plant-Firmware.zip)
+[ESP8266 Firmware](../../releases/download/latest/ESPTiny-Plant-Firmware.zip)
 
 ## Connect
 
     SSID: Plant
     Password: (blank)
     Interface: http://192.168.8.8
-
-## Update
-
-    1) Connect to ESP8266 WiFi
-    2) Go to http://192.168.8.8/update
 
 ## BOM (Bill of Materials)
 
@@ -46,11 +45,13 @@ This is the next evolution from the original [ATtiny13 Plant](https://github.com
 
 For 12V Battery use HT7533**-2** Regulator
 
-## Diagram
+## Technical
 
-![Diagram](Web/img/diagram.png?raw=true)
+<p align="center">
 
 ![Technical](Web/img/technical.png?raw=true)
+
+</p>
 
 ## Build
 
@@ -59,21 +60,22 @@ Sketch (Firmware)
 1. Install [Arduino IDE](https://www.arduino.cc/en/main/software)
 2. Arduino/File -> Preferences -> Additional Boards Manager URLs: http://arduino.esp8266.com/stable/package_esp8266com_index.json
 3. Tools -> Boards -> Board Manager -> esp8266 -> Install
-4. Tools -> Boards -> NodeMCU 1.0 -> Flash Size -> 4M (3M SPIFFS)
+4. Tools -> Boards -> NodeMCU 1.0 -> Flash Size -> 4M (2M SPIFFS)
 5. Sketch -> Export compiled Binary
+
+Firmware Binary: `build/esp8266.esp8266.nodemcuv2/ESPTiny-Plant.ino.bin`
 
 Additional Libraries
 
-https://github.com/me-no-dev/ESPAsyncWebServer
-https://github.com/devyte/ESPAsyncDNSServer
-https://github.com/me-no-dev/ESPAsyncTCP
-https://github.com/me-no-dev/ESPAsyncUDP
-https://github.com/mobizt/ESP-Mail-Client
+* https://github.com/me-no-dev/ESPAsyncWebServer
+* https://github.com/devyte/ESPAsyncDNSServer
+* https://github.com/me-no-dev/ESPAsyncTCP
+* https://github.com/me-no-dev/ESPAsyncUDP
+* https://github.com/mobizt/ESP-Mail-Client
 
+File System (Web Interface)
 
-FileSystem (Web Interface)
-
-1. Run "littlefs-build-mac" (Mac) to build LittleFS "/data"
+1. Run "littlefs-build-mac" (Mac) or "littlefs-build-win.ps1" (Windows) to build. LittleFS Binary: `build/flash-littlefs.bin`
 
 **Note:** Files must be GZIP'ed. HTTP server sends compressed code to the Browser for decompression.
 ```
@@ -82,9 +84,9 @@ response->addHeader("Content-Encoding", "gzip");
 
 Flashing Options:
 
-1. [Wireless - Web Interface](http://192.168.8.8/update)
-2. [USB-Serial/TTL - Arduino LittleFS Plugin](https://github.com/earlephilhower/arduino-esp8266littlefs-plugin)
-3. USB-Serial/TTL - Script "littlefs" (Mac)
+1. Wireless - Web Browser [http://192.168.8.8/update](http://192.168.8.8/update)
+2. USB-Serial/TTL - [Arduino LittleFS Plugin](https://github.com/earlephilhower/arduino-esp8266littlefs-plugin)
+3. USB-Serial/TTL - Script "littlefs-flash-mac" (Mac) or "littlefs-flash-win.ps1" (Windows)
 
 ![Flash](Web/img/flash.png?raw=true)
 

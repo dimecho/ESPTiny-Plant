@@ -35,3 +35,42 @@ function graphTheme() {
         ctxGridColor = '#707070';           
     }
 };
+
+function notify(messageHeader, messageBody, bg, id) {
+
+    var toast = document.createElement('div');
+    toast.className = 'toast fade show text-white bg-' + bg;
+    toast.setAttribute('role', 'alert');
+    toast.setAttribute('aria-live', 'assertive');
+    toast.setAttribute('aria-atomic', 'true');
+
+    if (messageHeader != '') {
+        var toastHeader = document.createElement('div');
+        toastHeader.className = 'toast-header text-white bg-' + bg;
+        toastHeader.textContent = messageHeader;
+        
+        var btnClose = document.createElement('button');
+        btnClose.className = 'btn-close';
+        btnClose.setAttribute('data-bs-dismiss', 'toast');
+        toastHeader.appendChild(btnClose);
+        
+        toast.appendChild(toastHeader);
+    }
+
+    if (messageBody != '') {
+        var toastBody = document.createElement('div');
+        toastBody.className = 'toast-body';
+        toastBody.textContent = messageBody;
+        toast.appendChild(toastBody);
+    }
+
+    document.getElementById('notify').appendChild(toast);
+
+    var toastNotify = new bootstrap.Toast(toast, {delay: 5000});
+    toastNotify.show();
+
+    toast.addEventListener('hidden.bs.toast', function () {
+      document.getElementById('notify').removeChild(this);
+    })
+};
+

@@ -310,7 +310,7 @@
           </g>
           <rect id="rect1087" x="745" y="540" width="187" height="68" style="fill:none" />
           <text id="text1089" transform="translate(811,559)" style="fill:#ebf4ce">Sleep</text>
-          <text id="text1085" transform="translate(798,589)" style="fill:#ebf4ce">Seconds</text>
+          <text id="text1085" transform="translate(798,589)" style="fill:#ebf4ce">Minutes</text>
         </g>
       </g>
     </g>

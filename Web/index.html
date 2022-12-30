@@ -3,17 +3,19 @@
     <head>
         <title>tiny plant</title>
         <meta charset="UTF-8" />
-        <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1"> 
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <link rel="stylesheet" type="text/css" id="cssSVG">
         <link rel="stylesheet" type="text/css" id="cssBootstrap">
         <link rel="stylesheet" type="text/css" href="css/preloader.css" />
         <link rel="stylesheet" href="css/roundslider.css" />
+        <link rel="stylesheet" href="css/rangeslider.css" />
         <link rel="shortcut icon" href="favicon.ico" />
         <script src="js/jquery.core.js"></script>
+        <script src="js/jquery.qrcode.js"></script>
         <script src="js/bootstrap.js"></script>
         <script src="js/preloader.js"></script>
         <script src="js/roundslider.js"></script>
+        <script src="js/rangeslider.js"></script>
         <script src="js/theme.js"></script>
         <script src="js/index.js"></script>
     </head>
@@ -24,7 +26,7 @@
             <div class="main row h-100">
                 <div id="svgInteractive" class="col-sm-12 svglayer bg-light">
                     <div id="captive-portal" align="center" class="hidden">
-                        <h3>Visit from Web-Browser</h3>
+                        <h3>Visit from Browser</h3>
                         <h1>http://192.168.8.8</h1>
                     </div>
                 </div>
@@ -80,7 +82,7 @@
                 </div>
             </div>
         </div>
-        <div class="modal zindex-modal" id="wirelessSettings" tabindex="-1" role="dialog" aria-hidden="true">
+        <div class="modal zindex-modal" id="wireless-Settings" tabindex="-1" role="dialog" aria-hidden="true">
             <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable" role="document" >
                 <div class="modal-content">
                     <div class="modal-header">
@@ -96,6 +98,9 @@
 							    <button class="nav-link" data-bs-toggle="tab" data-bs-target="#tabAlerts" type="button" role="tab" aria-selected="false">Alerts</button>
 							</li>
 							<li class="nav-item" role="presentation">
+							    <button class="nav-link" data-bs-toggle="tab" data-bs-target="#tabDemo" type="button" role="tab" aria-selected="false">Settings</button>
+							</li>
+							<li class="nav-item" role="presentation">
 							    <button class="nav-link" data-bs-toggle="tab" data-bs-target="#tabTest" type="button" role="tab" aria-selected="false">Test</button>
 							</li>
 							<li class="nav-item" role="presentation">
@@ -104,36 +109,53 @@
 						</ul>
 						<div class="tab-content mt-4">
 							<div class="tab-pane fade show active" id="tabWireless" role="tabpanel">
-								<form method="POST" action="/nvram?wireless" id="wirelessSettingsForm" oninput="formValidate()">
-		                            <fieldset class="form-group">
-		                                <div class="form-check">
-		                                    <label class="form-check-label">
-		                                    <input type="radio" class="form-check-input" id="WiFiModeAP" name="WiFiMode" value="0" onclick="HiddenInput('WiFiUsername',false)">
-		                                        WiFi Access Point
-		                                    </label>
-		                                </div>
-		                                <div class="form-check">
-		                                    <label class="form-check-label">
-		                                    <input type="radio" class="form-check-input" id="WiFiModeClient" name="WiFiMode" value="1" onclick="HiddenInput('WiFiUsername',false)">
-		                                        WiFi Client (WPA2 Personal)
-		                                    </label>
-		                                </div>
-		                                <div class="form-check">
-		                                    <label class="form-check-label">
-		                                    <input type="radio" class="form-check-input" id="WiFiModeClientEnt" name="WiFiMode" value="2" onclick="HiddenInput('WiFiUsername',true)">
-		                                        WiFi Client (WPA2 Enterprise)
-		                                    </label>
-		                                </div>
-		                                <div class="form-check">
-		                                  <label class="form-check-label">
-		                                    <input type="hidden" id="WiFiHidden" name="WiFiHidden" value="0">
-		                                    <input type="checkbox" id="WiFiHiddenCheckbox" class="form-check-input" onclick="HiddenCheck('WiFiHidden',this)">
-		                                        Hidden SSID
-		                                  </label>
-		                                </div>
-		                            </fieldset>
+								<form method="POST" action="/nvram?wireless" id="wireless-SettingsForm" oninput="formValidate()">
+									<div class="row">
+										<div class="col">
+											<fieldset class="form-group">
+				                                <div class="form-check">
+				                                    <label class="form-check-label">
+				                                    <input type="radio" class="form-check-input" id="WiFiModeAP" name="WiFiMode" value="0" onclick="RequireInput('WiFiUsername',false); SetWiFiMode()">
+				                                        WiFi Access Point
+				                                    </label>
+				                                </div>
+				                                <div class="form-check">
+				                                    <label class="form-check-label">
+				                                    <input type="radio" class="form-check-input" id="WiFiModeClient" name="WiFiMode" value="1" onclick="RequireInput('WiFiUsername',false); SetWiFiMode()">
+				                                        WiFi Client (WPA2 Personal)
+				                                    </label>
+				                                </div>
+				                                <div class="form-check">
+				                                    <label class="form-check-label">
+				                                    <input type="radio" class="form-check-input" id="WiFiModeClientEnt" name="WiFiMode" value="2" onclick="RequireInput('WiFiUsername',true); SetWiFiMode()">
+				                                        WiFi Client (WPA2 Enterprise)
+				                                    </label>
+				                                </div>
+		   										<div class="form-check">
+				                                    <label class="form-check-label">
+				                                    <input type="radio" class="form-check-input" id="WiFiModeClientWEP" name="WiFiMode" value="3" onclick="RequireInput('WiFiUsername',false); SetWiFiMode()">
+				                                        WiFi Client (WEP Key)
+				                                    </label>
+				                                </div>
+				                                <div class="form-check">
+				                                  <label class="form-check-label">
+				                                    <input type="hidden" id="WiFiHidden" name="WiFiHidden" value="0">
+				                                    <input type="checkbox" id="WiFiHiddenCheckbox" class="form-check-input" onclick="HiddenCheck('WiFiHidden',this)">
+				                                        Hidden SSID
+				                                  </label>
+				                                </div>
+				                            </fieldset>
+										</div>
+										<div class="col">
+											<div id="qrcode"></div>
+										</div>
+									</div>
+									<div class="row m-2">
+				                        <div class="badge bg-warning text-white mb-4 d-none" id="AlertWiFiPower">WiFi power maybe not reach AP</div>
+				                        <div class="badge bg-warning text-white mb-4 d-none" id="AlertWiFiDHCP">Don't forget to enable DHCP</div>
+				                    </div>
 		                            <div class="form-group">
-		                                <label for="WiFiPhyMode">Physical</label>
+		                                <label>Antenna</label>
 		                                <div class="input-group">
 		                                    <div class="input-group-addon"><i class="p-3"></i></div>
 		                                    <select id="WiFiPhyMode" class="form-control" name="WiFiPhyMode">
@@ -144,9 +166,10 @@
 		                                </div>
 		                            </div>
 		                            <div class="form-group">
+		                            	<label>Power</label>
 		                                <div class="input-group">
 		                                    <div class="input-group-addon"><i class="p-3"></i></div>
-		                                    <select id="WiFiPower" class="form-control" name="WiFiPower">
+		                                    <select id="WiFiPower" class="form-control" name="WiFiPower" onchange="SetWiFiMode()">
 		                                        <option value="1">1 dBm (1mW)</option>
 		                                        <option value="2">2 dBm (1mW)</option>
 		                                        <option value="3">3 dBm (1mW)</option>
@@ -175,7 +198,7 @@
 		                                </div>
 		                            </div>
 		                            <div class="form-group">
-		                                <label for="WiFiChannel">Channel</label>
+		                            	<label>Channel</label>
 		                                <div class="input-group">
 		                                    <div class="input-group-addon"><i class="p-3"></i></div>
 		                                    <select id="WiFiChannel" class="form-control" name="WiFiChannel">
@@ -193,7 +216,9 @@
 		                                    </select>
 		                                </div>
 		                            </div>
+		                            <div class="row mb-2"></div>
 		                            <div class="form-group">
+		                            	<label>Network</label>
 		                                <div class="input-group">
 		                                    <div class="input-group-addon"><i class="p-3"></i></div>
 		                                    <input type="text" id="WiFiSSID" name="WiFiSSID" class="form-control" placeholder="SSID" required>
@@ -202,34 +227,31 @@
 		                            <div class="form-group">
 		                                <div class="input-group">
 		                                    <div class="input-group-addon"><i class="p-3"></i></div>
-		                                    <input type="text" id="WiFiUsername" name="WiFiUsername" class="form-control" placeholder="Username@domain.com" disabled>
+		                                    <input type="text" id="WiFiUsername" name="WiFiUsername" class="form-control" placeholder="Username (WPA2 Enterprise)">
 		                                </div>
 		                            </div>
 		                            <div class="form-group">
 		                                <div class="input-group">
 		                                    <div class="input-group-addon"><i class="p-3"></i></div>
-		                                    <input type="password" id="WiFiPassword" name="WiFiPassword" class="form-control" placeholder="Password" required>
+		                                    <input type="password" id="WiFiPassword" name="WiFiPassword" class="form-control" placeholder="Password">
 		                                </div>
 		                            </div>
 		                            <div class="form-group">
 		                                <div class="input-group">
 		                                    <div class="input-group-addon"><i class="p-3"></i></div>
-		                                    <input type="password" id="WiFiPasswordConfirm" name="WiFiPasswordConfirm" class="form-control" placeholder="Password Confirm">
+		                                    <input type="password" id="WiFiPasswordConfirm" name="WiFiPasswordConfirm" class="form-control" placeholder="Password Confirm" oninput="generateWiFiQR()">
 		                                </div>
 		                            </div>
+		                            <div class="row mb-2"></div>
 		                            <fieldset class="form-group">
 		                            	 <div class="form-check">
 		                                  <label class="form-check-label">
-		                                        <input type="hidden" id="EnableLOG" name="EnableLOG" value="0">
-		                                        <input type="checkbox" id="EnableLOGCheckbox" class="form-check-input" onclick="HiddenCheck('EnableLOG',this)"> Enable Graph
+		                                        <input type="hidden" id="EnableLog" name="EnableLog" value="0">
+		                                        <input type="checkbox" id="EnableLogCheckbox" class="form-check-input" onclick="HiddenCheck('EnableLog',this)"> Enable Data Log
 		                                  </label>
 		                                </div>
 		                            </fieldset>
-		                            <div class="form-group">
-		                                <div class="input-group">
-		                                    <input type="text" id="EnableLOGInterval" name="EnableLOGInterval" class="form-control" placeholder="Graph Interval (seconds)">
-		                                </div>
-		                            </div>
+		                            <div class="row m-4"><input type="text" id="EnableLogInterval" name="EnableLogInterval" data-provider="slider"></div>
 		                            <fieldset class="form-group">
 		                                <div class="form-check">
 		                                  <label class="form-check-label">
@@ -263,84 +285,197 @@
 		                                    <input type="text" id="WiFiDNS" name="WiFiDNS" class="form-control" placeholder="DNS Address (8.8.8.8)" required>
 		                                </div>
 		                            </div>
+		                            <div class="row mb-4"></div>
 		                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal" onclick="$('.modalDialog').click()">Cancel</button>
-		                        	<button type="submit" class="btn btn-success" id="wireless-settings-ok">Save</button>
+		                        	<button type="button" class="btn btn-success" id="wireless-settings-ok">Save</button>
 		                        </form>
 							</div>
 							<div class="tab-pane fade" id="tabAlerts" role="tabpanel">
-								<div class="badge bg-danger text-white mb-4 d-none" id="AlertInfo">For this to work Wireless Client must be Enabled</div>
-								<form method="POST" action="/nvram?alerts" id="alertSettingsForm" oninput="formValidate()">
-	                   				<fieldset class="form-group">
-		                                <div class="form-check">
-		                                	<input type="hidden" id="AlertLowPower" name="AlertLowPower" value="0">
-		                                    <input type="checkbox" id="AlertLowPowerCheckbox" class="form-check-input" onclick="HiddenCheck('AlertLowPower',this)">
-		                                    <label class="form-check-label" for="AlertLowPower">Alert Low Power</label>
-		                                </div>
-		                                <div class="form-check">
-		                                	<input type="hidden" id="AlertWater" name="AlertWater" value="0">
-		                                    <input type="checkbox" id="AlertWaterCheckbox" class="form-check-input" onclick="HiddenCheck('AlertWater',this)">
-		                                    <label class="form-check-label" for="AlertWater">Alert Waterings</label>
-		                                </div>
-		                                <div class="form-check">
-		                                	<input type="hidden" id="AlertEmpty" name="AlertEmpty" value="0">
-		                                    <input type="checkbox" id="AlertEmptyCheckbox" class="form-check-input" onclick="HiddenCheck('AlertEmpty',this)">
-		                                    <label class="form-check-label" for="AlertEmpty">Alert Empty</label>
-		                                </div>
-		                            </fieldset>
+								<form method="POST" action="/nvram?alerts" id="alert-SettingsForm" oninput="formValidate()">
+									<div class="row m-2">
+					                    <div class="badge bg-danger text-white mb-4 d-none" id="AlertInfo">Wireless Client must be enabled!</div>
+					                    <div class="badge bg-danger text-white mb-4 d-none" id="AlertEncryptionInfo">No TLS Encryption, Add port (Example: smtp.server.com:587)</div>
+										<div class="badge bg-warning text-white mb-4 d-none" id="AlertGmailInfo">Do not use Gmail password, create an <a href="https://support.google.com/accounts/answer/185833" target="_blank">App Password</a>.</div>
+										<div class="badge bg-warning text-white mb-4 d-none" id="AlertGmailToken"><a href="https://console.cloud.google.com/apis/library/gmail.googleapis.com?project=clever-acolyte-161503" target="_blank">Enable Gmail API</a> and create <a href="https://console.cloud.google.com/apis/api/gmail.googleapis.com/credentials?project=clever-acolyte-161503" target="_blank">Web App Credentials</a> with OAuth 2.0 Client IDs.</div>
+										<div class="badge bg-warning text-white mb-4 d-none" id="AlertGmailTokenURL">Make sure Client ID has Authorized redirect URIs <b class="bg-dark" id="gmail-redirect-uri">http://localhost</b></div>
+										<div class="badge bg-success text-white mb-4 d-none" id="AlertOAuthInfo">Try modern OAuth2.0 Token instead of a password.</a></div>
+					                </div>
 		                            <div class="form-group">
+		                            	<label>Email Server</label>
 		                                <div class="input-group">
 		                                    <div class="input-group-addon"><i class="p-3"></i></div>
-		                                    <input type="text" id="AlertEmail" name="AlertEmail" class="form-control" placeholder="Recipient Email" required />
+		                                    <input type="text" id="AlertEmail" name="AlertEmail" class="form-control" placeholder="Recipient Email" oninput="smtpValidate(this)" required />
+		                                </div>
+		                                <div class="input-group">
+		                                    <div class="input-group-addon"><i class="p-3"></i></div>
+		                                    <input type="text" id="AlertSMTPServer" name="AlertSMTPServer" class="form-control" placeholder="SMTP Server" oninput="smtpValidate(this)" required />
+		                                </div>
+		                                <div class="input-group">
+		                                    <div class="input-group-addon"><i class="p-3"></i></div>
+		                                    <input type="text" id="AlertSMTPUsername" name="AlertSMTPUsername" class="form-control" placeholder="SMTP Username" oninput="smtpValidate(this)" />
+		                                </div>
+		                                <div class="input-group">
+		                                    <div class="input-group-addon"><i class="p-3"></i></div>
+		                                    <input type="password" id="AlertSMTPPassword" name="AlertSMTPPassword" class="form-control" placeholder="SMTP Password" oninput="smtpValidate(this)" />
+		                                </div>
+		                                <div class="input-group">
+		                                    <div class="input-group-addon"><i class="p-3"></i></div>
+		                                    <input type="password" id="AlertSMTPToken" name="AlertSMTPToken" class="form-control" placeholder="SMTP OAuth2.0 Token" oninput="smtpValidate(this)" />
+		                                    <button type="button" class="btn btn-secondary" onclick="getOAuthToken()">Generate Token</button>
 		                                </div>
 		                            </div>
-		                             <div class="form-group">
+		                            <div class="form-group">
+		                            	<label>Identity</label>
 		                                <div class="input-group">
 		                                    <div class="input-group-addon"><i class="p-3"></i></div>
 		                                    <input type="text" id="AlertPlantName" name="AlertPlantName" class="form-control" placeholder="Plant Name" />
 		                                </div>
 		                            </div>
-		                            <fieldset class="form-group">
-		                             	<div class="form-check">
-		                             		<input type="hidden" id="AlertSMTPTLS" name="AlertSMTPTLS" value="0">
-		                                    <input type="checkbox" id="AlertSMTPTLSCheckbox" class="form-check-input" onclick="HiddenCheck('AlertSMTPTLS',this)">
-			                                <label class="form-check-label" for="AlertSMTPTLS">Enable SMTP TLS (port 587)</label>
-		                                </div>
-		                            </fieldset>
-		                            <div class="form-group">
-		                                <div class="input-group">
-		                                    <div class="input-group-addon"><i class="p-3"></i></div>
-		                                    <input type="text" id="AlertSMTPServer" name="AlertSMTPServer" class="form-control" placeholder="SMTP Server" required />
-		                                </div>
+		                            <div class="row m-4"><input type="hidden" id="Alerts" name="Alerts" value="" />Send Email Alerts:</div>
+		                            <div class="row m-4 form-group" id="AlertSet">
+		                            	<div class="col-lg-6 col-12">
+		                            		<div class="form-check">
+			                                    <input type="checkbox" class="form-check-input" />
+			                                    <label class="form-check-label">DHCP IP</label>
+			                                </div>
+			                                <div class="form-check">
+			                                    <input type="checkbox" class="form-check-input" />
+			                                    <label class="form-check-label">Low Power</label>
+			                                </div>
+			                                <div class="form-check">
+			                                    <input type="checkbox" class="form-check-input" />
+			                                    <label class="form-check-label">Low Sensor</label>
+			                                </div>
+			                                <div class="form-check">
+			                                    <input type="checkbox" class="form-check-input" />
+			                                    <label class="form-check-label">Pump Run</label>
+			                                </div>
+		                            	</div>
+										<div class="col-lg-6 col-12">
+			                                <div class="form-check">
+			                                    <input type="checkbox" class="form-check-input" />
+			                                    <label class="form-check-label">Over Water</label>
+			                                </div>
+			                                <div class="form-check">
+			                                    <input type="checkbox" class="form-check-input" />
+			                                    <label class="form-check-label">Empty Water</label>
+			                                </div>
+			                                <div class="form-check">
+			                                    <input type="checkbox" class="form-check-input" />
+			                                    <label class="form-check-label">Internal Errors</label>
+			                                </div>
+			                                <div class="form-check">
+			                                    <input type="checkbox" class="form-check-input" />
+			                                    <label class="form-check-label">High Priority</label>
+			                                </div>
+										</div>
 		                            </div>
-		                            <div class="form-group">
-		                                <div class="input-group">
-		                                    <div class="input-group-addon"><i class="p-3"></i></div>
-		                                    <input type="text" id="AlertSMTPUsername" name="AlertSMTPUsername" class="form-control" placeholder="SMTP Username" required />
-		                                </div>
-		                            </div>
-		                            <div class="form-group">
-		                                <div class="input-group">
-		                                    <div class="input-group-addon"><i class="p-3"></i></div>
-		                                    <input type="password" id="AlertSMTPPassword" name="AlertSMTPPassword" class="form-control" placeholder="SMTP Password" required />
-		                                </div>
-		                            </div>
-		                            <div class="form-group">
-		                                <div class="input-group">
-		                                    <div class="input-group-addon"><i class="p-3"></i></div>
-		                                    <input type="password" id="AlertSMTPPasswordConfirm" name="AlertSMTPPasswordConfirm" class="form-control" placeholder="SMTP Password Confirm" />
-		                                </div>
-		                            </div>
+		                            <div class="row mb-4"></div>
 		                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-		                        	<button type="submit" class="btn btn-success" id="wireless-alerts-ok">Save</button>
+		                        	<button type="button" class="btn btn-success" id="alert-settings-ok">Save</button>
 		                        </form>
+							</div>
+							<div class="tab-pane fade" id="tabDemo" role="tabpanel">
+								<form method="POST" action="/nvram?demo" id="demo-SettingsForm" oninput="formValidate()">
+								    <div class="form-group">
+								    	<label>Security</label>
+								        <div class="input-group">
+								            <div class="input-group-addon"><i class="p-3"></i></div>
+								            <input type="password" id="DemoPassword" name="DemoPassword" class="form-control" placeholder="Settings Password" />
+								        </div>
+								    </div>
+								    <div class="form-group">
+								        <div class="input-group">
+								            <div class="input-group-addon"><i class="p-3"></i></div>
+								            <input type="password" id="DemoPasswordConfirm" name="DemoPasswordConfirm" class="form-control" placeholder="Settings Password Confirm" />
+								        </div>
+								    </div>
+								    <div class="form-group">
+		                            	<label>Timezone</label>
+		                                <div class="input-group">
+		                                    <div class="input-group-addon"><i class="p-3"></i></div>
+		                                    <select id="Timezone" class="form-control" name="Timezone">
+												<option value="-28800" selected="selected">(GMT -8:00) Pacific Time (US &amp; Canada)</option>
+												<option value="-25200">(GMT -7:00) Mountain Time (US &amp; Canada)</option>
+												<option value="-21600">(GMT -6:00) Central Time (US &amp; Canada)</option>
+												<option value="-18000">(GMT -5:00) Eastern Time (US &amp; Canada)</option>
+												<option value="-14400">(GMT -4:00) Atlantic Time (Canada)</option>
+												<option value="-12600">(GMT -3:30) Newfoundland</option>
+		                                    </select>
+		                                </div>
+		                            </div>
+								    <div class="row m-4"><input type="hidden" id="DemoAvailability" name="DemoAvailability" value="" />WiFi Availability:</div>
+								    <div class="row m-4 form-group">
+								    	<div class="col">
+								    		<div class="form-group" id="DemoAvailabilityWeek">
+								    			<div class="form-check">
+				                                    <input type="checkbox" class="form-check-input" />
+				                                    <label class="form-check-label">Sunday</label>
+				                                </div>
+				                                <div class="form-check">
+				                                    <input type="checkbox" class="form-check-input" />
+				                                    <label class="form-check-label" >Monday</label>
+				                                </div>
+				                                <div class="form-check">
+				                                    <input type="checkbox" class="form-check-input" />
+				                                    <label class="form-check-label">Tuesday</label>
+				                                </div>
+				                                <div class="form-check">
+				                                    <input type="checkbox" class="form-check-input" />
+				                                    <label class="form-check-label">Wednesday</label>
+				                                </div>
+				                                <div class="form-check">
+				                                    <input type="checkbox" class="form-check-input" />
+				                                    <label class="form-check-label">Thursday</label>
+				                                </div>
+				                                <div class="form-check">
+				                                    <input type="checkbox" class="form-check-input" />
+				                                    <label class="form-check-label">Friday</label>
+				                                </div>
+				                                <div class="form-check">
+				                                    <input type="checkbox" class="form-check-input" />
+				                                    <label class="form-check-label">Saturday</label>
+				                                </div>
+				                            </div>
+								    	</div>
+								    	<div class="col">
+				                            <div id="Availability-Slider"></div>
+								    	</div>
+								    </div>
+								    <div class="row mb-4"></div>
+								    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+									<button type="button" class="btn btn-success" id="demo-settings-ok">Save</button>
+								</form>
 							</div>
 							<div class="tab-pane fade" id="tabTest" role="tabpanel">
 							  	<div class="container">
 		                            <div class="row">
 		                                <div class="col">
-		                                    <button class="btn btn-success" type="button" id="testPump" onclick="testPump()">Test Pump</button>
-		                                    <button class="btn btn-success" type="button" id="testSensor">Test Sensor</button>
-		                                    <button class="btn btn-success" type="button" id="testSleep">Test Sleep/Wake</button>
+		                                    <button class="btn btn-success w-100" type="button" id="testPump" onclick="testPump()">Test Pump</button>
+		                                </div>
+		                                <div class="col">
+		                                    <button class="btn btn-success w-100" type="button" id="testSensor">Test Sensor</button>
+		                                </div>
+		                                <div class="col">
+		                                    <button class="btn btn-success w-100" type="button" id="testSleep">Test Sleep</button>
+		                                </div>
+		                                <div class="col">
+		                                    <button class="btn btn-success w-100" type="button" id="testLED" onclick="testLED()">Test LED</button>
+		                                </div>
+		                            </div>
+		                            <div class="row m-2"></div>
+		                            <div class="row">
+		                            	<div class="col">
+		                                    <button class="btn btn-block btn-success w-100" type="button" id="testFlood" onclick="testEmpty(0, true)">Test Flood</button>
+		                                </div>
+		                                <div class="col">
+		                                	<button class="btn btn-block btn-success w-100" type="button" id="testEmpty" onclick="testEmpty(0, false)">Test Empty</button>
+		                                </div>
+		                                <div class="col">
+		                                	<button class="btn btn-block btn-success w-100" type="button" id="testEmpty" onclick="testRefill()">Test Refill</button>
+		                                </div>
+		                                <div class="col">
+		                                    <button class="btn btn-block btn-success w-100" type="button" id="testSMTP" onclick="testEmail()">Test Email</button>
 		                                </div>
 		                            </div>
 		                            <div class="row mt-4">
@@ -355,22 +490,32 @@
 							<div class="tab-pane fade" id="tabFirmware" role="tabpanel">
 							  	<div class="container">
 		                            <div class="row">
-		                                <div class="col">
+		                            	<div class="col-lg-3 col-12">
 			                                <form method="POST" action="/update" enctype="multipart/form-data" id="formLittleFS">
 					                            <input type="file" accept=".bin" name="filesystem" id="fileLittleFS" hidden />
 					                            <input type="submit" hidden />
 					                        </form>
+		                                    <button class="btn btn-primary w-100" type="button" id="browseLittleFS">Flash LittleFS</button>
+		                                </div>
+		                                <div class="col-lg-3 col-12">
 					                        <form method="POST" action="/update" enctype="multipart/form-data" id="formFirmware">
 					                            <input type="file" accept=".bin" name="firmware" id="fileFirmware" hidden />
 					                            <input type="submit" hidden />
 					                        </form>
-		                                    <button class="btn btn-primary" type="button" id="browseLittleFS">Flash LittleFS</button>
-		                                    <button class="btn btn-primary" type="button" id="browseFirmware">Flash Firmware</button>
+		                                    <button class="btn btn-primary w-100" type="button" id="browseFirmware">Flash Firmware</button>
 		                                </div>
-		                                <div class="col">
-		                                    <small>LittleFS Version: 1.0</small><br/>
-		                                    <small id="sdkVersion">Bootloader Version: 1.0</small><br/>
+		                                <div class="col-lg-6 col-12 m-2">
+		                                    <small>LittleFS Version: 1.0.1</small><br/>
+		                                    <small id="coreVersion">Core Version: 3.0.2</small><br/>
+		                                    <small id="sdkVersion">SDK Version: 2.2.2</small><br/>
 		                                    <small id="firmwareVersion">Firmware Version: 1.0</small>
+		                                </div>
+		                            </div>
+		                            <div class="row">
+		                            	<div class="col-lg-6 col-12">
+		                                    <button class="btn btn-danger w-100" type="button" onclick="resetFlash()">Default Reset</button>
+		                                </div>
+		                                <div class="col-lg-6 col-12">
 		                                </div>
 		                            </div>
 		                            <div class="row mt-4">
@@ -385,6 +530,21 @@
 						</div>
                     </div>
                     <div class="modal-footer"></div>
+                </div>
+            </div>
+        </div>
+        <div class="modal zindex-modal" id="demo-Lock">
+            <div class="modal-dialog modal-sm modal-dialog-centered">
+                <div class="modal-content bg-transparent border-0">
+                	<form method="POST" action="/login" id="demo-LockForm">
+                		<div class="form-group">
+                            <div class="input-group">
+                                <div class="input-group-addon"><i class="p-3"></i></div>
+                                <input type="password" id="DemoPassword" name="DemoPassword" class="form-control" placeholder="Password" required />
+                            </div>
+                        </div>
+		            </form>
+		            <button type="submit" class="btn btn-success" id="demo-lock-ok">Login</button>
                 </div>
             </div>
         </div>

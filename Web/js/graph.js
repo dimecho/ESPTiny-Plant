@@ -5,6 +5,9 @@ var graphDivision = 60;
 var lineWidth = 3;
 var pageLimit = 4;
 
+var LOG_INTERVAL = 10;
+var DEEP_SLEEP = 22;
+
 var chart_datasets = [{
 	type: 'line',
 	label: 'ADC Value',
@@ -109,8 +112,9 @@ function buildGraphMenu() {
     var menu_buttons = $('#buildGraphButtons'); //.empty();
     var export_buttons = $('#buildGraphExport'); //.empty();
 
-	var btn_start = $('<button>', { class: 'btn btn-success mr-4' }).append('Start Graph');
-    var btn_stop = $('<button>', { class: 'btn btn-danger mr-4' }).append('Stop Graph');
+	var btn_start = $('<button>', { class: 'btn btn-success m-2' }).append('Start Graph');
+    var btn_stop = $('<button>', { class: 'btn btn-danger m-2' }).append('Stop Graph');
+    var btn_clean = $('<button>', { class: 'btn btn-warning m-2' }).append('Clear Data');
     
     var e_settings = $('<i>', { class: 'icons icon-settings h1 ml-4', 'data-toggle': 'tooltip', 'title': 'Settings' });
     var e_img = $('<i>', { class: 'icons icon-png h1 ml-4', onClick: 'exportPNG()', 'data-toggle': 'tooltip', 'title': 'Export Image' });
@@ -133,6 +137,23 @@ function buildGraphMenu() {
     btn_stop.click(function() {
         stopChart();
         btn_start.prop('disabled', false);
+    });
+
+    btn_clean.click(function() {
+        var log = new XMLHttpRequest();
+        log.open('GET', 'clearlog', true);
+        log.send();
+        log.onload = function() {
+            if (log.status == 200) {
+                if (log.responseText == "...") {
+                    notify('', 'Logs Cleaned', 'success');
+                }else{
+                    notify('', 'Logs Uknown', 'warning');
+                }
+            }else{
+                notify('', 'Logs Failed', 'danger');
+            }
+        };
     });
 
  	e_settings.click(function() {
@@ -166,10 +187,10 @@ function buildGraphMenu() {
             if(btn_start[0].disabled == true) {
 
             	var xhr = new XMLHttpRequest();
-    			//xhr.open('GET', 'nvram?offset=9&value=10', true);
+    			//xhr.open('GET', 'nvram.json?offset=' + LOG_INTERVAL + '&value=10', true);
     			//xhr.send();
 
-    			xhr.open('GET', 'nvram?offset=20&value=' + (e.from * 60), true);
+    			xhr.open('GET', 'nvram.json?offset=' + DEEP_SLEEP + '&value=' + (e.from * 60), true);
     			xhr.send();
 
                 //if (xhr) xhr.abort();
@@ -181,6 +202,7 @@ function buildGraphMenu() {
 	
     menu_buttons.append(btn_start);
     menu_buttons.append(btn_stop);
+    menu_buttons.append(btn_clean);
 
     export_buttons.append(e_settings);
     export_buttons.append(e_img);

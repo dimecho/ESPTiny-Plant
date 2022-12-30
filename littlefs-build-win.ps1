@@ -17,6 +17,7 @@ cd $PSScriptRoot
 Remove-Item -Recurse -Force .\data -ErrorAction SilentlyContinue
 Copy-Item -Path .\Web\ -Filter *.* -Destination .\data\ -Recurse -Force
 Remove-Item -Recurse -Force .\data\img -ErrorAction SilentlyContinue
+Remove-Item -Recurse -Force .\data\nvram.json -ErrorAction SilentlyContinue
 
 #====================
 #Download Compressors

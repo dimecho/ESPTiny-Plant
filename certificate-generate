@@ -1,0 +1,9 @@
+#!/bin/sh
+
+cd "$(dirname "$0")"
+
+echo "Enter Certificate Domain:"
+read domain
+
+openssl genrsa -out Web/server.key 1024
+openssl req -x509 -out Web/server.cer -key Web/server.key -new -sha256 -subj /CN=$domain -days 365 #-addext "keyUsage=digitalSignature,keyEncipherment" -addext extendedKeyUsage=serverAuth
