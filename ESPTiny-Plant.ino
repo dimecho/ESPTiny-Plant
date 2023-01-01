@@ -1,13 +1,15 @@
 /*
 NodeMCU 0.9 (ESP-12 Module)  > blue 16 pins
 NodeMCU 1.0 (ESP-12E Module) > black 22 pins
+
+Remember: Brand new ESP-12 short GPIO0 to GND (flash mode) then UART TX/RX
 */
 
 #include "version.h"
 
 #define DEBUG false
 #define THREADED false
-#define EEPROM_ID 0x3BDAB910  //Identify Sketch by EEPROM
+#define EEPROM_ID 0x3BDAB911  //Identify Sketch by EEPROM
 
 #define ASYNC_TCP_SSL_ENABLED false
 
@@ -30,6 +32,7 @@ NOTE for HTTPS
   #endif
 */
 
+//#include <ArduinoOTA.h>
 #include <EEPROM.h>
 #include <LittleFS.h>
 #include <StreamString.h>
@@ -80,22 +83,22 @@ AsyncDNSServer dnsServer;
 //Pin 1 = Rx = GPIO3
 //Pin 8 = Tx = GPIO1
 
-#if defined ARDUINO_ESP8266_NODEMCU_ESP12 || defined ARDUINO_ESP8266_NODEMCU_ESP12E
+#if defined ARDUINO_ESP8266_NODEMCU_ESP12 || defined ARDUINO_ESP8266_NODEMCU_ESP12E || defined ARDUINO_ESP8266_GENERIC
 #define pumpPin 5  //Output (D1 NodeMCU)
 #else
 #define pumpPin 3  //RX Output
 #endif
-#if defined ARDUINO_ESP8266_NODEMCU_ESP12 || defined ARDUINO_ESP8266_NODEMCU_ESP12E
+#if defined ARDUINO_ESP8266_NODEMCU_ESP12 || defined ARDUINO_ESP8266_NODEMCU_ESP12E || defined ARDUINO_ESP8266_GENERIC
 #define sensorPin 4  //Output (D2 NodeMCU)
 #else
 #define sensorPin 1  //TX Output
 #endif
-#if defined ARDUINO_ESP8266_NODEMCU_ESP12 || defined ARDUINO_ESP8266_NODEMCU_ESP12E
+#if defined ARDUINO_ESP8266_NODEMCU_ESP12 || defined ARDUINO_ESP8266_NODEMCU_ESP12E || defined ARDUINO_ESP8266_GENERIC
 #define watersensorPin 12  //Output (D6 NodeMCU)
 #else
 #define watersensorPin 3  //RX Output
 #endif
-#if defined ARDUINO_ESP8266_NODEMCU_ESP12 || defined ARDUINO_ESP8266_NODEMCU_ESP12E
+#if defined ARDUINO_ESP8266_NODEMCU_ESP12 || defined ARDUINO_ESP8266_NODEMCU_ESP12E || defined ARDUINO_ESP8266_GENERIC
 #define ledPin 2  //Output (D4 NodeMCU)
 #else
 #define ledPin 1  //Output
@@ -123,6 +126,9 @@ byte blinkEmpty = 0;
 #define text_html "text/html"
 #define text_plain "text/plain"
 #define text_json "application/json"
+#define locked_html "Locked"
+#define refresh_http "Refresh"
+#define content_length "Content-Length"
 
 /*
 ----------------
@@ -265,9 +271,6 @@ uint8_t OFF_TIME = 0;                     //to 6pm
 uint16_t LOG_INTERVAL_S = 0;
 uint16_t DEEP_SLEEP_S = 0;
 String LOCAL_IP = "";
-
-//PROGMEM
-const char locked_html[] = "Locked";
 
 //Analog to Digital Converter (cannot be both)
 ADC_MODE(ADC_TOUT);  //sensor input measuring
@@ -416,6 +419,8 @@ void setup() {
   nvram.toCharArray(DEMO_AVAILABILITY, sizeof(nvram));
   ON_TIME = String(DEMO_AVAILABILITY).substring(7, 9).toInt();
   OFF_TIME = String(DEMO_AVAILABILITY).substring(9, 11).toInt();
+  nvram = NVRAM_Read(_DEMO_PASSWORD);
+  nvram.toCharArray(DEMO_PASSWORD, sizeof(nvram));
 
   // Read struct from RTC memory //0 to 127, 4 bytes each
   ESP.rtcUserMemoryRead(0, (uint32_t *)&rtcData, sizeof(rtcData));
@@ -440,8 +445,9 @@ void setup() {
       ALERTS[0] = '1';                       //email DHCP IP
       memset(&rtcData, 0, sizeof(rtcData));  //reset RTC memory
       blinky(2000, 1, 0);
+      //ArduinoOTA.begin();
     }
-    setupWiFi(0);
+    setupWiFi(0, 1);
     setupWebServer();
 
     //ArduinoOTA.begin();
@@ -450,7 +456,7 @@ void setup() {
   offsetTiming();
 }
 
-void setupWiFi(uint8_t timeout) {
+void setupWiFi(uint8_t timeout, uint8_t power) {
 
   //Forcefull Wakeup
   //-------------------
@@ -476,23 +482,19 @@ void setupWiFi(uint8_t timeout) {
   nvram.toCharArray(WIRELESS_SSID, sizeof(nvram));
   nvram = NVRAM_Read(_WIRELESS_USERNAME);
   nvram.toCharArray(WIRELESS_USERNAME, sizeof(nvram));
-  nvram = NVRAM_Read(_DEMO_PASSWORD);
-  nvram.toCharArray(DEMO_PASSWORD, sizeof(nvram));
-  nvram = NVRAM_Read(_TIMEZONE_OFFSET);
-  nvram.toCharArray(TIMEZONE_OFFSET, sizeof(nvram));
-  timeClient.setTimeOffset(String(TIMEZONE_OFFSET).toInt());
 
-  /*
-  #ifdef WIFI_IS_OFF_AT_BOOT
-    enableWiFiAtBootTime();
-  #endif
-  */
   WiFi.persistent(false);  //Do not write settings to memory
 
   WIRELESS_PHY_MODE = NVRAM_Read(_WIRELESS_PHY_MODE).toInt();
   WiFi.setPhyMode((WiFiPhyMode_t)WIRELESS_PHY_MODE);
   WIRELESS_PHY_POWER = NVRAM_Read(_WIRELESS_PHY_POWER).toInt();
-  WiFi.setOutputPower(WIRELESS_PHY_POWER);
+
+  if(WIRELESS_PHY_POWER == 1) {   //auto tune wifi power (minimum power to reach AP)
+    WiFi.setOutputPower(power);   //starting from 1 to 24
+    power++;
+  }else{
+    WiFi.setOutputPower(WIRELESS_PHY_POWER);
+  }
 
   WIRELESS_MODE = NVRAM_Read(_WIRELESS_MODE).toInt();
   WIRELESS_HIDE = NVRAM_Read(_WIRELESS_HIDE).toInt();
@@ -630,7 +632,7 @@ void setupWiFi(uint8_t timeout) {
 #endif
       delay(1000);
 
-      if (timeout > 10) {
+      if (timeout > 24) {
 #if DEBUG
         Serial.println("Connection Failed! Rebooting...");
 #endif
@@ -646,24 +648,32 @@ void setupWiFi(uint8_t timeout) {
         delay(100);
         ESP.restart();
       }
-      setupWiFi(timeout++);
+      setupWiFi(timeout++, power);
       return;
     }
+    if(WIRELESS_PHY_POWER == 1) //save auto tuned wifi power
+      NVRAM_Write(_WIRELESS_PHY_POWER, String(power));
+
     WiFi.setAutoReconnect(true);
-
-    //TCP timer rate raised from 250ms to 3s
-    //WiFi.setSleepMode(WIFI_LIGHT_SLEEP);   //Light sleep is like modem sleep, but also turns off the system clock.
-    //WiFi.setSleepMode(WIFI_MODEM_SLEEP);   //Modem sleep disables WiFi between DTIM beacon intervals.
-    WiFi.setSleepMode(WIFI_MODEM_SLEEP, 4);  //Station wakes up every (DTIM-interval * listenInterval) This saves power but station interface may miss broadcast data.
-
+    
     //NTP Client to get time
     timeClient.begin();
     timeClient.update();
+    timeClient.setTimeOffset(NVRAM_Read(_TIMEZONE_OFFSET).toInt());
 
     //Offset runtime as current minutes (more accurate availability count)
     rtcData.runTime = timeClient.getMinutes() * 60;
     rtcData.ntpWeek = timeClient.getDay();
     rtcData.ntpHour = timeClient.getHours();
+#if DEBUG
+    Serial.print(timeClient.getDay());
+    Serial.print("|");
+    Serial.print(timeClient.getHours());
+    Serial.print("|");
+    Serial.print(timeClient.getMinutes());
+    Serial.print("\n");
+    //Serial.println(timeClient.getFormattedTime());
+#endif
 
     LOCAL_IP = WiFi.localIP().toString();
 
@@ -674,16 +684,14 @@ void setupWiFi(uint8_t timeout) {
       //nvram.toCharArray(NETWORK_IP, nvram.length());
 
 #if DEBUG
-    Serial.print(timeClient.getDay());
-    Serial.print("|");
-    Serial.print(timeClient.getHours());
-    Serial.print("|");
-    Serial.print(timeClient.getMinutes());
-    Serial.print("\n");
     Serial.println(WiFi.localIP().toString());
-    //Serial.println(timeClient.getFormattedTime());
 #endif
   }
+
+  //TCP timer rate raised from 250ms to 3s
+  //WiFi.setSleepMode(WIFI_LIGHT_SLEEP);   //Light sleep is like modem sleep, but also turns off the system clock.
+  //WiFi.setSleepMode(WIFI_MODEM_SLEEP);   //Modem sleep disables WiFi between DTIM beacon intervals.
+  WiFi.setSleepMode(WIFI_MODEM_SLEEP, 10);  //Station wakes up every (DTIM-interval * listenInterval) This saves power but station interface may miss broadcast data.
 }
 
 void setupWebServer() {
@@ -722,7 +730,7 @@ void setupWebServer() {
       //Cannot do inline with webserver, not enough ESP.getFreeHeap()
       //smtpSend("Test", String(EEPROM_ID));
     } else {
-      request->send_P(200, text_html, locked_html);
+      request->send(200, text_html, locked_html);
     }
   });
   server.on("/pump", HTTP_GET, [](AsyncWebServerRequest *request) {
@@ -730,10 +738,19 @@ void setupWebServer() {
       blinkDuration = 0;
       testPump = true;
       request->send(200, text_plain, String(PLANT_POT_SIZE));
-      //Cannot do inline with webserver, delay() not allowed
-      //runPump();
+      /*
+      AsyncWebServerResponse *response = request->beginResponse(text_html, 3, [](uint8_t *buffer, size_t maxLen, size_t index) -> size_t {
+        if (index) {
+          runPump(); //Cannot delay() here, Fatal exception 9(LoadStoreAlignmentCause)
+          return 0;
+        }
+        return snprintf((char *)buffer, maxLen, ".....");
+      });
+      response->addHeader(content_length, "3");
+      request->send(response);
+      */
     } else {
-      request->send_P(200, text_html, locked_html);
+      request->send(200, text_html, locked_html);
     }
   });
   server.on("/empty", HTTP_GET, [](AsyncWebServerRequest *request) {
@@ -746,7 +763,7 @@ void setupWebServer() {
       blinkDuration = 0;
       request->send(200, text_plain, String(rtcData.waterTime));
     } else {
-      request->send_P(200, text_html, locked_html);
+      request->send(200, text_html, locked_html);
     }
   });
   server.on("/adc", HTTP_GET, [](AsyncWebServerRequest *request) {
@@ -781,13 +798,13 @@ void setupWebServer() {
       }
       return snprintf((char *)buffer, maxLen, ".....");
     });
-    response->addHeader("Content-Length", "3");
+    response->addHeader(content_length, "3");
     request->send(response);
   });
   server.on("/data.log", HTTP_GET, [](AsyncWebServerRequest *request) {
     if (!LittleFS.exists(request->url())) {
       DATA_LOG = 1;
-      NVRAM_Write(_DATA_LOG, "1");
+      //NVRAM_Write(_DATA_LOG, "1");
       request->send(200, text_plain, "...");
     } else {
       AsyncWebServerResponse *response = request->beginResponse(LittleFS, request->url(), text_plain);
@@ -797,7 +814,7 @@ void setupWebServer() {
   server.on("/clearlog", HTTP_GET, [](AsyncWebServerRequest *request) {
     LittleFS.remove("data.log");
     DATA_LOG = 0;
-    NVRAM_Write(_DATA_LOG, "0");
+    //NVRAM_Write(_DATA_LOG, "0");
     request->send(200, text_plain, "...");
   });
   server.on("/login", HTTP_POST, [](AsyncWebServerRequest *request) {
@@ -815,7 +832,7 @@ void setupWebServer() {
         offsetTiming();
         request->send(200, text_plain, request->getParam(1)->value());
       } else {
-        request->send_P(200, text_html, locked_html);
+        request->send(200, text_html, locked_html);
       }
     } else {
       uint8_t mask[] = { 8, 26, 29 };
@@ -876,7 +893,7 @@ void setupWebServer() {
         }
         return snprintf((char *)buffer, maxLen, String(out + "  ").c_str());
       });
-      response->addHeader("Content-Length", String(out.length()));
+      response->addHeader(content_length, String(out.length()));
 
       String RefreshURL = "/";
       if (request->hasParam("WiFiIP", true)) {
@@ -884,7 +901,7 @@ void setupWebServer() {
       } else if (request->hasParam("WiFiMode", true)) {
         RefreshURL = "http://" + String(PLANT_NAME);
       }
-      response->addHeader("Refresh", "12; url=" + RefreshURL);
+      response->addHeader(refresh_http, "12; url=" + RefreshURL);
       request->send(response);
     }
   });
@@ -923,19 +940,15 @@ void setupWebServer() {
         Update.printError(str);
         request->send(200, text_plain, String("Update error: ") + str.c_str());
       } else {
-        //After FS flash, RTC memory is not initialized (unit8/uint16 are max, not zero)
-        memset(&rtcData, 0, sizeof(rtcData));  //reset RTC memory (set all zero)
-        ESP.rtcUserMemoryWrite(0, (uint32_t *)&rtcData, sizeof(rtcData));
-
         AsyncWebServerResponse *response = request->beginResponse(text_html, 29, [](uint8_t *buffer, size_t maxLen, size_t index) -> size_t {
-          if (index) {  //already sent
-            ESP.restart();
+          if (index) {
+            ESP.restart(); //required to flash new firmware
             return 0;
           }
           return snprintf((char *)buffer, maxLen, "Update Success! Rebooting.....");
         });
-        response->addHeader("Content-Length", "29");
-        response->addHeader("Refresh", "15; url=/");
+        response->addHeader(content_length, "29");
+        response->addHeader(refresh_http, "15; url=/");
         request->send(response);
       }
     },
@@ -947,7 +960,7 @@ void setupWebServer() {
       request->redirect("/index.html");
     } else {
       AsyncWebServerResponse *response = request->beginResponse(200, text_html, "File System Not Found ...");
-      response->addHeader("Refresh", "4; url=/update");
+      response->addHeader(refresh_http, "4; url=/update");
       request->send(response);
     }
   });
@@ -973,7 +986,7 @@ void setupWebServer() {
     if (file.endsWith("detect.html") || file.endsWith("generate_204") || file.endsWith("test.txt")) {
       //file = "/index.html";
       //if (!LittleFS.exists(file)) {
-        request->send(200, text_html, "<center><h1>http://" + LOCAL_IP + "</h1></center>");
+      request->send(200, text_html, "<center><h1>http://" + LOCAL_IP + "</h1></center>");
       //}
     } else if (file.endsWith("redirect") || file.endsWith("portal")) {
       request->redirect("http://" + LOCAL_IP);
@@ -1124,7 +1137,7 @@ void loop() {
   } else if (WiFi.getMode() == WIFI_AP) {
     WiFiClientCount = WiFi.softAPgetStationNum();  //counts all wifi clients (refresh may take 5 min to register station leave)
   }
-  
+
 #if DEBUG
   Serial.printf("WiFi Clients: %u\n", WiFiClientCount);
   Serial.printf("Runtime: %u\n", rtcData.runTime);
@@ -1154,7 +1167,7 @@ void loop() {
     Serial.printf("Range: %u:%u\n", ON_TIME, OFF_TIME);
 #endif
 
-    //Always ON based on day of week (power cosumption 0.06mA - 0.07mA)
+    //Always ON based on day of week (power cosumption AP = ~0.07mA STA = ~0.02mA)
     if (DEMO_AVAILABILITY[rtcData.ntpWeek] == '1' && WiFi.getMode() == WIFI_OFF && h >= ON_TIME && h < OFF_TIME) {
 #if DEBUG
       Serial.println("WiFi ON");
@@ -1163,7 +1176,7 @@ void loop() {
       LOG_INTERVAL = NVRAM_Read(_LOG_INTERVAL).toInt();
       offsetTiming();
 
-      setupWiFi(0);
+      setupWiFi(0, 1);
       setupWebServer();
     } else if (DEEP_SLEEP == 0 && h >= OFF_TIME) {  //outside of working hours
 #if DEBUG
@@ -1223,18 +1236,13 @@ void loop() {
     readySleep();
   } else if (testPump) {
     testPump = false;
-    LOG_INTERVAL = LOG_INTERVAL_S * 1000;
     runPump();
   } else if (testSMTP) {
     testSMTP = false;
-    LOG_INTERVAL = LOG_INTERVAL_S * 1000;
     smtpSend("Test", String(EEPROM_ID, HEX));
   }
-
+  
   //loopTimer = millis();
-
-  //Debug.handle();
-  //server.handleClient();
   //ArduinoOTA.handle();
 }
 
@@ -1702,8 +1710,12 @@ String getContentType(String filename) {
 //===============
 void WebUpload(AsyncWebServerRequest *request, String filename, size_t index, uint8_t *data, size_t len, bool final) {
   if (!index) {
-    //Serial.print(request->params());
 
+    //WARNING: Do not save RTC memory after Update.begin(). "chksum" will be different after reboot, firmware will not flash
+    /*
+    memset(&rtcData, 0, sizeof(rtcData));  //reset RTC memory (set all zero)
+    ESP.rtcUserMemoryWrite(0, (uint32_t *)&rtcData, sizeof(rtcData));
+    */
     Update.runAsync(true);  // tell the updaterClass to run in async mode
 
     if (filename.indexOf("fs") != -1) {
@@ -1713,7 +1725,6 @@ void WebUpload(AsyncWebServerRequest *request, String filename, size_t index, ui
       Serial.printf("Free Filesystem Space: %u\n", fsSize);
       Serial.printf("Filesystem Offset: %u\n", U_FS);
 #endif
-      close_all_fs();
       Update.begin(fsSize, U_FS);  //start with max available size
 
     } else {
@@ -1726,9 +1737,8 @@ void WebUpload(AsyncWebServerRequest *request, String filename, size_t index, ui
     }
   }
 
-  if (!Update.hasError()) {
+  //if (!Update.hasError())
     Update.write(data, len);
-  }
 
   if (final) {
     if (!Update.end(true)) {
@@ -1756,7 +1766,7 @@ void smtpSend(String subject, String body) {
   byte off = 0;
   if (WiFi.getMode() == WIFI_OFF)  //alerts during off cycle
   {
-    setupWiFi(0);  //turn on temporary
+    setupWiFi(0, 1);  //turn on temporary
     off = 1;
   }
 
