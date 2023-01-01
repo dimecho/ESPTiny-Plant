@@ -674,21 +674,20 @@ function AlertSet(alerts) {
 function SetWiFiMode() {
 	document.getElementById('AlertInfo').classList.add('d-none');
 
-	var wifi_mode = document.getElementsByName('WiFiMode');
-
-    if(wifi_mode[0].checked) {
+	var mode = document.getElementsByName('WiFiMode');
+    if(mode[0].checked) {
         $('#WiFiModeAP').prop('checked', true);
        	document.getElementById('AlertWiFiPower').classList.add('d-none');
 		document.getElementById('AlertWiFiDHCP').classList.add('d-none');
 		document.getElementById('AlertInfo').classList.remove('d-none');
-    }else if(wifi_mode[1].checked) {
+    }else if(mode[1].checked) {
         $('#WiFiModeClient').prop('checked', true);
         WarningWiFiMode();
-    }else if(wifi_mode[2].checked) {
+    }else if(mode[2].checked) {
         $('#WiFiModeClientEnt').prop('checked', true);
         RequireInput('WiFiUsername',true);
         WarningWiFiMode();
-    }else if(wifi_mode[3].checked) {
+    }else if(mode[3].checked) {
         $('#WiFiModeClientWEP').prop('checked', true);
         WarningWiFiMode();
     }
@@ -968,6 +967,16 @@ function testEmpty(loop, flood)
     xhr.send();
 };
 
+function autoWiFiPower()
+{
+	var mode = document.getElementsByName('WiFiMode');
+    if(mode[0].checked) {
+		notify('', 'Auto Tune only in WiFi Client Mode', 'danger');
+    }else{
+    	document.getElementById('WiFiPower').value = 1;
+    }
+};
+
 function testLED()
 {
 
@@ -1125,8 +1134,8 @@ function checkFirmwareUpdates(v)
     */
 };
 
-function progressTimer(speed, bar, callback) {
-
+function progressTimer(speed, bar, callback)
+{
 	timerUploadCounter = 0;
 
     var timer = setInterval(function() {
@@ -1139,34 +1148,25 @@ function progressTimer(speed, bar, callback) {
     }, speed);
 };
 
-function escape_string (string) {
-    var to_escape = ['\\', ';', ',', ':', '"'];
-    var hex_only = /^[0-9a-f]+$/i;
-    var output = "";
-    for (var i=0; i<string.length; i++) {
-        if($.inArray(string[i], to_escape) != -1) {
-            output += '\\'+string[i];
-        }
-        else {
-            output += string[i];
-        }
+function generateWiFiQR()
+{
+	var enc = 'WPA'; //WPA, WEP, nopass
+    var ssid = document.getElementById('WiFiSSID').value;
+    var mode = document.getElementsByName('WiFiMode');
+    var hidden = document.getElementById('WiFiHiddenCheckbox').checked;
+    var user = document.getElementById('WiFiUsername').value;
+    var pass = document.getElementById('WiFiPasswordConfirm').value;
+    if(mode[2].checked) {
+    	//WIFI:T:WPA2-EAP;S:[network SSID];E:[EAP method];PH2:[Phase 2 method];A:[anonymous identity];I:[username];P:[password];;
+    	enc = 'WPA2-EAP;E:PEAP;PH2:MS-CHAPv2;I:' + escape(user);
     }
-    //if (hex_only.test(output)) {
-    //    output = '"'+output+'"';
-    //}
-    return output;
-};
-
-function generateWiFiQR() {
-    var ssid = $('#WiFiSSID').val();
-    var hidden = $('#WiFiHiddenCheckbox').is(':checked');
-    var enc = 'WPA'; //WPA, WEP, nopass
-    var key = $('#WiFiPasswordConfirm').val();
-    var qrstring = 'WIFI:S:'+escape_string(ssid)+';T:'+enc+';P:'+escape_string(key)+';';
+    var qrstring = 'WIFI:S:' + escape(ssid) + ';T:' + enc + ';P:' + escape(pass) + ';';
     if (hidden) {
         qrstring += 'H:true';
     }
     qrstring += ';';
+    console.log(qrstring);
+
     $('#qrcode').empty();
     $('#qrcode').qrcode({width:160,height:160,text:qrstring});
     
