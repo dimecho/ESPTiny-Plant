@@ -1,0 +1,8 @@
+MacOS
+~/Library/Arduino15/packages/esp8266/hardware/esp8266/3.0.2/platform.txt
+recipe.hooks.sketch.prebuild.0.pattern={build.source.path}/semver/semver-incr-build {build.source.path}/version.h
+
+
+Windows
+C:\Users\<username>\AppData\Local\Arduino15\packages\esp8266\hardware\esp8266\3.0.2\platform.txt
+recipe.hooks.sketch.prebuild.0.pattern={build.source.path}\semver\semver-incr-build.bat {build.source.path}\version.h
