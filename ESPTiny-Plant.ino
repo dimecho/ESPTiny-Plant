@@ -9,15 +9,14 @@ Remember: Brand new ESP-12 short GPIO0 to GND (flash mode) then UART TX/RX
 
 #define DEBUG false
 #define THREADED false
-#define EEPROM_ID 0x3BDAB911  //Identify Sketch by EEPROM
+#define EEPROM_ID 0x3BDAB912  //Identify Sketch by EEPROM
 
-#define ASYNC_TCP_SSL_ENABLED false
-
+#define ASYNCWEBSERVER_SSL false
 /*
 NOTE for HTTPS
 
    Need to fix ESPAsyncTCP library
-   1) Modify line 5 in async_config.h to #define ASYNC_TCP_SSL_ENABLED 1
+   1) Modify line 5 in async_config.h to #define ASYNCWEBSERVER_SSL 1
    2) Modify line 279 in ESPAsyncTCP.cpp
    from
 
@@ -25,11 +24,20 @@ NOTE for HTTPS
 
   to
 
-  #if ASYNC_TCP_SSL_ENABLED
+  #if ASYNCWEBSERVER_SSL
       return connect(IPAddress(addr.addr), port, secure);
   #else
       return connect(IPAddress(addr.addr), port);
   #endif
+*/
+#define ASYNCWEBSERVER_REGEX false //<regex> will add 100k to binary
+/*
+  To Activate RegEx:
+  
+  MacOS: ~/Library/Arduino15/packages/esp8266/hardware/esp8266/3.0.2/platform.txt
+  Windows: C:\Users\<username>\AppData\Local\Arduino15\packages\esp8266\hardware\esp8266\3.0.2\platform.txt
+
+  compiler.cpp.extra_flags=-DASYNCWEBSERVER_REGEX=1
 */
 
 //#include <ArduinoOTA.h>
@@ -45,6 +53,8 @@ extern "C" {
 #include "user_interface.h"
 #include "wpa2_enterprise.h"
 }
+//#include <coredecls.h> //for disable_extra4k_at_link_timer()
+
 typedef enum {
   EAP_TLS,
   EAP_PEAP,
@@ -65,7 +75,7 @@ SMTP_Message message;
 //#include <CapacitiveSensor.h>
 //#include <time.h>
 
-#if ASYNC_TCP_SSL_ENABLED
+#if ASYNCWEBSERVER_SSL
 String HTTPS_FQDN = "esp.tinyplant.ca";  //SSL certificate match CN
 
 AsyncWebServer httpserver(80);
@@ -297,6 +307,9 @@ void setup() {
   //Needed after deepSleep for ESP8266 Core 3.0.x. Otherwise error: pll_cal exceeds 2ms
   delay(1);
 
+  //WPA2 Enterpise stability
+  //disable_extra4k_at_link_time(); //use official/legacy ram location for user stack
+
   //ESP8266 Bootloader 2.2.2 Deep Sleep is 32bit about 2,147,483,647 = 35 min
   //ESP8266 Bootloader 2.4.1 Deep Sleep is 64bit about 12,731,80,9786 = 3h 30min
   //Serial.println("deepSleepMax: " + uint64ToString(ESP.deepSleepMax()));
@@ -401,7 +414,7 @@ void setup() {
     NVRAM_Write(_TIMEZONE_OFFSET, String(TIMEZONE_OFFSET));
     NVRAM_Write(_DEMO_AVAILABILITY, DEMO_AVAILABILITY);
     //==========
-    NVRAM_Write(_ADC_ERROR_OFFSET, String(ADC_ERROR_OFFSET));
+    //NVRAM_Write(_ADC_ERROR_OFFSET, String(ADC_ERROR_OFFSET));
 
     memset(&rtcData, 0, sizeof(rtcData));  //reset RTC memory
 
@@ -456,6 +469,7 @@ void setup() {
   offsetTiming();
 }
 
+//This is a power expensive function 80+mA
 void setupWiFi(uint8_t timeout, uint8_t power) {
 
   //Forcefull Wakeup
@@ -465,23 +479,11 @@ void setupWiFi(uint8_t timeout, uint8_t power) {
   //WiFi.forceSleepWake();
   //-------------------
   IPAddress ip, gateway, subnet, dns;
-  String nvram = NVRAM_Read(_NETWORK_IP);
-  nvram.toCharArray(NETWORK_IP, sizeof(nvram));
-  ip.fromString(NETWORK_IP);
-  nvram = NVRAM_Read(_NETWORK_SUBNET);
-  nvram.toCharArray(NETWORK_SUBNET, sizeof(nvram));
-  subnet.fromString(NETWORK_SUBNET);
-  nvram = NVRAM_Read(_NETWORK_GATEWAY);
-  nvram.toCharArray(NETWORK_GATEWAY, sizeof(nvram));
-  gateway.fromString(NETWORK_GATEWAY);
-  nvram = NVRAM_Read(_NETWORK_DNS);
-  nvram.toCharArray(NETWORK_DNS, sizeof(nvram));
-  dns.fromString(NETWORK_DNS);
+  ip.fromString(NVRAM_Read(_NETWORK_IP));
+  subnet.fromString(NVRAM_Read(_NETWORK_SUBNET));
+  gateway.fromString(NVRAM_Read(_NETWORK_GATEWAY));
+  dns.fromString(NVRAM_Read(_NETWORK_DNS));
   //-------------------
-  nvram = NVRAM_Read(_WIRELESS_SSID);
-  nvram.toCharArray(WIRELESS_SSID, sizeof(nvram));
-  nvram = NVRAM_Read(_WIRELESS_USERNAME);
-  nvram.toCharArray(WIRELESS_USERNAME, sizeof(nvram));
 
   WiFi.persistent(false);  //Do not write settings to memory
 
@@ -509,7 +511,7 @@ void setupWiFi(uint8_t timeout, uint8_t power) {
     //WiFi.enableAP(true);
     WiFi.mode(WIFI_AP);
     WiFi.softAPConfig(ip, gateway, subnet);
-    WiFi.softAP(WIRELESS_SSID, NVRAM_Read(_WIRELESS_PASSWORD), WIRELESS_CHANNEL, WIRELESS_HIDE, 4);  //max 4 clients
+    WiFi.softAP(NVRAM_Read(_WIRELESS_SSID), NVRAM_Read(_WIRELESS_PASSWORD), WIRELESS_CHANNEL, WIRELESS_HIDE, 4);  //max 4 clients
 
 #if DEBUG
     Serial.println(WiFi.softAPIP());
@@ -560,61 +562,74 @@ void setupWiFi(uint8_t timeout, uint8_t power) {
 
     NETWORK_DHCP = NVRAM_Read(_NETWORK_DHCP).toInt();
     if (NETWORK_DHCP == 0) {
-      WiFi.config(ip, dns, gateway, subnet);
+      WiFi.config(ip, gateway, subnet, dns);
     }
     WiFi.hostname(PLANT_NAME);
 
     if (WIRELESS_MODE == 2) {  // WPA2-Enterprise
 
-      wifi_station_clear_cert_key();
-      wifi_station_clear_username();
-      wifi_station_set_username((uint8 *)WIRELESS_USERNAME, sizeof(WIRELESS_USERNAME));
-
-      /*
-      eap_method_t method = EAP_TTLS;
-
+      eap_method_t method = EAP_PEAP;
       struct station_config wifi_config;
       memset(&wifi_config, 0, sizeof(wifi_config));
-      strcpy((char*)wifi_config.ssid, WIRELESS_SSID);
-      //memcpy(wifi_config.password, WIRELESS_PASSWORD,strlen(WIRELESS_PASSWORD));	// only for WPA2-PSK
-      memcpy(wifi_config.password, "", strlen(""));	                                // only for WPA2-Enterprise
-      wifi_config.beacon_interval = 100;
-      wifi_config.max_connection = 8;
+      strcpy((char*)wifi_config.ssid, NVRAM_Read(_WIRELESS_SSID).c_str());
+      //memcpy(wifi_config.ssid, WIRELESS_SSID, sizeof(WIRELESS_SSID));
+      //memcpy(wifi_config.password, WIRELESS_PASSWORD, strlen(WIRELESS_PASSWORD));	// only for WPA2-PSK
+      //memcpy(wifi_config.password, "", 0);	                                      // only for WPA2-Enterprise
+      //wifi_config.beacon_interval = 100;
+      //wifi_config.max_connection = 4;
       wifi_station_set_config(&wifi_config);
-
+      
+      wifi_station_set_wpa2_enterprise_auth(1);
       wifi_station_clear_enterprise_identity();
       wifi_station_clear_enterprise_username();
       wifi_station_clear_enterprise_password();
-      //wifi_station_clear_enterprise_new_password();
+      
+      //Must have @<domain.com> otherwise default anonymous@espressif.com is used
+      wifi_station_set_enterprise_identity((u8*)NVRAM_Read(_WIRELESS_USERNAME).c_str(), NVRAM_Read(_WIRELESS_USERNAME).length());
+      //wifi_station_set_enterprise_identity((u8*)"esptest@domain.com", strlen("esptest@domain.com"));
 
-      wifi_station_set_wpa2_enterprise_auth(1);
-      wifi_station_set_enterprise_identity((uint8 *)WIRELESS_USERNAME, sizeof(WIRELESS_USERNAME));
+      if (method == EAP_PEAP || method == EAP_TTLS) {
 
-      if (method == EAP_TLS) {
-        wifi_station_clear_enterprise_cert_key();
-        //wifi_station_set_enterprise_cert_key(client_cert, sizeof(client_cert), client_key, sizeof(client_key), NULL, 0);
-      } else if (method == EAP_PEAP || method == EAP_TTLS) {
-        wifi_station_clear_enterprise_ca_cert();
-        wifi_station_set_enterprise_username((uint8 *)WIRELESS_USERNAME, sizeof(WIRELESS_USERNAME));
-        wifi_station_set_enterprise_password((uint8 *)NVRAM_Read(_WIRELESS_PASSWORD).c_str(), sizeof(NVRAM_Read(_WIRELESS_PASSWORD)));
-
-        // ESP8266 does not support bigger than SHA256 certificate
-        File file = LittleFS.open("/radius.cer", "r");
-        if (file) {
-          size_t size = file.size();
-          uint8_t* ca_cert = (uint8_t*)calloc(size + 1, sizeof(uint8_t)); //malloc(size);
-          file.read(ca_cert, size);
-          file.close();
-          wifi_station_set_enterprise_ca_cert(ca_cert, sizeof(ca_cert)); //This is an option for EAP_PEAP and EAP_TTLS.
-        }
+        wifi_station_set_enterprise_username((u8*)NVRAM_Read(_WIRELESS_USERNAME).c_str(), NVRAM_Read(_WIRELESS_USERNAME).length());
+        wifi_station_set_enterprise_password((u8*)NVRAM_Read(_WIRELESS_PASSWORD).c_str(), NVRAM_Read(_WIRELESS_PASSWORD).length());
+        //wifi_station_set_enterprise_username((u8*)"esptest@domain.com", strlen("esptest@domain.com"));
+        //wifi_station_set_enterprise_password((u8*)"esptest0", strlen("esptest0"));
       }
-      wifi_station_connect();
-      */
-    } else if (WIRELESS_MODE == 3) {
-      WiFi.enableInsecureWEP();  //Old School
-    }
 
-    WiFi.begin(WIRELESS_SSID, NVRAM_Read(_WIRELESS_PASSWORD));  //Connect to the WiFi network
+      //ESP8266 does not support bigger than SHA256 certificate
+      /*
+      File file = LittleFS.open("/radius.cer", "r");
+      if (file) {
+        size_t size = file.size();
+        uint8_t* cert = (uint8_t*) malloc(size);
+        file.read(cert, size);
+        file.close();
+        if (method == EAP_TLS) {
+          file = LittleFS.open("/radius.key", "r");
+          if (file) {
+            size_t size = file.size();
+            uint8_t* cert_key = (uint8_t*) malloc(size);
+            file.read(cert_key, size);
+            file.close();
+            wifi_station_clear_enterprise_cert_key();
+            wifi_station_set_enterprise_cert_key(cert, sizeof(cert), cert_key, sizeof(cert_key), NULL, 0);
+            free(cert_key); //free malloc()
+          }
+        } else if (method == EAP_TTLS) {
+          wifi_station_clear_enterprise_ca_cert();
+          wifi_station_set_enterprise_ca_cert(cert, sizeof(cert)); //This is an option for EAP_PEAP and EAP_TTLS.
+        }
+        free(cert); //free malloc()
+      }
+      */
+      wifi_station_connect();
+
+    } else {
+      if (WIRELESS_MODE == 3)
+        WiFi.enableInsecureWEP();  //Old School
+
+      WiFi.begin(NVRAM_Read(_WIRELESS_SSID), NVRAM_Read(_WIRELESS_PASSWORD));  //Connect to the WiFi network
+    }
 
     //No wifi-scan required when RF channel and AP mac-address is provided
     //uint8_t WIRELESS_BSSID[6] = { 0xF8, 0x1E, 0xDF, 0xFE, 0xE9, 0x39 };
@@ -680,8 +695,8 @@ void setupWiFi(uint8_t timeout, uint8_t power) {
     if (ALERTS[0] == '1')
       smtpSend("DHCP IP", LOCAL_IP);
 
-      //nvram = WiFi.localIP().toString();
-      //nvram.toCharArray(NETWORK_IP, nvram.length());
+    //nvram = WiFi.localIP().toString();
+    //nvram.toCharArray(NETWORK_IP, nvram.length());
 
 #if DEBUG
     Serial.println(WiFi.localIP().toString());
@@ -817,7 +832,7 @@ void setupWebServer() {
     //NVRAM_Write(_DATA_LOG, "0");
     request->send(200, text_plain, "...");
   });
-  server.on("/login", HTTP_POST, [](AsyncWebServerRequest *request) {
+  server.on("/login", HTTP_ANY, [](AsyncWebServerRequest *request) {
     if (request->getParam(0)->value() == DEMO_PASSWORD) {
       DEMO_PASSWORD[0] = 0;  //reset
     }
@@ -912,7 +927,7 @@ void setupWebServer() {
         return request->requestAuthentication();
 
     String updateURL = "http://" + LOCAL_IP + "/update";
-    String updateHTML = "<!DOCTYPE html><html><head></head><body><form method=POST action='" + updateURL + "' enctype='multipart/form-data'><input type=file accept='.bin' name=firmware><input type=submit value='Update Firmware'></form><br><form method=POST action='" + updateURL + "' enctype='multipart/form-data'><input type=file accept='.bin' name=filesystem><input type=submit value='Update Filesystem'></form></body></html>";
+    String updateHTML = "<!DOCTYPE html><html><body><form method=POST action='" + updateURL + "' enctype='multipart/form-data'><input type=file accept='.bin' name=firmware><input type=submit value='Update Firmware'></form><br><form method=POST action='" + updateURL + "' enctype='multipart/form-data'><input type=file accept='.bin' name=filesystem><input type=submit value='Update Filesystem'></form></body></html>";
     request->send(200, text_html, updateHTML);
   });
   /*
@@ -923,7 +938,7 @@ void setupWebServer() {
     request->send(200, text_plain, "<pre>Format " + result + "\nTotal Flash Size: " + String(ESP.getFlashChipSize()) + "\nFilesystem Size: " + String(fs_info.totalBytes) + "\nFilesystem Used: " + String(fs_info.usedBytes) + "</pre>");
   });
   */
-#if ASYNC_TCP_SSL_ENABLED
+#if ASYNCWEBSERVER_SSL
   //Web Updates only work over HTTP (TODO: Check Update Library)
   httpserver.on(
 #else
@@ -965,6 +980,29 @@ void setupWebServer() {
     }
   });
 
+   /*
+    Captive portals
+    ---------------
+    - Apple /hotspot-detect.html
+    - Android /generate_204
+    - Firefox /canonical.html > /captive-portal
+    - Microsoft /connecttest.txt > /redirect
+  */
+#if ASYNCWEBSERVER_REGEX
+  //anchored start to ^ improves performance
+  //server.on("(?is)^\\/(\bhotspot-detect\b|\bgenerate_204\b|\bconnecttest\b)", HTTP_GET, [](AsyncWebServerRequest *request) {
+  server.on("(hotspot-detect\.html+)|(generate_204+)|(connecttest\.txt+)$", HTTP_GET, [](AsyncWebServerRequest *request) {
+    request->send(200, text_html, "<center><h1>http://" + LOCAL_IP + "</h1></center>");
+  });
+  //server.on("(?is)^\\/(\bredirect\b|\bcaptive-portal\b)", HTTP_GET, [](AsyncWebServerRequest *request) {
+  server.on("(redirect+)|(captive-portal+)$", HTTP_GET, [](AsyncWebServerRequest *request) {
+    request->redirect("http://" + LOCAL_IP);
+  });
+  server.on("^\\/regex\\/([0-9]+)$", HTTP_GET, [] (AsyncWebServerRequest *request) {
+    request->send(200, text_plain, "OK");
+  });
+#endif
+
   server.onNotFound([](AsyncWebServerRequest *request) {
     //Serial.println((request->method() == HTTP_GET) ? "GET" : "POST");
 
@@ -974,44 +1012,27 @@ void setupWebServer() {
 #if DEBUG
     Serial.println("Request:" + file);
 #endif
-    /*
-    Captive portals
-    ---------------
-    - Apple /hotspot-detect.html
-    - Android /generate_204
-    - Firefox /canonical.html > /captive-portal
-    - Microsoft /connecttest.txt > /redirect
-    */
 
-    if (file.endsWith("detect.html") || file.endsWith("generate_204") || file.endsWith("test.txt")) {
-      //file = "/index.html";
-      //if (!LittleFS.exists(file)) {
+#if !ASYNCWEBSERVER_REGEX
+    if (file.endsWith("detect.html") || file.endsWith("generate_204")) { // || file.endsWith("test.txt")) {
+      //if (!LittleFS.exists("/index.html")) {
       request->send(200, text_html, "<center><h1>http://" + LOCAL_IP + "</h1></center>");
       //}
     } else if (file.endsWith("redirect") || file.endsWith("portal")) {
       request->redirect("http://" + LOCAL_IP);
-      //}else if (file.endsWith("canonical.html")) {
-      //  request->send(200, text_html, "<meta http-equiv=\"refresh\" content=\"0;url=http://support.mozilla.org/kb/captive-portal\"/>");
-      //}else if (file.endsWith("success.txt")) {
-      //  request->send(200, text_plain, "success");
+    } else
+#endif
+    if (LittleFS.exists(file)) {
+      AsyncWebServerResponse *response = request->beginResponse(LittleFS, file, getContentType(file));
+      response->addHeader("Content-Encoding", "gzip");
+      //response->addHeader("Cache-Control", "max-age=3600");
+      request->send(response);
     } else {
-      if (LittleFS.exists(file)) {
-        String contentType = getContentType(file);
-
-        AsyncWebServerResponse *response = request->beginResponse(LittleFS, file, contentType);
-        if (!file.endsWith(".log")) {
-          response->addHeader("Content-Encoding", "gzip");
-        }
-        //response->addHeader("Cache-Control", "max-age=3600");
-        request->send(response);
-
-      } else {
-        request->send(404, text_plain, "404: Not Found");
-      }
+      request->send(404, text_plain, "404: Not Found");
     }
   });
 
-#if ASYNC_TCP_SSL_ENABLED
+#if ASYNCWEBSERVER_SSL
   server.onSslFileRequest([](void *arg, const char *filename, uint8_t **buf) -> int {
 #if DEBUG
     Serial.printf("SSL File: %s\n", filename);
@@ -1065,19 +1086,25 @@ void setupWebServer() {
   */
   server.beginSecure("/server.cer", "/server.key", NULL);
 
+#if ASYNCWEBSERVER_REGEX
   // HTTP to HTTPS Redirect
-  httpserver.on("^\\/([a-zA-Z0-9]+)$", HTTP_GET, [](AsyncWebServerRequest *request) {
+  httpserver.on("^\\/([a-z0-9]+)$", HTTP_GET, [](AsyncWebServerRequest *request) {
     //HTTPS_FQDN = LOCAL_IP;
     request->redirect("https://" + HTTPS_FQDN + request->url());
   });
+#else
   httpserver.onNotFound([](AsyncWebServerRequest *request) {
     //HTTPS_FQDN = LOCAL_IP;
     request->redirect("https://" + HTTPS_FQDN + request->url());
   });
+#endif
   httpserver.begin();
 #else
   server.begin();  // Web server start
 #endif
+
+  //server.serveStatic("/", LittleFS, "/");
+  //server.onRequestBody(serverCompression);
 }
 
 void loop() {
@@ -1166,19 +1193,25 @@ void loop() {
     Serial.printf("Week: %s\n", String(DEMO_AVAILABILITY).substring(0, 7));
     Serial.printf("Range: %u:%u\n", ON_TIME, OFF_TIME);
 #endif
+    //Always ON based on day of week (power cosumption AP = ~70mA STA = ~20mA)
+    if (DEMO_AVAILABILITY[rtcData.ntpWeek] == '1' && h >= ON_TIME && h < OFF_TIME)
+    {
+      WiFi.forceSleepWake(); //try to get true mode as MODEM_SLEEP causes WIFI_OFF
+      delay(1);
 
-    //Always ON based on day of week (power cosumption AP = ~0.07mA STA = ~0.02mA)
-    if (DEMO_AVAILABILITY[rtcData.ntpWeek] == '1' && WiFi.getMode() == WIFI_OFF && h >= ON_TIME && h < OFF_TIME) {
-#if DEBUG
-      Serial.println("WiFi ON");
-#endif
-      DEEP_SLEEP = 0;
-      LOG_INTERVAL = NVRAM_Read(_LOG_INTERVAL).toInt();
-      offsetTiming();
+      if (WiFi.getMode() == WIFI_OFF)
+      {
+    #if DEBUG
+          Serial.println("WiFi ON");
+    #endif
+        LOG_INTERVAL = NVRAM_Read(_LOG_INTERVAL).toInt();
+        DEEP_SLEEP = 0;
+        offsetTiming();
 
-      setupWiFi(0, 1);
-      setupWebServer();
-    } else if (DEEP_SLEEP == 0 && h >= OFF_TIME) {  //outside of working hours
+        setupWiFi(0, 1);
+        setupWebServer();
+      }
+    } else if (DEEP_SLEEP_S == 0 && h >= OFF_TIME) {  //outside of working hours
 #if DEBUG
       Serial.println("WiFi OFF");
 #endif
@@ -1619,9 +1652,7 @@ String NVRAM_Read(uint8_t address) {
 
 void NVRAM_Read_Config() {
 
-  DEEP_SLEEP = NVRAM_Read(_DEEP_SLEEP).toInt();
-  if (DEEP_SLEEP > 1)
-    DEEP_SLEEP *= 60;
+  DEEP_SLEEP = NVRAM_Read(_DEEP_SLEEP).toInt() * 60;
   LOG_INTERVAL = NVRAM_Read(_LOG_INTERVAL).toInt();
 
   DATA_LOG = NVRAM_Read(_DATA_LOG).toInt();

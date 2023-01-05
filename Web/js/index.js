@@ -64,56 +64,46 @@ document.addEventListener('DOMContentLoaded', function(event)
 {
 	loadTheme();
 
-    console.log(navigator.appCodeName);
-	console.log(navigator.appName);
-	console.log(navigator.appVersion);
-	console.log(navigator.platform);
-	console.log(navigator.userAgent);
+    loadSVG();
 	
-	if(navigator.platform == 'MacIntel' && navigator.appVersion.indexOf('AppleWebKit') != -1 && navigator.appVersion.indexOf('Safari') == -1) {
-		document.getElementById('captive-portal').classList.remove('hidden');
-	}else{
-	    loadSVG();
-		
-		updateNTP();
+	updateNTP();
 
-	    document.getElementById('wireless-settings-ok').onclick = function() {
-			if(DEMOLOCK) {
-				PlantLogin();
-			}else{
-		        if($('#EnableLogCheckbox').prop('checked') == true) {
-		        	var loginterval = $('#EnableLogInterval').val();
-		        	var deepsleep = $('#power-Slider').data('roundSlider').getValue();
+    document.getElementById('wireless-settings-ok').onclick = function() {
+		if(DEMOLOCK) {
+			PlantLogin();
+		}else{
+	        if($('#EnableLogCheckbox').prop('checked') == true) {
+	        	var loginterval = $('#EnableLogInterval').val();
+	        	var deepsleep = $('#power-Slider').data('roundSlider').getValue();
 
-		        	//console.log(loginterval  + " < " + deepsleep);
-		        	if(loginterval < (deepsleep * 60)) {
-					    saveSetting(DEEP_SLEEP, 1); //in minutes
-						notify('','Deep Sleep is longer than Log Interval', 'danger');
-						notify('', 'Wireless Always On', 'success');
-		        	}
-		        }
-		        document.getElementById('wireless-SettingsForm').submit();
-			}
-		};
+	        	//console.log(loginterval  + " < " + deepsleep);
+	        	if(loginterval < (deepsleep * 60)) {
+				    saveSetting(DEEP_SLEEP, 1); //in minutes
+					notify('','Deep Sleep is longer than Log Interval', 'danger');
+					notify('', 'Wireless Always On', 'success');
+	        	}
+	        }
+	        document.getElementById('wireless-SettingsForm').submit();
+		}
+	};
 
-		document.getElementById('alert-settings-ok').onclick = function() {
-			if(DEMOLOCK) {
-				PlantLogin();
-			}else{
-				AlertSet([0, 0, 0, 0, 0, 0, 0, 0]);
-		    	document.getElementById('alert-SettingsForm').submit();
-			}
-		};
+	document.getElementById('alert-settings-ok').onclick = function() {
+		if(DEMOLOCK) {
+			PlantLogin();
+		}else{
+			AlertSet([0, 0, 0, 0, 0, 0, 0, 0]);
+	    	document.getElementById('alert-SettingsForm').submit();
+		}
+	};
 
-		document.getElementById('demo-settings-ok').onclick = function() {
-			if(DEMOLOCK) {
-				PlantLogin();
-			}else{
-				AvailabilityWeek([0, 0, 0, 0, 0, 0, 0]);
-		    	document.getElementById('demo-SettingsForm').submit();
-			}
-		};
-	}
+	document.getElementById('demo-settings-ok').onclick = function() {
+		if(DEMOLOCK) {
+			PlantLogin();
+		}else{
+			AvailabilityWeek([0, 0, 0, 0, 0, 0, 0]);
+	    	document.getElementById('demo-SettingsForm').submit();
+		}
+	};
 });
 
 function updateNTP() {
@@ -855,7 +845,7 @@ function emailValidate(email)
 	return true;
 };
 
-function smtpValidate(item)
+function inputValidate(item)
 {
 	if(item.value == '')
 		return;
@@ -863,9 +853,14 @@ function smtpValidate(item)
 	clearTimeout(notifyTimer);
     notifyTimer = setTimeout(function() {
     	var smtp = $('#AlertSMTPServer').val();
-    	if(item.id == 'AlertEmail') {
+
+    	if(item.id == 'WiFiUsername') {
 			if(!emailValidate(item.value)) {
-				notify('', 'Email format needs @domain.com', 'danger');
+				notify('', 'EAP PEAP identity requires @<domain.com>', 'danger');
+			}
+    	}else if(item.id == 'AlertEmail') {
+			if(!emailValidate(item.value)) {
+				notify('', 'Email format needs @<domain.com>', 'danger');
 			}
 		}else if(item.id == 'AlertSMTPServer') {
 	    	if(smtp.indexOf(':') == -1) {
