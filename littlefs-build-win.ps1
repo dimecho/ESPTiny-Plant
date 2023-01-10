@@ -15,9 +15,11 @@ cd $PSScriptRoot
 #Copy Files
 #==============
 Remove-Item -Recurse -Force .\data -ErrorAction SilentlyContinue
-Copy-Item -Path .\Web\ -Filter *.* -Destination .\data\ -Recurse -Force
+Copy-Item -Path .\Web\ -Filter *.* -Destination .\data\ -Recurse
 Remove-Item -Recurse -Force .\data\img -ErrorAction SilentlyContinue
 Remove-Item -Recurse -Force .\data\nvram.json -ErrorAction SilentlyContinue
+New-Item -ItemType directory -Path .\data\img
+Copy-Item -Path .\Web\img\cert.svg -Destination .\data\img
 
 #====================
 #Download Compressors

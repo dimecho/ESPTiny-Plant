@@ -514,6 +514,25 @@
 		                                <div class="col-lg-6 col-12">
 		                                </div>
 		                            </div>
+		                            <div class="row mt-5">
+		                            	<div class="col-lg-3 col-12">
+			                                <form method="POST" action="/tls" enctype="multipart/form-data" id="formCertificate">
+					                            <input type="file" accept=".der,.cer" name="cert" id="fileCertificate" hidden />
+					                            <input type="submit" hidden />
+					                        </form>
+		                                    <button class="btn btn-primary w-100" type="button" id="browseCertificate">Certificate</button>
+		                                </div>
+		                                <div class="col-lg-3 col-12">
+					                        <form method="POST" action="/tls" enctype="multipart/form-data" id="formPrivateKey">
+					                            <input type="file" accept=".der,.key" name="key" id="filePrivateKey" hidden />
+					                            <input type="submit" hidden />
+					                        </form>
+		                                    <button class="btn btn-primary w-100" type="button" id="browsePrivateKey">Private Key</button>
+		                                </div>
+		                                <div class="col-lg-6 col-12">
+		                                	<img src="img/cert.svg" width="64" height="64" />
+		                                </div>
+		                            </div>
 		                            <div class="row mt-4">
 		                            	<div class="col">
 		                            		<div class="progress progress-striped active">

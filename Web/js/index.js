@@ -46,18 +46,17 @@ var PLANT_SOIL_MOISTURE = 17;
 var PLANT_MANUAL_TIMER = 18;
 var PLANT_SOIL_TYPE = 19;
 var PLANT_TYPE = 20;
-var PLANT_LED = 21;
-var DEEP_SLEEP = 22;
+var DEEP_SLEEP = 21;
 //==========
-var EMAIL_ALERT = 23;
-var SMTP_SERVER = 24;
-var SMTP_USERNAME = 25;
-var SMTP_PASSWORD = 26;
-var PLANT_NAME = 27
-var ALERTS = 28;
-var DEMO_PASSWORD = 29;
-var TIMEZONE_OFFSET = 30;
-var DEMO_AVAILABILITY = 31;
+var EMAIL_ALERT = 22;
+var SMTP_SERVER = 23;
+var SMTP_USERNAME = 24;
+var SMTP_PASSWORD = 25;
+var PLANT_NAME = 26;
+var ALERTS = 27;
+var DEMO_PASSWORD = 28;
+var TIMEZONE_OFFSET = 29;
+var DEMO_AVAILABILITY = 30;
 var DEMOLOCK = false;
 
 document.addEventListener('DOMContentLoaded', function(event)
@@ -109,7 +108,7 @@ document.addEventListener('DOMContentLoaded', function(event)
 function updateNTP() {
 	const d = new Date();
 	var ntp = new XMLHttpRequest();
-	ntp.open('GET', 'ntp?week=' + d.getDay() + '&hour=' + d.getHours() + '&minute=' + d.getMinutes(), true);
+	ntp.open('GET', 'api?week=' + d.getDay() + '&hour=' + d.getHours() + '&minute=' + d.getMinutes() + '&ntp=1', true);
 	ntp.send();
 };
 
@@ -157,7 +156,7 @@ function loadSVG(svgfile) {
 			                NVRAMtoSVG(nvram.response);
 			            }
 			            var adc = new XMLHttpRequest();
-			            adc.open('GET', 'adc', true);
+			            adc.open('GET', 'api?adc=1', true);
 			            adc.send();
 			            adc.onloadend = function() {
 						    if(xhr.status == 200) {
@@ -234,12 +233,13 @@ function loadSVG(svgfile) {
 			                var x = document.getElementById('led-enabled');
 						  	if (x.style.display === 'block') {
 						  		x.style.display = 'none';
-						   		saveSetting(PLANT_LED, 0);
+						   		//saveSetting(PLANT_LED, 0);
+						   		saveSetting('8&alert=0',0);
 						  	} else {
 						   		x.style.display = 'block';
-						    	document.getElementById('power-text').textContent = 8;
-						    	saveSetting(PLANT_LED, 1);
-			                	saveSetting(DEEP_SLEEP, 8);
+						   		//saveSetting(PLANT_LED, 1);
+						   		saveSetting('8&alert=1',1);
+						    	//document.getElementById('power-text').textContent = 8;
 						  	}
 			            }
 
@@ -479,9 +479,6 @@ function loadSVG(svgfile) {
 				                    document.getElementsByName('WiFiMode')[data['nvram'][WIFI_MODE]].checked = true;
 				                    SetWiFiMode();
 
-				                    AlertSet([data['nvram'][ALERTS].charAt(0), data['nvram'][ALERTS].charAt(1), data['nvram'][ALERTS].charAt(2), data['nvram'][ALERTS].charAt(3), data['nvram'][ALERTS].charAt(4), data['nvram'][ALERTS].charAt(5), data['nvram'][ALERTS].charAt(6), data['nvram'][ALERTS].charAt(7)]);
-
-
 				                    $('#AlertEmail').val(data['nvram'][EMAIL_ALERT]);
 				                    $('#AlertSMTPUsername').val(data['nvram'][SMTP_USERNAME]);
 				                    var smtp = data['nvram'][SMTP_SERVER];
@@ -534,8 +531,7 @@ function loadSVG(svgfile) {
 					                progressTimer(80, 1);
 					                document.getElementById('formLittleFS').submit();
 					            }
-				            })
-
+				            });
 				            $('#fileFirmware').change(function() {
 				            	if(DEMOLOCK) {
 									PlantLogin();
@@ -544,23 +540,35 @@ function loadSVG(svgfile) {
 					                progressTimer(20, 1);
 					                document.getElementById('formFirmware').submit();
 					            }
-				            })
-
+				            });
 				            $('#browseLittleFS').click(function() {
 				            	if(DEMOLOCK) {
 									PlantLogin();
 								}else{
 				                	$('#fileLittleFS').trigger('click');
 				            	}
-				            })
-
+				            });
 				            $('#browseFirmware').click(function(){
 				            	if(DEMOLOCK) {
 									PlantLogin();
 								}else{
 				                	$('#fileFirmware').trigger('click');
 				            	}
-				            })
+				            });
+				            $('#browseCertificate').click(function(){
+				            	if(DEMOLOCK) {
+									PlantLogin();
+								}else{
+				                	$('#fileCertificate').trigger('click');
+				            	}
+				            });
+				            $('#browsePrivateKey').click(function(){
+				            	if(DEMOLOCK) {
+									PlantLogin();
+								}else{
+				                	$('#filePrivateKey').trigger('click');
+				            	}
+				            });
 				        }
 				    }
 				}
@@ -658,7 +666,12 @@ function AlertSet(alerts) {
     		set[i].checked = true;
     	}
     }
-	$('#Alerts').val(alerts.join(""));
+    var l = '0';
+    var x = document.getElementById('led-enabled');
+	if (x.style.display == 'block') {
+		l = '1';
+	}
+	$('#Alerts').val(alerts.join("") + l);
 };
 
 function SetWiFiMode() {
@@ -738,23 +751,26 @@ function HiddenCheck(id, element) {
 
 function NVRAMtoSVG(data)
 {
+    /*
     if(data['nvram'][DATA_LOG] == '1') {
-        $('#graph-enabled').show();
+        document.getElementById('graph-enabled').style.display = 'block';
     }else{
-        $('#graph-enabled').hide();
-    }
-    if(data['nvram'][PLANT_LED] == '1') {
-        $('#led-enabled').show();
+        document.getElementById('graph-enabled').style.display = 'none';
+    } */
+    if(data['nvram'][ALERTS].charAt(8) == '1') {
+        document.getElementById('led-enabled').style.display = 'block';
     }else{
-        $('#led-enabled').hide();
+        document.getElementById('led-enabled').style.display = 'none';
     }
     if (data['nvram'][PLANT_MANUAL_TIMER] == '0') {
-        $('#timer-enabled').hide();
-        $('#timer-disabled').show();
+    	document.getElementById('timer-enabled').style.display = 'none';
+    	document.getElementById('timer-disabled').style.display = 'block';
     }else{
-        $('#timer-disabled').hide();
-        $('#timer-enabled').show();
+    	document.getElementById('timer-disabled').style.display = 'none';
+    	document.getElementById('timer-enabled').style.display = 'block';
     }
+
+    AlertSet([data['nvram'][ALERTS].charAt(0), data['nvram'][ALERTS].charAt(1), data['nvram'][ALERTS].charAt(2), data['nvram'][ALERTS].charAt(3), data['nvram'][ALERTS].charAt(4), data['nvram'][ALERTS].charAt(5), data['nvram'][ALERTS].charAt(6), data['nvram'][ALERTS].charAt(7)]);
     
     document.getElementById('pot-size-text').textContent = data['nvram'][PLANT_POT_SIZE];
     document.getElementById('moisture-text').textContent = data['nvram'][PLANT_SOIL_MOISTURE];
@@ -779,7 +795,7 @@ function sleep(ms) {
 
 function resetFlash()
 {
-	window.open('reset');
+	window.open('api?reset=1');
 };
 
 function testPump()
@@ -787,7 +803,7 @@ function testPump()
 	testPumpLoopback(false, function(log) {
 		var xhr = new XMLHttpRequest();
 		xhr.clearlog = log.responseText;
-		xhr.open('GET', 'pump', true);
+		xhr.open('GET', 'api?pump=1', true);
 	    xhr.send();
 	    xhr.onload = function() {
 	        if (xhr.status == 200) {
@@ -830,7 +846,7 @@ function testPumpLoopback(clearlog, callback)
 			}
 			if(clearlog) {
 				var clog = new XMLHttpRequest();
-				clog.open('GET', 'clearlog', true);
+				clog.open('GET', 'data.log?clear=1', true);
 				clog.send();
 			}
         }
@@ -889,7 +905,7 @@ function inputValidate(item)
 function testFlood(water)
 {
 	var xhr = new XMLHttpRequest();
-	xhr.open('GET', 'empty?water=' + water, true);
+	xhr.open('GET', 'api?water=' + water + '&empty=1', true);
     xhr.onload = function() {
         if (xhr.status == 200) {
         	if(xhr.responseText == "Locked") {
@@ -983,7 +999,7 @@ function testEmail()
 		notify('', 'Missing SMTP Server', 'danger');
 	}else{
 		var xhr = new XMLHttpRequest();
-		xhr.open('GET', 'smtp', true);
+		xhr.open('GET', 'api?smtp=1', true);
 	    xhr.send();
 	    xhr.onload = function() {
 	        if (xhr.status == 200) {

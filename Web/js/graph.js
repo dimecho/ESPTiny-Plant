@@ -6,7 +6,7 @@ var lineWidth = 3;
 var pageLimit = 4;
 
 var LOG_INTERVAL = 10;
-var DEEP_SLEEP = 22;
+var DEEP_SLEEP = 21;
 
 var chart_datasets = [{
 	type: 'line',
@@ -460,7 +460,7 @@ function startChart() {
             updateChart();
         }
     }
-    xhr.open('GET', 'clearlog', true);
+    xhr.open('GET', 'data.log?clear=1', true);
     xhr.send();
 };
 
@@ -551,7 +551,7 @@ function updateChart() {
         	$.iGrowl({ type: 'error', message:  'HTTP Error ' + xhr.status});
         }
     }
-    xhr.open('GET', 'adc', true);
+    xhr.open('GET', 'api?adc=1', true);
     xhr.send();
 };
 
