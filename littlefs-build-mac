@@ -2,9 +2,7 @@
 
 cd "$(dirname "$0")"
 
-#=============
-#Copy Files
-#=============
+#Copy Web Files
 rm -rf data
 cp -rf Web data
 rm -rf data/img
@@ -12,33 +10,35 @@ rm -rf data/nvram.json
 rm -rf data/svg/index.html
 mkdir data/img
 cp -rf Web/img/cert.svg data/img
-
 purgecss --css data/bootstrap.css --content data/*.html --whitelist bg-success,bg-danger,bg-warning --output data/css/bootstrap.css
 purgecss --css data/bootstrap.slate.css --content data/*.html --whitelist bg-success,bg-danger,bg-warning  --output data/css/bootstrap.slate.css
 purgecss --css data/roundslider.css --content data/*.html --whitelist --output data/css/roundslider.css
 purgecss --css data/rangeslider.css --content data/*.html --whitelist --output data/css/rangeslider.css
 purgecss --css data/igrowl.css --content data/*.html --whitelist --output data/css/igrowl.css
-#==============
-#Download Tool
-#==============
-mkdir -p tools
-if [ ! -f tools/mklittlefs ]; then
-    curl -L -o tools/x86_64-apple-darwin14-mklittlefs-295fe9b.tar.gz -k -C - https://github.com/earlephilhower/mklittlefs/releases/download/3.0.0/x86_64-apple-darwin14-mklittlefs-295fe9b.tar.gz
-    cd tools
-    gunzip -c x86_64-apple-darwin14-mklittlefs-295fe9b.tar.gz | tar xopf -
-    mv mklittlefs ./mklittlefs-295fe9b
-    mv mklittlefs-295fe9b/mklittlefs ./
-    rm -rf mklittlefs-295fe9b
-    cd ../
-fi
 
-#==============
-#Compress Files
-#==============
+#Compress Web Files
 for f in $(find data -type f -name '*.*' ! -name '*.key' ! -name '*.cer'); do
     gzip "$f"
     mv "$f.gz" "$f"
 done
 
+for dir in $(find ~/Library/Arduino15/packages/esp8266/hardware/esp8266 -depth 1 -type d); do
+    esp8266="$(basename $dir)"
+    break
+done
+
+for dir in $(find ~/Library/Arduino15/packages/esp8266/tools/mklittlefs/ -depth 1 -type d); do
+    gcc="$(basename $dir)"
+    break
+done
+
+#Build LittleFS
 mkdir -p build
-./tools/mklittlefs -c ./data/ -b 8192 -p 256 -s 680000 ./build/flash-littlefs.bin
+~/Library/Arduino15/packages/esp8266/tools/mklittlefs/$gcc/mklittlefs -c ./data/ -b 8192 -p 256 -d 5 -s 640000 ./build/flash-littlefs.bin
+
+#Compress LittleFS
+#gzip -9 ./build/flash-littlefs.bin
+#mv ./build/flash-littlefs.bin.gz  ./build/flash-littlefs.bin
+
+#Sign LittleFS
+~/Library/Arduino15/packages/esp8266/hardware/esp8266/$esp8266/tools/signing.py --mode sign --privatekey ./private.key --bin ./build/flash-littlefs.bin --out ./build/flash-littlefs.signed

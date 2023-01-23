@@ -488,14 +488,14 @@
 		                            <div class="row">
 		                            	<div class="col-lg-3 col-12">
 			                                <form method="POST" action="/update" enctype="multipart/form-data" id="formLittleFS">
-					                            <input type="file" accept=".bin" name="filesystem" id="fileLittleFS" hidden />
+					                            <input type="file" accept=".bin,.signed" name="filesystem" id="fileLittleFS" hidden />
 					                            <input type="submit" hidden />
 					                        </form>
 		                                    <button class="btn btn-primary w-100" type="button" id="browseLittleFS">Flash LittleFS</button>
 		                                </div>
 		                                <div class="col-lg-3 col-12">
 					                        <form method="POST" action="/update" enctype="multipart/form-data" id="formFirmware">
-					                            <input type="file" accept=".bin" name="firmware" id="fileFirmware" hidden />
+					                            <input type="file" accept=".bin,.signed" name="firmware" id="fileFirmware" hidden />
 					                            <input type="submit" hidden />
 					                        </form>
 		                                    <button class="btn btn-primary w-100" type="button" id="browseFirmware">Flash Firmware</button>
@@ -530,7 +530,7 @@
 		                                    <button class="btn btn-primary w-100" type="button" id="browsePrivateKey">Private Key</button>
 		                                </div>
 		                                <div class="col-lg-6 col-12">
-		                                	<img src="img/cert.svg" width="64" height="64" />
+		                                	<img src="img/cert.svg" loading="lazy" width="64" height="64" />
 		                                </div>
 		                            </div>
 		                            <div class="row mt-4">
