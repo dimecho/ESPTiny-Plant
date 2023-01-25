@@ -2,25 +2,28 @@
 
 cd "$(dirname "$0")"
 
+for dir in $(find ~/Library/Arduino15/packages/esp8266/hardware/esp8266 -depth 1 -type d); do
+    esp8266="$(basename $dir)"
+    break
+done
+
 echo " > Flash Filesystem (LittleFS)? (y/n)"
 read yn
 if [ $yn = y ]; then
-    #if [[ ! $(type -p pip) ]]; then
-    #    cd ~/Downloads
-    #    curl https://bootstrap.pypa.io/get-pip.py -o get-pip.py
-    #    python get-pip.py --user --no-warn-script-location
-    #fi
-    #pip install pyserial --user
-    #pip install esptool --user
+    echo " > Over The Air (OTA)? (y/n)"
+    read yn
+    if [ $yn = y ]; then
+        ~/Library/Arduino15/packages/esp8266/hardware/esp8266/$esp8266/tools/espota.py -r -i 192.168.8.8 -p 8266 -s -f build/flash-littlefs.bin
+    else
+        shopt -s nocasematch
 
-    shopt -s nocasematch
-    
-    cu=$(ls /dev/cu.* && ls /dev/tty.usb*)
-    for serial in $cu; do
-        if [[ $serial == *usb* ]] || [[ $serial == *ch34* ]] || [[ $serial == *pl23* ]] ; then
-           echo $serial
-           tools/esptool --port $serial --baud 115200 write_flash 0x100000 build/flash-littlefs.bin
-            break
-        fi
-    done
+        cu=$(ls /dev/cu.* && ls /dev/tty.usb*)
+        for serial in $cu; do
+            if [[ $serial == *usb* ]] || [[ $serial == *ch34* ]] || [[ $serial == *pl23* ]] ; then
+                echo $serial
+                ~/Library/Arduino15/packages/esp8266/hardware/esp8266/$esp8266/tools/esptool/esptool.py --port $serial --baud 115200 write_flash 0x100000 build/flash-littlefs.bin
+                break
+            fi
+        done
+    fi
 fi

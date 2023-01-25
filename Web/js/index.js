@@ -211,7 +211,7 @@ function loadSVG(svgfile) {
 												div.onclick = function() {
 													var id = this.id;
 													console.log(i);
-													saveSetting(PLANT_TYPE, i, function() { loadSVG(id); modal.hide(); });
+													//saveSetting(PLANT_TYPE, i, function() { loadSVG(id); modal.hide(); });
 									            }
 							                	svgPlant.appendChild(div);
 							                }
@@ -437,7 +437,9 @@ function loadSVG(svgfile) {
 				                    var data = nvram.response; //nvram.responseText;
 				                    document.getElementById('coreVersion').textContent = 'Core Version: ' + data['nvram'][0].split('|')[0];
 				                    document.getElementById('sdkVersion').textContent = 'SDK Version: ' + data['nvram'][0].split('|')[1];
-				                    document.getElementById('firmwareVersion').textContent = 'Firmware Version: ' + data['nvram'][0].split('|')[2];
+				                    var LFS_VERSION = data['nvram'][0].split('|')[2];
+				                    document.getElementById('fsVersion').textContent = 'LittleFS Version: ' + (0xffff & (LFS_VERSION >> 16)) + "." + (0xffff & (LFS_VERSION >> 0)) + "." + (0xffff & (LFS_VERSION >> 20));
+				                    document.getElementById('firmwareVersion').textContent = 'Firmware Version: ' + data['nvram'][0].split('|')[3];
 
 				                    var bool_value = data['nvram'][WIFI_HIDE] == '1' ? true : false;
 				                    $('#WiFiHidden').val(data['nvram'][WIFI_HIDE]);

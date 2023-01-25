@@ -9,7 +9,7 @@ Remember: Brand new ESP-12 short GPIO0 to GND (flash mode) then UART TX/RX
 
 #define DEBUG 0
 #define THREADED 0
-#define EEPROM_ID 0x3BDAB914  //Identify Sketch by EEPROM
+#define EEPROM_ID 0x3BDAB915  //Identify Sketch by EEPROM
 #define ASYNCWEBSERVER_SSL 0
 /*
 NOTE for HTTPS
@@ -40,6 +40,8 @@ NOTE for HTTPS
   compiler.cpp.extra_flags=-DASYNCWEBSERVER_REGEX=1
 */
 
+#define SPIFFS LittleFS
+#include <LittleFS.h>
 #include <Updater.h>
 //#define ATOMIC_FS_UPDATE  //gzip works with 4MB (FS: 1MB, OTA ~1019kB)
 /*
@@ -59,8 +61,8 @@ NOTE for HTTPS
 #endif
 */
 
+//#include <ArduinoOTA.h>
 #include <EEPROM.h>
-#include <LittleFS.h>
 #include <StreamString.h>
 #include <NTPClient.h>
 #include <ESP8266WiFi.h>
@@ -444,8 +446,13 @@ void setup() {
   nvram.toCharArray(DEMO_AVAILABILITY, sizeof(nvram));
   ON_TIME = String(DEMO_AVAILABILITY).substring(7, 9).toInt();
   OFF_TIME = String(DEMO_AVAILABILITY).substring(9, 11).toInt();
-  PLANT_NAME = NVRAM_Read(_PLANT_NAME);
   DEMO_PASSWORD = NVRAM_Read(_DEMO_PASSWORD);
+  WIRELESS_MODE = NVRAM_Read(_WIRELESS_MODE).toInt();
+  WIRELESS_HIDE = NVRAM_Read(_WIRELESS_HIDE).toInt();
+  WIRELESS_CHANNEL = NVRAM_Read(_WIRELESS_CHANNEL).toInt();
+  WIRELESS_PHY_MODE = NVRAM_Read(_WIRELESS_PHY_MODE).toInt();
+  WIRELESS_PHY_POWER = NVRAM_Read(_WIRELESS_PHY_POWER).toInt();
+  PLANT_NAME = NVRAM_Read(_PLANT_NAME);
 
   struct rst_info *rstInfo = system_get_rst_info();
   uint8_t wakeupReason = rstInfo->reason;
@@ -471,9 +478,6 @@ void setup() {
     }
     setupWiFi(0, 1);
     setupWebServer();
-
-    //ArduinoOTA.begin();
-    blinky(400, 2, 0);  //Alive blink
   }
 
   offsetTiming();
@@ -481,6 +485,8 @@ void setup() {
 
 //This is a power expensive function 80+mA
 void setupWiFi(uint8_t timeout, uint8_t power) {
+
+  blinky(200, 3, 0);  //Alive blink
 
   //Forcefull Wakeup
   //-------------------
@@ -496,21 +502,17 @@ void setupWiFi(uint8_t timeout, uint8_t power) {
   //-------------------
 
   WiFi.persistent(false);  //Do not write settings to memory
-
-  WIRELESS_PHY_MODE = NVRAM_Read(_WIRELESS_PHY_MODE).toInt();
   WiFi.setPhyMode((WiFiPhyMode_t)WIRELESS_PHY_MODE);
-  WIRELESS_PHY_POWER = NVRAM_Read(_WIRELESS_PHY_POWER).toInt();
+
+  //0    (for lowest RF power output, supply current ~ 70mA
+  //20.5 (for highest RF power output, supply current ~ 80mA
 
   if (WIRELESS_PHY_POWER == 1) {  //auto tune wifi power (minimum power to reach AP)
-    WiFi.setOutputPower(power);   //starting from 1 to 24
+    WiFi.setOutputPower(power);
     power++;
   } else {
     WiFi.setOutputPower(WIRELESS_PHY_POWER);
   }
-
-  WIRELESS_MODE = NVRAM_Read(_WIRELESS_MODE).toInt();
-  WIRELESS_HIDE = NVRAM_Read(_WIRELESS_HIDE).toInt();
-  WIRELESS_CHANNEL = NVRAM_Read(_WIRELESS_CHANNEL).toInt();
   const String WIRELESS_SSID = NVRAM_Read(_WIRELESS_SSID);
   const String WIRELESS_PASSWORD = NVRAM_Read(_WIRELESS_PASSWORD);
 
@@ -580,6 +582,8 @@ void setupWiFi(uint8_t timeout, uint8_t power) {
 
     if (WIRELESS_MODE == 2) {  // WPA2-Enterprise
 
+      const String WIRELESS_USERNAME = NVRAM_Read(_WIRELESS_USERNAME);
+
       eap_method_t method = EAP_PEAP;
       struct station_config wifi_config;
       memset(&wifi_config, 0, sizeof(wifi_config));
@@ -590,63 +594,68 @@ void setupWiFi(uint8_t timeout, uint8_t power) {
       //wifi_config.beacon_interval = 100;
       //wifi_config.max_connection = 4;
       wifi_station_set_config(&wifi_config);
-
-      wifi_station_set_wpa2_enterprise_auth(1);
+      wifi_station_set_reconnect_policy(true);
+      wifi_station_set_wpa2_enterprise_auth(true);
       wifi_station_clear_enterprise_identity();
       wifi_station_clear_enterprise_username();
       wifi_station_clear_enterprise_password();
+      wifi_station_clear_enterprise_cert_key();
+      wifi_station_clear_enterprise_ca_cert();
 
-      const char *WIRELESS_USERNAME = NVRAM_Read(_WIRELESS_USERNAME).c_str();
+      //Connecting to WPA2-ENTERPRISE AP needs more than 26 KB memory
+      if (ESP.getFreeHeap() > 26624)  //ensure enough space
+      {
+        //Must have @<domain.com> otherwise default anonymous@espressif.com is used
+        wifi_station_set_enterprise_identity((u8 *)WIRELESS_USERNAME.c_str(), WIRELESS_USERNAME.length());
+        //wifi_station_set_enterprise_identity((u8*)"esptest@domain.com", strlen("esptest@domain.com"));
 
-      //Must have @<domain.com> otherwise default anonymous@espressif.com is used
-      wifi_station_set_enterprise_identity((u8 *)WIRELESS_USERNAME, sizeof(WIRELESS_USERNAME));
-      //wifi_station_set_enterprise_identity((u8*)"esptest@domain.com", strlen("esptest@domain.com"));
-
-      if (method == EAP_PEAP || method == EAP_TTLS) {
-
-        wifi_station_set_enterprise_username((u8 *)WIRELESS_USERNAME, sizeof(WIRELESS_USERNAME));
-        wifi_station_set_enterprise_password((u8 *)WIRELESS_PASSWORD.c_str(), WIRELESS_PASSWORD.length());
-        //wifi_station_set_enterprise_username((u8*)"esptest@domain.com", strlen("esptest@domain.com"));
-        //wifi_station_set_enterprise_password((u8*)"esptest0", strlen("esptest0"));
-      }
-
-      //ESP8266 does not support bigger than SHA256 certificate
-      if (LittleFS.exists("/radius.cer")) {
-        File file = LittleFS.open("/radius.cer", "r");
-        size_t size = file.size();
-        uint8_t cert[size];
-        size_t offset = 0;
-        while (size > 0) {
-          size_t chunkSize = (size < 512) ? size : 512;
-          file.read(cert + offset, chunkSize);
-          offset += chunkSize;
-          size -= chunkSize;
+        if (method == EAP_PEAP || method == EAP_TTLS) {
+          wifi_station_set_enterprise_username((u8 *)WIRELESS_USERNAME.c_str(), WIRELESS_USERNAME.length());
+          wifi_station_set_enterprise_password((u8 *)WIRELESS_PASSWORD.c_str(), WIRELESS_PASSWORD.length());
+          //wifi_station_set_enterprise_username((u8*)"esptest@domain.com", strlen("esptest@domain.com"));
+          //wifi_station_set_enterprise_password((u8*)"esptest0", strlen("esptest0"));
         }
-        file.close();
-        if (method == EAP_TLS) {
-          if (LittleFS.exists("/radius.key")) {
-            File file = LittleFS.open("/radius.key", "r");
-            size_t size = file.size();
-            uint8_t cert_key[size];
-            size_t offset = 0;
-            while (size > 0) {
-              size_t chunkSize = (size < 512) ? size : 512;
-              file.read(cert_key + offset, chunkSize);
-              offset += chunkSize;
-              size -= chunkSize;
-            }
-            file.close();
-            wifi_station_clear_enterprise_cert_key();
-            wifi_station_set_enterprise_cert_key(cert, sizeof(cert), cert_key, sizeof(cert_key), NULL, 0);
+
+        //ESP8266 does not support bigger than SHA256 certificate
+        //WPA2-ENTERPRISE can only support unencrypted certificate and private key, and only in PEM format
+        if (LittleFS.exists("/radius.cer")) {
+          File file = LittleFS.open("/radius.cer", "r");
+          size_t size = file.size();
+          uint8_t cert[size];
+          size_t offset = 0;
+          while (size > 0) {
+            size_t chunkSize = (size < 512) ? size : 512;
+            file.read(cert + offset, chunkSize);
+            offset += chunkSize;
+            size -= chunkSize;
           }
-        } else if (method == EAP_TTLS) {
-          wifi_station_clear_enterprise_ca_cert();
-          wifi_station_set_enterprise_ca_cert(cert, sizeof(cert));  //This is an option for EAP_PEAP and EAP_TTLS.
+          file.close();
+          if (method == EAP_TLS) {
+            if (LittleFS.exists("/radius.key")) {
+              File file = LittleFS.open("/radius.key", "r");
+              size_t size = file.size();
+              uint8_t cert_key[size];
+              size_t offset = 0;
+              while (size > 0) {
+                size_t chunkSize = (size < 512) ? size : 512;
+                file.read(cert_key + offset, chunkSize);
+                offset += chunkSize;
+                size -= chunkSize;
+              }
+              file.close();
+              wifi_station_set_enterprise_cert_key(cert, sizeof(cert), cert_key, sizeof(cert_key), NULL, 0);
+            }
+          } else if (method == EAP_TTLS) {
+            wifi_station_set_enterprise_ca_cert(cert, sizeof(cert));  //This is an option for EAP_PEAP and EAP_TTLS.
+          }
         }
+        //wifi_station_disconnect();
+        wifi_station_connect();
+      } else {
+        timeout = 22;
       }
-      wifi_station_connect();
-
     } else {
+
       if (WIRELESS_MODE == 3)
         WiFi.enableInsecureWEP();  //Old School
 
@@ -669,7 +678,7 @@ void setupWiFi(uint8_t timeout, uint8_t power) {
 #endif
       delay(1000);
 
-      if (timeout > 24) {
+      if (timeout > 21) {
 #if DEBUG
         Serial.println("Connection Failed! Rebooting...");
 #endif
@@ -678,7 +687,7 @@ void setupWiFi(uint8_t timeout, uint8_t power) {
         //NVRAM_Write(_EEPROM_ID, "0");
         NVRAM_Write(_WIRELESS_MODE, "0");
         NVRAM_Write(_WIRELESS_HIDE, "0");
-        NVRAM_Write(_WIRELESS_SSID, WIRELESS_SSID);
+        NVRAM_Write(_WIRELESS_SSID, PLANT_NAME);
         NVRAM_Write(_WIRELESS_PASSWORD, "");
         NVRAM_Write(_LOG_INTERVAL, "60");
         NVRAM_Write(_NETWORK_DHCP, "0");
@@ -729,7 +738,25 @@ void setupWiFi(uint8_t timeout, uint8_t power) {
 }
 
 void setupWebServer() {
-  LittleFS.begin();
+  //LittleFSConfig config;
+  //LittleFS.setConfig(config);
+  if (!LittleFS.begin()) {
+#if DEBUG
+    Serial.println("LittleFS Mount Failed");
+#endif
+    return;
+  }
+#if DEBUG
+  FSInfo info;
+  LittleFS.info(info);
+  Serial.printf("Total: %u\nUsed: %u\nBlock: %u\nPage: %u\nMax open files: %u\nMax path len: %u\n",
+                info.totalBytes,
+                info.usedBytes,
+                info.blockSize,
+                info.pageSize,
+                info.maxOpenFiles,
+                info.maxPathLength);
+#endif
   //==============================================
   //Async Web Server HTTP_GET, HTTP_POST, HTTP_ANY
   //==============================================
@@ -757,7 +784,7 @@ void setupWebServer() {
         NVRAM_Erase();
         AsyncWebServerResponse *response = request->beginResponse(text_html, 3, [](uint8_t *buffer, size_t maxLen, size_t index) -> size_t {
           if (index) {
-            delay(100);
+            //delay(100);
             ESP.restart();
             return 0;
           }
@@ -916,7 +943,7 @@ void setupWebServer() {
 
       AsyncWebServerResponse *response = request->beginResponse(text_html, out.length(), [out](uint8_t *buffer, size_t maxLen, size_t index) -> size_t {
         if (index) {
-          delay(100);
+          //delay(100);
           ESP.restart();
           return 0;
         }
@@ -936,11 +963,12 @@ void setupWebServer() {
   });
   server.on("/update", HTTP_GET, [](AsyncWebServerRequest *request) {
     webTimer = millis();
- #if !ARDUINO_SIGNING
-    if (DEMO_PASSWORD != "")
-      if (!request->authenticate("", DEMO_PASSWORD.c_str()))
-        return request->requestAuthentication();
- #endif
+#if ARDUINO_SIGNING
+#else
+      if (DEMO_PASSWORD != "")
+        if (!request->authenticate("", DEMO_PASSWORD.c_str()))
+          return request->requestAuthentication();
+#endif
     String updateURL = "http://" + NETWORK_IP + "/update";
     String updateHTML = "<!DOCTYPE html><html><body><form method=POST action='" + updateURL + "' enctype='multipart/form-data'><input type=file accept='.bin,.signed' name=firmware><input type=submit value='Update Firmware'></form><br><form method=POST action='" + updateURL + "' enctype='multipart/form-data'><input type=file accept='.bin,.signed' name=filesystem><input type=submit value='Update Filesystem'></form></body></html>";
     AsyncWebServerResponse *response = request->beginResponse(200, text_html, updateHTML);
@@ -949,14 +977,14 @@ void setupWebServer() {
     response->addHeader("Access-Control-Allow-Origin", "*");
     request->send(response);
   });
-  /*
-  server.on("/format", HTTP_GET, [](AsyncWebServerRequest *request) {
-    FSInfo fs_info;
-    String result = LittleFS.format() ? "OK" : "Error";
-    LittleFS.info(fs_info);
-    request->send(200, text_plain, "<pre>Format " + result + "\nTotal Flash Size: " + String(ESP.getFlashChipSize()) + "\nFilesystem Size: " + String(fs_info.totalBytes) + "\nFilesystem Used: " + String(fs_info.usedBytes) + "</pre>");
-  });
-  */
+/*
+    server.on("/format", HTTP_GET, [](AsyncWebServerRequest *request) {
+      FSInfo fs_info;
+      String result = LittleFS.format() ? "OK" : "Error";
+      LittleFS.info(fs_info);
+      request->send(200, text_plain, "<pre>Format " + result + "\nTotal Flash Size: " + String(ESP.getFlashChipSize()) + "\nFilesystem Size: " + String(fs_info.totalBytes) + "\nFilesystem Used: " + String(fs_info.usedBytes) + "</pre>");
+    });
+*/
 #if ASYNCWEBSERVER_SSL
   //Web Updates only work over HTTP (TODO: Check Update Library)
   httpserver.on(
@@ -964,7 +992,8 @@ void setupWebServer() {
   server.on(
 #endif
     "/update", HTTP_POST, [&](AsyncWebServerRequest *request) {
- #if !ARDUINO_SIGNING
+#if ARDUINO_SIGNING
+#else
       if (DEMO_PASSWORD != "")
         if (!request->authenticate("", DEMO_PASSWORD.c_str()))
           return request->requestAuthentication();
@@ -981,7 +1010,7 @@ void setupWebServer() {
       }
       AsyncWebServerResponse *response = request->beginResponse(text_html, out.length(), [out](uint8_t *buffer, size_t maxLen, size_t index) -> size_t {
         if (index) {
-          delay(100);
+          //delay(100);
           ESP.restart();
           return 0;
         }
@@ -1128,6 +1157,7 @@ void setupWebServer() {
 
 void loop() {
   //delay(1);  //enable Modem-Sleep
+  //ArduinoOTA.handle();
 
   delay(LOG_INTERVAL);                //if (millis() - loopTimer < LOG_INTERVAL) return;
   rtcData.runTime += LOG_INTERVAL_S;  //track time since NTP sync (as seconds)
@@ -1291,9 +1321,6 @@ void loop() {
     testSMTP = false;
     smtpSend("Test", String(EEPROM_ID, HEX));
   }
-
-  //loopTimer = millis();
-  //ArduinoOTA.handle();
 }
 
 void readySleep() {
@@ -1592,6 +1619,8 @@ String NVRAM(uint8_t from, uint8_t to, uint8_t *maskValues) {
   out += "|";
   out += ESP.getSdkVersion();
   out += "|";
+  out += LFS_VERSION;
+  out += "|";
   out += _VERSION;
   out += "\",";
 
@@ -1612,6 +1641,9 @@ String NVRAM(uint8_t from, uint8_t to, uint8_t *maskValues) {
       if (i == _DEMO_PASSWORD && DEMO_PASSWORD == "") {
         out += "\"\",";
       } else {
+#if DEBUG
+        Serial.printf("NVRAM Mask: %u\n", i);
+#endif
         out += "\"*****\",";
       }
     }
@@ -1789,7 +1821,6 @@ void WebUpload(AsyncWebServerRequest *request, String filename, size_t index, ui
 #endif
       if (!Update.begin(fsSize, U_FS))  //start with max available size
         Update.printError(Serial);
-
     } else {
       uint32_t maxSketchSpace = (ESP.getFreeSketchSpace() - 0x1000) & 0xFFFFF000;  //calculate sketch space required for the update
 #if DEBUG
