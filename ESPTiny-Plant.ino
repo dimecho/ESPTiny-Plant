@@ -963,8 +963,7 @@ void setupWebServer() {
   });
   server.on("/update", HTTP_GET, [](AsyncWebServerRequest *request) {
     webTimer = millis();
-#if ARDUINO_SIGNING
-#else
+#ifndef ARDUINO_SIGNING
       if (DEMO_PASSWORD != "")
         if (!request->authenticate("", DEMO_PASSWORD.c_str()))
           return request->requestAuthentication();
@@ -973,8 +972,8 @@ void setupWebServer() {
     String updateHTML = "<!DOCTYPE html><html><body><form method=POST action='" + updateURL + "' enctype='multipart/form-data'><input type=file accept='.bin,.signed' name=firmware><input type=submit value='Update Firmware'></form><br><form method=POST action='" + updateURL + "' enctype='multipart/form-data'><input type=file accept='.bin,.signed' name=filesystem><input type=submit value='Update Filesystem'></form></body></html>";
     AsyncWebServerResponse *response = request->beginResponse(200, text_html, updateHTML);
     //response->addHeader("Content-type", "text/html; charset=utf-8");
-    response->addHeader("Access-Control-Allow-Headers", "*");
-    response->addHeader("Access-Control-Allow-Origin", "*");
+    //response->addHeader("Access-Control-Allow-Headers", "*");
+    //response->addHeader("Access-Control-Allow-Origin", "*");
     request->send(response);
   });
 /*
@@ -992,8 +991,7 @@ void setupWebServer() {
   server.on(
 #endif
     "/update", HTTP_POST, [&](AsyncWebServerRequest *request) {
-#if ARDUINO_SIGNING
-#else
+#ifndef ARDUINO_SIGNING
       if (DEMO_PASSWORD != "")
         if (!request->authenticate("", DEMO_PASSWORD.c_str()))
           return request->requestAuthentication();
@@ -1841,9 +1839,6 @@ void WebUpload(AsyncWebServerRequest *request, String filename, size_t index, ui
       Update.printError(Serial);
     }
   }
-#if (ARDUINO_ESP8266_MAJOR >= 3 && ARDUINO_ESP8266_MINOR >= 1)
-  esp_yield();  //3.1.x
-#endif
 }
 
 void onUpload(AsyncWebServerRequest *request, String filename, size_t index, uint8_t *data, size_t len, bool final) {
