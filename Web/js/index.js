@@ -434,12 +434,14 @@ function loadSVG(svgfile) {
 				            nvram.send();
 				            nvram.onload = function(e) {
 				                try {
-				                    var data = nvram.response; //nvram.responseText;
-				                    document.getElementById('coreVersion').textContent = 'Core Version: ' + data['nvram'][0].split('|')[0];
-				                    document.getElementById('sdkVersion').textContent = 'SDK Version: ' + data['nvram'][0].split('|')[1];
-				                    var LFS_VERSION = data['nvram'][0].split('|')[2];
-				                    document.getElementById('fsVersion').textContent = 'LittleFS Version: ' + (0xffff & (LFS_VERSION >> 16)) + "." + (0xffff & (LFS_VERSION >> 0)) + "." + (0xffff & (LFS_VERSION >> 20));
-				                    document.getElementById('firmwareVersion').textContent = 'Firmware Version: ' + data['nvram'][0].split('|')[3];
+				                	var data = nvram.response; //nvram.responseText;
+				                    var v = data["nvram"][0].split('|');
+				                    document.getElementById('coreVersion').textContent = 'Core Version: ' + v[0];
+				                    document.getElementById('sdkVersion').textContent = 'SDK Version: ' + v[1];
+				                    document.getElementById('fsVersion').textContent = 'LittleFS Version: ' + (0xffff & (v[2] >> 16)) + "." + (0xffff & (v[2] >> 0)) + "." + (0xffff & (v[2] >> 20));
+				                    document.getElementById('firmwareVersion').textContent = 'Firmware Version: ' + v[3];
+				                    document.getElementById('iram').textContent = 'IRAM: ' + Math.round(v[4]/1024) + ' KB (' + v[4] + ')';
+									document.getElementById('dram').textContent = 'DRAM: ' + Math.round(v[5]/1024) + ' KB (' + v[5] + ')';
 
 				                    var bool_value = data['nvram'][WIFI_HIDE] == '1' ? true : false;
 				                    $('#WiFiHidden').val(data['nvram'][WIFI_HIDE]);
