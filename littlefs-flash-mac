@@ -13,7 +13,7 @@ if [ $yn = y ]; then
     echo " > Over The Air (OTA)? (y/n)"
     read yn
     if [ $yn = y ]; then
-        ~/Library/Arduino15/packages/esp8266/hardware/esp8266/$esp8266/tools/espota.py -r -i 192.168.8.8 -p 8266 -s -f build/flash-littlefs.signed
+        ~/Library/Arduino15/packages/esp8266/hardware/esp8266/$esp8266/tools/espota.py -r -i 192.168.8.8 -p 8266 -s -f build/flash-littlefs.bin.signed
     else
         shopt -s nocasematch
 
@@ -21,7 +21,7 @@ if [ $yn = y ]; then
         for serial in $cu; do
             if [[ $serial == *usb* ]] || [[ $serial == *ch34* ]] || [[ $serial == *pl23* ]] ; then
                 echo $serial
-                ~/Library/Arduino15/packages/esp8266/hardware/esp8266/$esp8266/tools/esptool/esptool.py --port $serial --baud 115200 write_flash 0x100000 build/flash-littlefs.signed
+                ~/Library/Arduino15/packages/esp8266/hardware/esp8266/$esp8266/tools/esptool/esptool.py --port $serial --baud 115200 write_flash 0x100000 build/flash-littlefs.bin.signed
                 break
             fi
         done

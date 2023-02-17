@@ -34,16 +34,17 @@ done
 
 #Build LittleFS
 mkdir -p build
-#_start:            0x00200000 (2097152)
-#_size:             0x001FA000 (2072576)
-#~/Library/Arduino15/packages/esp8266/tools/mklittlefs/$gcc/mklittlefs -c ./data/ -b 8192 -p 256 -d 5 -s 2072576 ./build/flash-littlefs.bin
 
 #Sign LittleFS
 #_signed_size:      2072576 - 8192 = 2064384
 #_signature:        256
 #_signature_length: 4
 ~/Library/Arduino15/packages/esp8266/tools/mklittlefs/$gcc/mklittlefs -c ./data/ -b 8192 -p 256 -d 5 -s 2064384 ./build/flash-littlefs.bin
-~/Library/Arduino15/packages/esp8266/hardware/esp8266/$esp8266/tools/signing.py --mode sign --privatekey ./private.key --bin ./build/flash-littlefs.bin --out ./build/flash-littlefs.signed
+~/Library/Arduino15/packages/esp8266/hardware/esp8266/$esp8266/tools/signing.py --mode sign --privatekey ./private.key --bin ./build/flash-littlefs.bin --out ./build/flash-littlefs.bin.signed
+
+#_start:            0x00200000 (2097152)
+#_size:             0x001FA000 (2072576)
+~/Library/Arduino15/packages/esp8266/tools/mklittlefs/$gcc/mklittlefs -c ./data/ -b 8192 -p 256 -d 5 -s 2072576 ./build/flash-littlefs.bin
 
 #Compress LittleFS
 #gzip -9 ./build/flash-littlefs.bin

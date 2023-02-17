@@ -21,21 +21,15 @@ Remove-Item -Recurse -Force .\data\nvram.json -ErrorAction SilentlyContinue
 New-Item -ItemType directory -Path .\data\img
 Copy-Item -Path .\Web\img\cert.svg -Destination .\data\img
 
-#====================
-#Download Compressors
-#====================
+#==============
+#Download
+#==============
 [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12;
 
 if(!(Test-Path .\tools -PathType Container)) { 
   New-Item -ItemType directory -Path .\tools
 }
-
-if (!(Test-Path .\tools\mklittlefs.exe)) {
-	Invoke-WebRequest -OutFile .\tools\x86_64-w64-mingw32-mklittlefs-295fe9b.zip -Uri "https://github.com/earlephilhower/mklittlefs/releases/download/3.0.0/x86_64-w64-mingw32-mklittlefs-295fe9b.zip"
-}
-
 if (!(Test-Path "C:\ProgramData\chocolatey\bin\gzip.exe")) {
-	#Invoke-WebRequest -OutFile .\tools\gzip-1.3.12-1-bin.zip -Uri "http://sourceforge.mirrorservice.org/g/gn/gnuwin32/gzip/1.3.12-1/gzip-1.3.12-1-bin.zip"
   if(!(Test-Path "C:\ProgramData\chocolatey" -PathType Container)) {
     if (!(Test-Path .\tools\chocolatey.ps1)) {
       Invoke-WebRequest -OutFile .\tools\chocolatey.ps1 -Uri "https://chocolatey.org/install.ps1"
@@ -45,31 +39,35 @@ if (!(Test-Path "C:\ProgramData\chocolatey\bin\gzip.exe")) {
   }
   Start-Process powershell -ArgumentList "choco install gzip -y" -NoNewWindow -Wait
 }
-
-Get-ChildItem .\tools -Filter *.zip | 
-Foreach-Object {
-  Expand-Archive -Path $_.FullName -DestinationPath .\tools -Force
-  Remove-Item $_.FullName -ErrorAction SilentlyContinue
+if (!(Test-Path "C:\ProgramData\chocolatey\lib\python")) {
+  Elevate
+  Start-Process powershell -ArgumentList "choco install python -y" -NoNewWindow -Wait
 }
-Move-Item .\tools\mklittlefs\mklittlefs.exe -Destination .\tools -ErrorAction SilentlyContinue
-Remove-Item -Recurse -Force .\tools\mklittlefs -ErrorAction SilentlyContinue
+if (!(Test-Path "C:\ProgramData\chocolatey\lib\openssl")) {
+  Elevate
+  Start-Process powershell -ArgumentList "choco install openssl -y" -NoNewWindow -Wait
+}
 
 #==============
 #Compress Files
 #==============
 Get-ChildItem .\data -Recurse -Exclude *.key,*.cer -Filter *.* | 
 Foreach-Object {
-    if (-Not (Test-Path $_.FullName -PathType Container)) {
-      gzip.exe $_.FullName
-      Move-Item "$($_.FullName).gz" -Destination $_.FullName
-    }
+  if (-Not (Test-Path $_.FullName -PathType Container)) {
+    gzip.exe $_.FullName
+    Move-Item "$($_.FullName).gz" -Destination $_.FullName
+  }
 }
 
 #================
-#Find Folder Size
+#Build LittleFS
 #================
 if(!(Test-Path .\build -PathType Container)) { 
   New-Item -ItemType directory -Path .\build
 }
-#Start-Process .\tools\mklittlefs.exe -ArgumentList "-c .\data -b 8192 -p 256 -s 643072 flash-littlefs.bin" -NoNewWindow -PassThru -Wait
-Start-Process .\tools\mklittlefs.exe -ArgumentList "-c .\data -b 8192 -p 256 -s 680000 .\build\flash-littlefs.bin" -NoNewWindow -PassThru -Wait
+#================
+#Sign LittleFS
+#================
+Start-Process "$env:LOCALAPPDATA\Arduino15\packages\esp8266\tools\mklittlefs\3.1.0-gcc10.3-e5f9fec\mklittlefs.exe" -ArgumentList "-c .\data -b 8192 -p 256 -s 2064384 .\build\flash-littlefs.bin" -NoNewWindow -PassThru -Wait
+python "$env:LOCALAPPDATA\Arduino15\packages\esp8266\hardware\esp8266\3.1.1\tools\signing.py --mode sign --privatekey $PSScriptRoot\private.key --bin $PSScriptRoot\build\flash-littlefs.bin --out $PSScriptRoot\build\flash-littlefs.bin.signed"
+Start-Process "$env:LOCALAPPDATA\Arduino15\packages\esp8266\tools\mklittlefs\3.1.0-gcc10.3-e5f9fec\mklittlefs.exe" -ArgumentList "-c .\data -b 8192 -p 256 -s 2072576 .\build\flash-littlefs.bin" -NoNewWindow -PassThru -Wait
