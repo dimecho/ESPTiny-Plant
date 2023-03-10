@@ -2,9 +2,11 @@
 <html>
     <head>
         <title>tiny plant - graph</title>
-        <meta content="text/html;charset=utf-8" http-equiv="Content-Type">
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <link rel="stylesheet" type="text/css" id="cssBootstrap">
-        <link rel="stylesheet" href="css/rangeslider.css" />
+        <link rel="stylesheet" type="text/css" href="css/preloader.css" />
+        <link rel="stylesheet" type="text/css" href="css/rangeslider.css" />
         <style>
         .chartWrapper {
           position: relative;
@@ -27,13 +29,15 @@
         }
         </style>
         <link rel="shortcut icon" href="favicon.ico" />
+        <script src="js/preloader.js"></script>
         <script src="js/jquery.core.js"></script>
+        <script src="js/bootstrap.js"></script>
         <script src="js/chart.js"></script>
         <script src="js/rangeslider.js"></script>
-        <script src="js/theme.js"></script>
         <script src="js/graph.js"></script>
     </head>
-    <body>
+    <body class="preloader">
+        <div id="preloader"></div>
         <div class="toast-container position-absolute top-0 end-0 p-3" id="notify" style="z-index:2000"></div>
         <div class="container-fluid d-flex flex-column">
             <div class="row d-flex mt-4">
@@ -73,5 +77,6 @@
                 </div>
             </div>
         </div>
+        <img class="d-none" src="img/cert.svg" />
     </body>
 </html>

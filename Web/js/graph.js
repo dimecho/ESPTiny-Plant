@@ -548,7 +548,7 @@ function updateChart() {
                 updateChart();
             }, refreshSpeed);
         }else{
-        	$.iGrowl({ type: 'error', message:  'HTTP Error ' + xhr.status});
+            notify('', 'HTTP Error ' + xhr.status, 'error');
         }
     }
     xhr.open('GET', 'api?adc=1', true);

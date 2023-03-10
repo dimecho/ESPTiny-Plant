@@ -134,6 +134,19 @@ AsyncDNSServer dnsServer;
 
 #define UART_BAUDRATE 115200
 
+//ADC_MODE(ADC_TOUT); //Sensor input measuring
+//ADC_MODE(ADC_VCC);  //Self voltage measuring
+ADC_MODE(get_adc());  //Analog to Digital Converter (cannot be both)
+
+//Executed very early on startup, variable defined within the get_adc function
+uint32_t get_adc() {
+  uint32_t adc_mode;
+  ESP.rtcUserMemoryRead(100, &adc_mode, sizeof(adc_mode));
+  if ((adc_mode != ADC_VCC) && (adc_mode != ADC_TOUT)) return ADC_TOUT;
+  return adc_mode;
+}
+uint32_t ADCMODE;  //Global variable
+
 #if THREADED
 #include <Ticker.h>
 void blinkThread();  //void ICACHE_RAM_ATTR
@@ -259,7 +272,7 @@ const int NVRAM_Map[] = {
 uint8_t WIRELESS_MODE = 0;  //WIRELESS_AP = 0, WIRELESS_STA(WPA2) = 1, WIRELESS_STA(WPA2 ENT) = 2, WIRELESS_STA(WEP) = 3
 //uint8_t WIRELESS_HIDE = 0;
 uint8_t WIRELESS_PHY_MODE = 3;   //WIRELESS_PHY_MODE_11B = 1, WIRELESS_PHY_MODE_11G = 2, WIRELESS_PHY_MODE_11N = 3
-uint8_t WIRELESS_PHY_POWER = 3;  //Max = 20.5dBm (some ESP modules 24.0dBm) should be multiples of 0.25
+uint8_t WIRELESS_PHY_POWER = 5;  //Max = 20.5dBm (some ESP modules 24.0dBm) should be multiples of 0.25
 uint8_t WIRELESS_CHANNEL = 7;
 //String WIRELESS_SSID = "Plant";
 //char WIRELESS_USERNAME[] = "";
@@ -272,7 +285,7 @@ String NETWORK_IP = "192.168.8.8";
 //char NETWORK_GATEWAY[] = "";
 //char NETWORK_DNS[] = "";
 uint8_t PLANT_POT_SIZE = 4;          //pump run timer - seconds
-uint16_t PLANT_SOIL_MOISTURE = 700;  //ADC value
+uint16_t PLANT_SOIL_MOISTURE = 480;  //ADC value
 uint32_t PLANT_MANUAL_TIMER = 0;     //manual sleep timer - hours
 uint8_t PLANT_SOIL_TYPE = 2;         //['Sand', 'Clay', 'Dirt', 'Loam', 'Moss'];
 uint8_t PLANT_TYPE = 0;              //['Bonsai', 'Monstera', 'Palm'];
@@ -285,12 +298,12 @@ uint32_t DEEP_SLEEP = 4;             //auto sleep timer - minutes
 String PLANT_NAME = "";
 char ALERTS[] = "000000000";  //dhcp-ip, low-power, low-sensor, pump-run, over-water, empty-water, internal-errors, high-priority, led-code
 //=============================
-String DEMO_PASSWORD = "";                 //public demo
+String DEMO_PASSWORD = "";  //public demo
 //String TIMEZONE_OFFSET = "-28800";       //UTC offset in seconds
 char DEMO_AVAILABILITY[] = "00000000618";  //M, T, W, T, F, S, S + Time Range
-uint8_t ADC_ERROR_OFFSET = 64;             //WAKE_RF_DISABLED offset
+//uint8_t ADC_ERROR_OFFSET = 64;           //WAKE_RF_DISABLED offset
 //=============================
-uint32_t WEB_SLEEP = 300000;              //5 minutes = 5 x 60x 1000
+uint32_t WEB_SLEEP = 300000;  //5 minutes = 5 x 60x 1000
 //=============================
 uint16_t delayBetweenAlertEmails = 0;     //2 hours = 2 x 60 = 120 minutes = x4 30 min loops
 uint16_t delayBetweenRefillReset = 0;     //2 hours = 2 x 60 = 120 minutes = x4 30 min loops
@@ -299,10 +312,6 @@ uint8_t ON_TIME = 0;                      //from 6am
 uint8_t OFF_TIME = 0;                     //to 6pm
 uint16_t LOG_INTERVAL_S = 0;
 uint16_t DEEP_SLEEP_S = 0;
-
-//Analog to Digital Converter (cannot be both)
-ADC_MODE(ADC_TOUT);  //sensor input measuring
-//ADC_MODE(ADC_VCC); //self voltage measuring
 
 WiFiUDP ntpUDP;
 NTPClient timeClient(ntpUDP);
@@ -441,6 +450,10 @@ void setup() {
     WIRELESS_PHY_MODE = NVRAM_Read(_WIRELESS_PHY_MODE).toInt();
     WIRELESS_PHY_POWER = NVRAM_Read(_WIRELESS_PHY_POWER).toInt();
     ESP.rtcUserMemoryRead(32, (uint32_t *)&rtcData, sizeof(rtcData));
+    ADCMODE = get_adc();
+    if (ADCMODE == ADC_VCC) {                                               //Measure VCC this runtime
+      ESP.rtcUserMemoryWrite(100, (uint32_t *)ADC_TOUT, sizeof(ADC_TOUT));  //Next time measure ADC sensor
+    }
   }
   //EEPROM.end();
 
@@ -465,11 +478,12 @@ void setup() {
     if (wakeupReason == 6) {
       LOG_INTERVAL = 300;                    //prevent WiFi from sleeping 5 minutes
       ALERTS[0] = '1';                       //email DHCP IP
+      ALERTS[1] = '0';                       //low voltage
       memset(&rtcData, 0, sizeof(rtcData));  //reset RTC memory
       blinky(2000, 1, 0);
       setupWiFi(22);
       //ArduinoOTA.begin();
-    }else{
+    } else {
       setupWiFi(0);
     }
     setupWebServer();
@@ -510,7 +524,7 @@ void setupWiFi(uint8_t timeout) {
     //WiFi Access Point Mode
     //=====================
     uint8_t WIRELESS_HIDE = NVRAM_Read(_WIRELESS_HIDE).toInt();
-    
+
     //WiFi.enableSTA(false);
     //WiFi.enableAP(true);
     WiFi.mode(WIFI_AP);
@@ -691,11 +705,11 @@ void setupWiFi(uint8_t timeout) {
         //delay(100);
         ESP.restart();
       }
-      WIRELESS_PHY_POWER++; //auto tune wifi power (minimum power to reach AP)
+      WIRELESS_PHY_POWER++;  //auto tune wifi power (minimum power to reach AP)
       setupWiFi(timeout++);
       return;
     }
-    NVRAM_Write(_WIRELESS_PHY_POWER, String(WIRELESS_PHY_POWER)); //save auto tuned wifi power
+    NVRAM_Write(_WIRELESS_PHY_POWER, String(WIRELESS_PHY_POWER));  //save auto tuned wifi power
 
     WiFi.setAutoReconnect(true);
 
@@ -912,14 +926,14 @@ void setupWebServer() {
       } else if (request->hasParam("DemoPassword", true)) {
         from = 28, to = 31, skip = 29;
       }
-      
+
       uint8_t n = 0;
       for (uint8_t i = from; i <= to; i++) {
         n = i;
         if (i > skip)
           n--;
-        
-        if(i != skip) {
+
+        if (i != skip) {
           out += "[";
           out += n;
           out += +"] ";
@@ -1149,8 +1163,31 @@ void loop() {
   //delay(1);  //enable Modem-Sleep
   //ArduinoOTA.handle();
 
-  delay(LOG_INTERVAL);                //if (millis() - loopTimer < LOG_INTERVAL) return;
   rtcData.runTime += LOG_INTERVAL_S;  //track time since NTP sync (as seconds)
+
+  //Measure voltage every 10000s runtime (~2.5 hours)
+  if (ALERTS[1] == '1' && rtcData.runTime % 10000 == 0) {
+    if (ADCMODE == ADC_TOUT) {
+      ESP.rtcUserMemoryWrite(100, (uint32_t *)ADC_VCC, sizeof(ADC_VCC));  //Next time measure VCC
+    } else {
+      //A0 pin needs to be free, not connected to anything in order for the internal measurement to work properly
+      //A0 pin in NodeMCU is connected to (resistor/capacitor) and needs to be floating in order to use ADC_MODE(ADC_VCC)
+      int vcc = ESP.getVcc();
+      double dvcc = (float)vcc / 1024;
+#if DEBUG
+      Serial.println("Voltage: " + String(dvcc, 3) + "v");
+#endif
+      dataLog("v:" + String(dvcc, 3));
+      //TODO: only send below 2.8 volt?
+      //{
+      smtpSend("Low Voltage", String(dvcc) + "v");
+      //}
+      ESP.rtcUserMemoryWrite(32, (uint32_t *)&rtcData, sizeof(rtcData));
+    }
+    ESP.restart();  //Reboot to switch ADC_MODE
+  }
+
+  delay(LOG_INTERVAL);  //if (millis() - loopTimer < LOG_INTERVAL) return;
 
   /*
     IMPORTANT!
@@ -1296,12 +1333,11 @@ void loop() {
 #endif
       //We need to split deep sleep as 32-bit unsigned integer is 4294967295 or 0xffffffff max ~71 minutes
       if (rtcData.waterTime >= PLANT_MANUAL_TIMER) {
+        runPump();
         rtcData.emptyBottle = 0;  //assume no sensor with manual timer
         rtcData.waterTime = 0;
-        runPump();
-      } else {
-        rtcData.waterTime++;
       }
+      rtcData.waterTime++;
     }
     readySleep();
   } else if (testPump) {
@@ -1404,8 +1440,6 @@ void runPump() {
   Serial.println("TIMER:" + String(PLANT_MANUAL_TIMER));
 #endif
 
-  rtcData.emptyBottle++;  //Sensorless Empty Detection
-
   uint32_t duration = PLANT_POT_SIZE;
 
   //Watering Map -  Different soils takes different time to soak the water
@@ -1449,42 +1483,51 @@ void runPump() {
   if (ALERTS[3] == '1')
     smtpSend("Run Pump", String(PLANT_POT_SIZE));
 
+  rtcData.emptyBottle++;  //Sensorless Empty Detection
+
   dataLog("T:" + String(PLANT_MANUAL_TIMER) + ",M:" + String(PLANT_SOIL_MOISTURE));
 }
 
 uint16_t sensorRead(uint8_t enablePin) {
-  //A0 conflicts with WiFi Module
-  //-----------------
-  /*
-  if (WiFi.getMode() != WIFI_OFF) {
-    WiFi.forceSleepBegin();
-    //delay(1);
-  }
-  */
-  /*
-    adcAttachPin(moistureSensorPin);
-    analogReadResolution(11);
-    analogSetAttenuation(ADC_6db);
-  */
-  //analogRead(moistureSensorPin);  //Discharge any capacitance
+  uint16_t result = 1024;
 
-  digitalWrite(enablePin, HIGH);                    //ON
-  uint16_t result = analogRead(moistureSensorPin);  //readADC()
-  if (WiFi.getMode() == WIFI_OFF) {
-    result -= ADC_ERROR_OFFSET;
-  }
-  digitalWrite(enablePin, LOW);  //OFF
-  /*
-  if (WiFi.getMode() != WIFI_OFF) {
-    WiFi.forceSleepWake();
-    //delay(1);
-  }
-  */
+  if (ADCMODE == ADC_TOUT) {
+
+    //A0 conflicts with WiFi Module
+    //-----------------
+    /*
+    if (WiFi.getMode() != WIFI_OFF) {
+      WiFi.forceSleepBegin();
+      //delay(1);
+    }
+    */
+    /*
+      adcAttachPin(moistureSensorPin);
+      analogReadResolution(11);
+      analogSetAttenuation(ADC_6db);
+    */
+    //analogRead(moistureSensorPin);  //Discharge any capacitance
+
+    digitalWrite(enablePin, HIGH);  //ON
+    result = analogRead(moistureSensorPin);  //readADC()
+    /*
+    if (WiFi.getMode() == WIFI_OFF) {
+      result -= ADC_ERROR_OFFSET;
+    }
+    */
+    digitalWrite(enablePin, LOW);  //OFF
+    /*
+    if (WiFi.getMode() != WIFI_OFF) {
+      WiFi.forceSleepWake();
+      //delay(1);
+    }
+    */
 #if DEBUG
-  Serial.printf("Deep Sleep: %u\n", DEEP_SLEEP);
-  Serial.printf("Plant Timer: %u\n", PLANT_MANUAL_TIMER);
-  Serial.printf("Sensor: %u\n", result);
+    Serial.printf("Deep Sleep: %u\n", DEEP_SLEEP);
+    Serial.printf("Plant Timer: %u\n", PLANT_MANUAL_TIMER);
+    Serial.printf("Sensor: %u\n", result);
 #endif
+  }
 
   return result;
 }
@@ -1746,10 +1789,10 @@ void offsetTiming() {
   } else {  //Always ON or Logging ON
   */
   //Warning: ESP8266 will crash if devided by zero
-  PLANT_MANUAL_TIMER = PLANT_MANUAL_TIMER * 3600 / (LOG_INTERVAL + DEEP_SLEEP);  //wait hours to loops
-  delayBetweenAlertEmails = 1 * 3600 / (LOG_INTERVAL + DEEP_SLEEP);              //1 hours as loops of seconds
-  delayBetweenRefillReset = 2 * 3600 / (LOG_INTERVAL + DEEP_SLEEP);              //2 hours as loops of seconds
-  delayBetweenOverfloodReset = 8 * 3600 / (LOG_INTERVAL + DEEP_SLEEP);           //8 hours as loops of seconds
+  PLANT_MANUAL_TIMER = PLANT_MANUAL_TIMER * 3600 / (LOG_INTERVAL + DEEP_SLEEP + PLANT_MANUAL_TIMER);  //wait hours to loops + offset startup delay 1s per every hour
+  delayBetweenAlertEmails = 1 * 3600 / (LOG_INTERVAL + DEEP_SLEEP);                                   //1 hours as loops of seconds
+  delayBetweenRefillReset = 2 * 3600 / (LOG_INTERVAL + DEEP_SLEEP);                                   //2 hours as loops of seconds
+  delayBetweenOverfloodReset = 8 * 3600 / (LOG_INTERVAL + DEEP_SLEEP);                                //8 hours as loops of seconds
   //}
 
   DEEP_SLEEP_S = DEEP_SLEEP;      //store in seconds - no need to convert in loop()
@@ -1892,7 +1935,7 @@ void smtpSend(String subject, String body) {
   uint8_t smtpPort = 25;
   uint8_t smtpPortIndex = smtpServer.indexOf(':');
   if (smtpPortIndex != -1) {
-    smtpPort = smtpServer.substring(smtpPortIndex + 1, smtpServer.length()).toInt();;
+    smtpPort = smtpServer.substring(smtpPortIndex + 1, smtpServer.length()).toInt();
     smtpServer = smtpServer.substring(0, smtpPortIndex);
   }
 

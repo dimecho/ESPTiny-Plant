@@ -17,6 +17,14 @@ purgecss --css data/rangeslider.css --content data/*.html --whitelist --output d
 purgecss --css data/igrowl.css --content data/*.html --whitelist --output data/css/igrowl.css
 
 #Compress Web Files
+echo " > Compress Javascript? (y/n)"
+read yn
+if [ $yn = y ]; then
+    for f in $(find data -type f -name '*.js'); do
+        closure-compiler --strict_mode_input=false --language_in ECMASCRIPT5 --js_output_file "$f-min.js" --js "$f"
+        mv "$f-min.js" "$f"
+    done
+fi
 for f in $(find data -type f -name '*.*' ! -name '*.key' ! -name '*.cer'); do
     gzip "$f"
     mv "$f.gz" "$f"

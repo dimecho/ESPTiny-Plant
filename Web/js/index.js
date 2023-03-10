@@ -106,7 +106,7 @@ document.addEventListener('DOMContentLoaded', function(event)
 });
 
 function updateNTP() {
-	const d = new Date();
+	var d = new Date();
 	var ntp = new XMLHttpRequest();
 	ntp.open('GET', 'api?week=' + d.getDay() + '&hour=' + d.getHours() + '&minute=' + d.getMinutes() + '&ntp=1', true);
 	ntp.send();
@@ -447,6 +447,13 @@ function loadSVG(svgfile) {
 				                    $('#WiFiHidden').val(data['nvram'][WIFI_HIDE]);
 				                    $('#WiFiHiddenCheckbox').prop('checked', bool_value);
 				                    $("#WiFiPhyMode").val(data["nvram"][WIFI_PHY_MODE]);
+				                    if(data["nvram"][WIFI_PHY_MODE] == 3) {
+				                    	var optionObject = document.getElementById('WiFiPower').options;
+				                    	optionObject[17].setAttribute('hidden','true');
+				                    	optionObject[18].setAttribute('hidden','true');
+				                    	optionObject[19].setAttribute('hidden','true');
+				                    	optionObject[20].setAttribute('hidden','true');
+				                    }
 				                    $("#WiFiPower").val(data["nvram"][WIFI_PHY_POWER]);
 				                    $('#WiFiChannel').val(data['nvram'][WIFI_CHANNEL]);
 				                    $('#WiFiSSID').val(data['nvram'][WIFI_SSID]);
@@ -456,7 +463,7 @@ function loadSVG(svgfile) {
 				                    $('#EnableLogCheckbox').prop('checked', bool_value);
 				                    $('#EnableLogInterval').val(data['nvram'][LOG_INTERVAL]);
 
-				                    $('#EnableLogInterval').ionRangeSlider({
+				                    var rangeslider_parameters = {
 								        skin: 'big',
 								        grid: true,
 								        step: 1,
@@ -464,7 +471,22 @@ function loadSVG(svgfile) {
 								        max: 600,
 								        from: data['nvram'][LOG_INTERVAL],
 								        postfix: ' Seconds'
-								    });
+								    };
+				                    if (typeof ionRangeSlider !== "function") {
+				                    	var stylesheet = document.createElement('link');
+				                    	stylesheet.rel = 'stylesheet';
+										stylesheet.href = 'css/rangeslider.css';
+				                    	document.head.appendChild(stylesheet);
+
+									    var script = document.createElement('script');
+										script.onload = function() {
+											$('#EnableLogInterval').ionRangeSlider(rangeslider_parameters);
+										};
+										script.src = 'js/rangeslider.js';
+										document.head.appendChild(script);
+									}else{
+										$('#EnableLogInterval').ionRangeSlider(rangeslider_parameters);
+									}
 
 				                    bool_value = data['nvram'][NETWORK_DHCP] == '1' ? true : false;
 				                    $('#WiFiDHCP').val(data['nvram'][NETWORK_DHCP]);
@@ -524,7 +546,7 @@ function loadSVG(svgfile) {
 						            });
 						            AvailabilityWeek([data['nvram'][DEMO_AVAILABILITY].charAt(0), data['nvram'][DEMO_AVAILABILITY].charAt(1), data['nvram'][DEMO_AVAILABILITY].charAt(2), data['nvram'][DEMO_AVAILABILITY].charAt(3), data['nvram'][DEMO_AVAILABILITY].charAt(4), data['nvram'][DEMO_AVAILABILITY].charAt(5), data['nvram'][DEMO_AVAILABILITY].charAt(6)]);
 
-				                }catch{}
+				                } catch (error) {}
 				            }
 
 				            $('#fileLittleFS').change(function() {
@@ -791,10 +813,6 @@ function formValidate() {
 	}else if(DemoPassword.value != null) {
 		DemoPasswordConfirm.setCustomValidity(DemoPasswordConfirm.value != DemoPassword.value ? 'Passwords do not match.' : '');
 	}
-};
-
-function sleep(ms) {
-  return new Promise(resolve => setTimeout(resolve, ms));
 };
 
 function resetFlash()
@@ -1180,18 +1198,28 @@ function generateWiFiQR()
         qrstring += 'H:true';
     }
     qrstring += ';';
-    console.log(qrstring);
+    //console.log(qrstring);
 
-    $('#qrcode').empty();
-    $('#qrcode').qrcode({width:160,height:160,text:qrstring});
-    
-    var canvas = $('#qrcode canvas');
-    if (canvas.length == 1) {
-        var data = canvas[0].toDataURL('image/png');
-        var e = $('#qrcode');
-        e.attr('href', data);
-        e.attr('download', ssid+'-qrcode.png');
-        // e.show() sets display:inline, but we need inline-block
-        //e.css('display', 'inline-block');
-    }
+	if (typeof QRious !== "function") {
+	    var script = document.createElement('script');
+		//script.onload = function() {};
+		script.src = 'js/qrious.js';
+		document.head.appendChild(script);
+	}else{
+		var qrcode = new QRious({
+			element: document.getElementById('qrcode'),
+			level: 'M',
+			size: 160,
+			value: qrstring
+		});
+		var a = document.getElementById('qrcode-dl');
+		a.href = qrcode.toDataURL('image/png');
+		a.download = ssid+'-qrcode.png';
+	}
 };
+
+/*
+function sleep(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms));
+};
+*/
