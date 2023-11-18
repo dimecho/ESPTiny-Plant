@@ -10,7 +10,7 @@ Remember: Brand new ESP-12 short GPIO0 to GND (flash mode) then UART TX/RX
 #define DEBUG 0
 #define THREADED 0
 //#define ARDUINO_SIGNING 0
-#define EEPROM_ID 0x3BDAB915  //Identify Sketch by EEPROM
+#define EEPROM_ID 0x3BDAB916  //Identify Sketch by EEPROM
 #define ASYNCWEBSERVER_SSL 0
 /*
 NOTE for HTTPS
@@ -195,7 +195,7 @@ struct {
   uint16_t alertTime;    //prevent email spam
 } rtcData;
 
-//uint32_t loopTimer = 0;  //loop() slow down
+uint32_t loopTimer = 0;  //loop() slow down
 uint32_t webTimer = 0;  //track last webpage access
 
 bool testPump = false;
@@ -232,7 +232,7 @@ bool testSMTP = false;
 #define _DEMO_PASSWORD 28
 #define _TIMEZONE_OFFSET 29
 #define _DEMO_AVAILABILITY 30
-#define _ADC_ERROR_OFFSET 31
+#define _PIN_PNP 31
 
 const int NVRAM_Map[] = {
   16,  //_EEPROM_ID
@@ -251,11 +251,11 @@ const int NVRAM_Map[] = {
   16,  //_NETWORK_SUBNET
   16,  //_NETWORK_GATEWAY
   16,  //_NETWORK_DNS
-  8,   //_PLANT_POT_SIZE
-  8,   //_PLANT_SOIL_MOISTURE
+  16,   //_PLANT_POT_SIZE
+  16,   //_PLANT_SOIL_MOISTURE
   32,  //_PLANT_MANUAL_TIMER
-  8,   //_PLANT_SOIL_TYPE
-  8,   //_PLANT_TYPE
+  16,   //_PLANT_SOIL_TYPE
+  16,   //_PLANT_TYPE
   32,  //_DEEP_SLEEP
   64,  //_EMAIL_ALERT
   64,  //_SMTP_SERVER
@@ -266,7 +266,7 @@ const int NVRAM_Map[] = {
   32,  //_DEMO_PASSWORD
   16,  //_TIMEZONE_OFFSET
   16,  //_DEMO_AVAILABILITY
-  8    //_ADC_ERROR_OFFSET
+  16   //_PIN_PNP
 };
 
 uint8_t WIRELESS_MODE = 0;  //WIRELESS_AP = 0, WIRELESS_STA(WPA2) = 1, WIRELESS_STA(WPA2 ENT) = 2, WIRELESS_STA(WEP) = 3
@@ -284,11 +284,11 @@ String NETWORK_IP = "192.168.8.8";
 //String NETWORK_SUBNET = "255.255.255.0";
 //char NETWORK_GATEWAY[] = "";
 //char NETWORK_DNS[] = "";
-uint8_t PLANT_POT_SIZE = 4;          //pump run timer - seconds
+uint16_t PLANT_POT_SIZE = 4;         //pump run timer - seconds
 uint16_t PLANT_SOIL_MOISTURE = 480;  //ADC value
 uint32_t PLANT_MANUAL_TIMER = 0;     //manual sleep timer - hours
-uint8_t PLANT_SOIL_TYPE = 2;         //['Sand', 'Clay', 'Dirt', 'Loam', 'Moss'];
-uint8_t PLANT_TYPE = 0;              //['Bonsai', 'Monstera', 'Palm'];
+uint16_t PLANT_SOIL_TYPE = 2;        //['Sand', 'Clay', 'Dirt', 'Loam', 'Moss'];
+uint16_t PLANT_TYPE = 0;             //['Bonsai', 'Monstera', 'Palm'];
 uint32_t DEEP_SLEEP = 4;             //auto sleep timer - minutes
 //=============================
 //String EMAIL_ALERT = "";
@@ -301,7 +301,6 @@ char ALERTS[] = "000000000";  //dhcp-ip, low-power, low-sensor, pump-run, over-w
 String DEMO_PASSWORD = "";  //public demo
 //String TIMEZONE_OFFSET = "-28800";       //UTC offset in seconds
 char DEMO_AVAILABILITY[] = "00000000618";  //M, T, W, T, F, S, S + Time Range
-//uint8_t ADC_ERROR_OFFSET = 64;           //WAKE_RF_DISABLED offset
 //=============================
 uint32_t WEB_SLEEP = 300000;  //5 minutes = 5 x 60x 1000
 //=============================
@@ -312,6 +311,8 @@ uint8_t ON_TIME = 0;                      //from 6am
 uint8_t OFF_TIME = 0;                     //to 6pm
 uint16_t LOG_INTERVAL_S = 0;
 uint16_t DEEP_SLEEP_S = 0;
+uint16_t PIN_PNP = 0;                      //LOW = NPN, HIGH = PNP
+//uint8_t ADC_ERROR_OFFSET = 64;           //WAKE_RF_DISABLED offset
 
 WiFiUDP ntpUDP;
 NTPClient timeClient(ntpUDP);
@@ -319,11 +320,10 @@ NTPClient timeClient(ntpUDP);
 void setup() {
   //pinMode(deepsleepPin, WAKEUP_PULLUP);
 
-  pinMode(pumpPin, OUTPUT);
-  digitalWrite(pumpPin, LOW);
+  pinMode(pumpPin, INPUT_PULLUP); //Float the pin until set NPN or PNP
 
-  pinMode(sensorPin, OUTPUT);
   digitalWrite(sensorPin, LOW);
+  pinMode(sensorPin, OUTPUT);
 
   //Needed after deepSleep for ESP8266 Core 3.0.x. Otherwise error: pll_cal exceeds 2ms
   //delay(1);
@@ -434,7 +434,7 @@ void setup() {
     NVRAM_Write(_TIMEZONE_OFFSET, "-28800");
     NVRAM_Write(_DEMO_AVAILABILITY, DEMO_AVAILABILITY);
     //==========
-    //NVRAM_Write(_ADC_ERROR_OFFSET, String(ADC_ERROR_OFFSET));
+    NVRAM_Write(_PIN_PNP,  String(PIN_PNP)); //TODO: based in flash ID
 
     memset(&rtcData, 0, sizeof(rtcData));  //reset RTC memory
     LittleFS.format();
@@ -796,6 +796,7 @@ void setupWebServer() {
         AsyncWebServerResponse *response = request->beginResponse(text_html, 3, [](uint8_t *buffer, size_t maxLen, size_t index) -> size_t {
           if (index) {
             //delay(100);
+            NVRAM_Write(_PIN_PNP, String(PIN_PNP));
             ESP.restart();
             return 0;
           }
@@ -902,7 +903,7 @@ void setupWebServer() {
       }
     } else {
       uint8_t mask[] = { 8, 25, 28 };
-      String out = NVRAM(1, 30, mask);
+      String out = NVRAM(1, 31, mask);
       request->send(200, text_json, out);
     }
   });
@@ -1162,7 +1163,17 @@ void setupWebServer() {
 void loop() {
   //delay(1);  //enable Modem-Sleep
   //ArduinoOTA.handle();
+  //delay(LOG_INTERVAL);
 
+ if (testPump) {
+    testPump = false;
+    runPump();
+  } else if (testSMTP) {
+    testSMTP = false;
+    smtpSend("Test", String(EEPROM_ID, HEX));
+  }
+
+  if (millis() - loopTimer < LOG_INTERVAL) return;
   rtcData.runTime += LOG_INTERVAL_S;  //track time since NTP sync (as seconds)
 
   //Measure voltage every 10000s runtime (~2.5 hours)
@@ -1186,8 +1197,6 @@ void loop() {
     }
     ESP.restart();  //Reboot to switch ADC_MODE
   }
-
-  delay(LOG_INTERVAL);  //if (millis() - loopTimer < LOG_INTERVAL) return;
 
   /*
     IMPORTANT!
@@ -1293,9 +1302,8 @@ void loop() {
       offsetTiming();
     }
     //----------------------------------------
-
     if (PLANT_MANUAL_TIMER == 0) {
-      if (moisture <= 14) {  //Sensor Not in Soil
+      if (moisture <= 32) {  //Sensor Not in Soil
         blinky(200, 4, 0);
         if (ALERTS[2] == '1')
           smtpSend("Low Sensor", String(moisture));
@@ -1340,13 +1348,8 @@ void loop() {
       rtcData.waterTime++;
     }
     readySleep();
-  } else if (testPump) {
-    testPump = false;
-    runPump();
-  } else if (testSMTP) {
-    testSMTP = false;
-    smtpSend("Test", String(EEPROM_ID, HEX));
   }
+  loopTimer = millis();
 }
 
 void readySleep() {
@@ -1466,19 +1469,17 @@ void runPump() {
     arraymap++;
   }
   //===================
-
-  //pinMode(pumpPin, OUTPUT);
-  digitalWrite(pumpPin, HIGH);  //ON
+  turnNPNorPNP(1); //ON
   do {
     if (pulse[duration] == 1) {
-      digitalWrite(pumpPin, HIGH);  //ON
+      turnNPNorPNP(1); //ON
     } else {
-      digitalWrite(pumpPin, LOW);  //OFF
+      turnNPNorPNP(0); //OFF
     }
     delay(1000);
     duration--;
   } while (duration > 0);
-  digitalWrite(pumpPin, LOW);  //OFF
+  turnNPNorPNP(0); //OFF
 
   if (ALERTS[3] == '1')
     smtpSend("Run Pump", String(PLANT_POT_SIZE));
@@ -1508,7 +1509,10 @@ uint16_t sensorRead(uint8_t enablePin) {
     */
     //analogRead(moistureSensorPin);  //Discharge any capacitance
 
+    pinMode(moistureSensorPin, INPUT);
+    digitalWrite(moistureSensorPin, LOW); //Internal pull-up OFF
     digitalWrite(enablePin, HIGH);  //ON
+
     result = analogRead(moistureSensorPin);  //readADC()
     /*
     if (WiFi.getMode() == WIFI_OFF) {
@@ -1516,6 +1520,7 @@ uint16_t sensorRead(uint8_t enablePin) {
     }
     */
     digitalWrite(enablePin, LOW);  //OFF
+    digitalWrite(moistureSensorPin, HIGH); //Internal pull-up ON (20k resistor)
     /*
     if (WiFi.getMode() != WIFI_OFF) {
       WiFi.forceSleepWake();
@@ -1765,7 +1770,17 @@ void NVRAM_Read_Config() {
   PLANT_TYPE = NVRAM_Read(_PLANT_TYPE).toInt();
 
   //==========
-  //ADC_ERROR_OFFSET = NVRAM_Read(_ADC_ERROR_OFFSET).toInt();
+  PIN_PNP = NVRAM_Read(_PIN_PNP).toInt();
+  turnNPNorPNP(0);
+}
+
+void turnNPNorPNP(uint8_t state) {
+  if (PIN_PNP == 1 && state == 0) {
+    pinMode(pumpPin, INPUT_PULLUP); //Float the pin for PNP off
+  }else{
+    digitalWrite(pumpPin, state);
+    pinMode(pumpPin, OUTPUT);
+  }
 }
 
 void offsetTiming() {
@@ -1789,7 +1804,7 @@ void offsetTiming() {
   } else {  //Always ON or Logging ON
   */
   //Warning: ESP8266 will crash if devided by zero
-  PLANT_MANUAL_TIMER = PLANT_MANUAL_TIMER * 3600 / (LOG_INTERVAL + DEEP_SLEEP + PLANT_MANUAL_TIMER);  //wait hours to loops + offset startup delay 1s per every hour
+  PLANT_MANUAL_TIMER = PLANT_MANUAL_TIMER * 3600 / (LOG_INTERVAL + DEEP_SLEEP + PLANT_MANUAL_TIMER);  //wait hours to loops
   delayBetweenAlertEmails = 1 * 3600 / (LOG_INTERVAL + DEEP_SLEEP);                                   //1 hours as loops of seconds
   delayBetweenRefillReset = 2 * 3600 / (LOG_INTERVAL + DEEP_SLEEP);                                   //2 hours as loops of seconds
   delayBetweenOverfloodReset = 8 * 3600 / (LOG_INTERVAL + DEEP_SLEEP);                                //8 hours as loops of seconds

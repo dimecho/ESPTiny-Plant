@@ -20,7 +20,7 @@
         <div class="toast-container position-absolute top-0 end-0 p-3" id="notify" style="z-index:2000"></div>
         <div class="container">
             <div class="row main">
-                <div id="svgInteractive" class="col bg-light svglayer"></div>
+            	<center><div id="svgInteractive" class="col bg-light svglayer"></div></center>
             </div>
         </div>
         <div class="modal zindex-modal" id="moisture-Settings">
@@ -503,14 +503,17 @@
 		                                    <small id="dram">DRAM: 0</small>
 		                                </div>
 		                            </div>
-		                            <div class="row">
+		                            <div class="row mt-2">
+		                            	<div class="col-lg-6 col-12">
+		                            	 	<input type="text" id="EnablePNP" name="EnablePNP" data-provider="slider">
+		                                </div>
+		                            </div>
+		                            <div class="row mt-2">
 		                            	<div class="col-lg-6 col-12">
 		                                    <button class="btn btn-danger w-100" type="button" onclick="resetFlash()">Default Reset</button>
 		                                </div>
-		                                <div class="col-lg-6 col-12">
-		                                </div>
 		                            </div>
-		                            <div class="row mt-5">
+		                            <div class="row mt-4">
 		                            	<div class="col-lg-3 col-12">
 			                                <form method="POST" action="/tls" enctype="multipart/form-data" id="formCertificate">
 					                            <input type="file" accept=".der,.cer" name="cert" id="fileCertificate" hidden />
@@ -540,7 +543,26 @@
 							</div>
 						</div>
                     </div>
-                    <div class="modal-footer"></div>
+                </div>
+            </div>
+        </div>
+        <div class="modal zindex-modal" id="keep-EEPROM">
+            <div class="modal-dialog modal-dialog-centered">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title">EEPROM</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body">
+                    	<span id="keep-eeprom-text"></span>
+                    	<div class="progress progress-striped active">
+		    				<div class="progress-bar" style="width:0%"></div>
+		    			</div>
+		    		</div>
+                    <div class="modal-footer">
+                    	<button type="button" class="btn btn-danger" data-bs-dismiss="modal" id="keep-eeprom-no">No (Default)</button>
+                        <button type="button" class="btn btn-success" data-bs-dismiss="modal" id="keep-eeprom-yes">Yes</button>
+                    </div>
                 </div>
             </div>
         </div>

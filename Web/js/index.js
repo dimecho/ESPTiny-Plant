@@ -57,11 +57,34 @@ var ALERTS = 27;
 var DEMO_PASSWORD = 28;
 var TIMEZONE_OFFSET = 29;
 var DEMO_AVAILABILITY = 30;
+var PIN_PNP = 31;
 var DEMOLOCK = false;
 
 document.addEventListener('DOMContentLoaded', function(event)
 {
 	loadTheme();
+
+	if(document.cookie != "")
+	{
+		document.getElementById('keep-eeprom-text').textContent="Restoring settings ...";
+		document.querySelectorAll("#keep-EEPROM .modal-footer")[0].style.display = "none";
+		var modal = new bootstrap.Modal(document.getElementById('keep-EEPROM'));
+		modal.show();
+	    progressTimer(62,2,function() {
+        	$('.modal').modal('hide');
+        	notify('','EEPROM restored with no passwords', 'danger');
+		});
+		var ArrayCookies = document.cookie.split(";");
+		for (i = 0; i < ArrayCookies.length; i++) {
+	        var c_name = ArrayCookies[i].substr(0, ArrayCookies[i].indexOf("="));
+	        var c_value = ArrayCookies[i].substr(ArrayCookies[i].indexOf("=") + 1);
+	        c_name = c_name.replace(/^\s+|\s+$/g, "");
+
+	        //console.log(c_name + '(' + eval(c_name) + ') = ' + unescape(c_value));
+	        saveSetting(eval(c_name), unescape(c_value));
+	    }
+	    deleteCookies();
+	}
 
     loadSVG();
 	
@@ -133,12 +156,13 @@ function loadSVG(svgfile) {
 				index.open('GET', 'svg', true);
 				index.send();
 				index.onload = function(e) {
+					svgfile = 'bonsai.svg';
 					if(index.response != undefined) {
-						var s = index.responseText.split('\n');
-						console.log(s);
-						svgfile = s[nvram.response['nvram'][PLANT_TYPE]]; //match index # to file name
-					}else{
-						svgfile = 'bonsai.svg';
+						try{
+							var s = index.responseText.split('\n');
+							console.log(s);
+							svgfile = s[nvram.response['nvram'][PLANT_TYPE]]; //match index # to file name
+						}catch{}
 					}
 					document.getElementById('cssSVG').href = 'svg/' + svgfile.replace('.svg', '.css');
 
@@ -211,7 +235,7 @@ function loadSVG(svgfile) {
 												div.onclick = function() {
 													var id = this.id;
 													console.log(i);
-													//saveSetting(PLANT_TYPE, i, function() { loadSVG(id); modal.hide(); });
+													saveSetting(PLANT_TYPE, i, function() { loadSVG(id); modal.hide(); });
 									            }
 							                	svgPlant.appendChild(div);
 							                }
@@ -228,20 +252,21 @@ function loadSVG(svgfile) {
 			            document.getElementById('graph').onclick = function() {
 			                window.location.href = 'graph.html';
 			            }
-
-			            document.getElementById('led').onclick = function() {
-			                var x = document.getElementById('led-enabled');
-						  	if (x.style.display === 'block') {
-						  		x.style.display = 'none';
-						   		//saveSetting(PLANT_LED, 0);
-						   		saveSetting('8&alert=0',0);
-						  	} else {
-						   		x.style.display = 'block';
-						   		//saveSetting(PLANT_LED, 1);
-						   		saveSetting('8&alert=1',1);
-						    	//document.getElementById('power-text').textContent = 8;
-						  	}
-			            }
+			            if(document.getElementById('led')){
+				            document.getElementById('led').onclick = function() {
+				                var x = document.getElementById('led-enabled');
+							  	if (x.style.display === 'block') {
+							  		x.style.display = 'none';
+							   		//saveSetting(PLANT_LED, 0);
+							   		saveSetting('8&alert=0',0);
+							  	} else {
+							   		x.style.display = 'block';
+							   		//saveSetting(PLANT_LED, 1);
+							   		saveSetting('8&alert=1',1);
+							    	//document.getElementById('power-text').textContent = 8;
+							  	}
+				            }
+				        }
 
 				        document.getElementById('pot-size').onclick = function() {
 				        	var modal = new bootstrap.Modal(document.getElementById('pot-size-Settings'));
@@ -380,43 +405,49 @@ function loadSVG(svgfile) {
 				                	document.getElementById('soil-moss').onclick = function() {
 										var moss_color = $('#soil-moss-badge')[0].firstElementChild.attributes.fill.value;
 										document.getElementById('soil-type-color').style.fill = moss_color;
-								        document.getElementById('soil-text').style.fill = moss_color;
 								        document.getElementById('soil-type-text').textContent = soil_type_labels[0];
+								        if(document.getElementById('soil-text'))
+								        	document.getElementById('soil-text').style.fill = moss_color;
 								        saveSetting(PLANT_SOIL_TYPE, 0, function() { modal.hide(); });
 								    }
 								    document.getElementById('soil-loam').onclick = function() {
 								    	var loam_color = $('#soil-loam-badge')[0].firstElementChild.attributes.fill.value;
 										document.getElementById('soil-type-color').style.fill = loam_color;
-								        document.getElementById('soil-text').style.fill = loam_color; //
 								        document.getElementById('soil-type-text').textContent = soil_type_labels[1];
+								        if(document.getElementById('soil-text'))
+								        	document.getElementById('soil-text').style.fill = loam_color;
 								        saveSetting(PLANT_SOIL_TYPE, 1, function() { modal.hide(); });
 								    }
 								    document.getElementById('soil-dirt').onclick = function() {
 										var dirt_color = $('#soil-dirt-badge')[0].firstElementChild.attributes.fill.value;
 										document.getElementById('soil-type-color').style.fill = dirt_color;
-								        document.getElementById('soil-text').style.fill = dirt_color;
 								        document.getElementById('soil-type-text').textContent = soil_type_labels[2];
+								        if(document.getElementById('soil-text'))
+								        	document.getElementById('soil-text').style.fill = dirt_color;
 								        saveSetting(PLANT_SOIL_TYPE, 2, function() { modal.hide(); });
 								    }
 								    document.getElementById('soil-clay').onclick = function() {
 								    	var clay_color = $('#soil-clay-badge')[0].firstElementChild.attributes.fill.value;
 								    	document.getElementById('soil-type-color').style.fill = clay_color;
-								        document.getElementById('soil-text').style.fill = clay_color;
 								        document.getElementById('soil-type-text').textContent = soil_type_labels[3];
+								        if(document.getElementById('soil-text'))
+								        	document.getElementById('soil-text').style.fill = clay_color;
 								        saveSetting(PLANT_SOIL_TYPE, 3, function() { modal.hide(); });
 								    }
 								    document.getElementById('soil-sand').onclick = function() {
 								    	var sand_color = $('#soil-sand-badge')[0].firstElementChild.attributes.fill.value;
 								    	document.getElementById('soil-type-color').style.fill = sand_color;
-								        document.getElementById('soil-text').style.fill = sand_color;
 								        document.getElementById('soil-type-text').textContent = soil_type_labels[4];
+								        if(document.getElementById('soil-text'))
+								        	document.getElementById('soil-text').style.fill = sand_color;
 								        saveSetting(PLANT_SOIL_TYPE, 4, function() { modal.hide(); });
 								    }
 								    document.getElementById('soil-rock').onclick = function() {
 								    	var rock_color = $('#soil-rock-badge')[0].firstElementChild.attributes.fill.value;
 								    	document.getElementById('soil-type-color').style.fill = rock_color;
-								        document.getElementById('soil-text').style.fill = rock_color;
 								        document.getElementById('soil-type-text').textContent = soil_type_labels[5];
+								        if(document.getElementById('soil-text'))
+								        	document.getElementById('soil-text').style.fill = rock_color;
 								        saveSetting(PLANT_SOIL_TYPE, 5, function() { modal.hide(); });
 								    }
 				                }
@@ -462,7 +493,8 @@ function loadSVG(svgfile) {
 				                    $('#EnableLog').val(data['nvram'][DATA_LOG]);
 				                    $('#EnableLogCheckbox').prop('checked', bool_value);
 				                    $('#EnableLogInterval').val(data['nvram'][LOG_INTERVAL]);
-
+				                    $('#EnablePNP').val(data['nvram'][PIN_PNP]);
+				            		
 				                    var rangeslider_parameters = {
 								        skin: 'big',
 								        grid: true,
@@ -471,6 +503,15 @@ function loadSVG(svgfile) {
 								        max: 600,
 								        from: data['nvram'][LOG_INTERVAL],
 								        postfix: ' Seconds'
+								    };
+								    var pnpslider_parameters = {
+								        skin: 'big',
+								        grid: false,
+								        step: 1,
+								        min: 0,
+								        max: 1,
+								        from: data['nvram'][PIN_PNP],
+								        values: ["NPN", "PNP"]
 								    };
 				                    if (typeof ionRangeSlider !== "function") {
 				                    	var stylesheet = document.createElement('link');
@@ -481,11 +522,13 @@ function loadSVG(svgfile) {
 									    var script = document.createElement('script');
 										script.onload = function() {
 											$('#EnableLogInterval').ionRangeSlider(rangeslider_parameters);
+											$('#EnablePNP').ionRangeSlider(pnpslider_parameters);
 										};
 										script.src = 'js/rangeslider.js';
 										document.head.appendChild(script);
 									}else{
 										$('#EnableLogInterval').ionRangeSlider(rangeslider_parameters);
+										$('#EnablePNP').ionRangeSlider(pnpslider_parameters);
 									}
 
 				                    bool_value = data['nvram'][NETWORK_DHCP] == '1' ? true : false;
@@ -524,6 +567,77 @@ function loadSVG(svgfile) {
 						                    notify('','Log Interval ' + v + ' is low, Flash may fill up fast!', 'warning');
 						                }
 						            });
+						            $('#EnablePNP').on('input', function() {
+						                if(this.value == 'PNP') {
+						                    notify('','PNP Transistor! Controled with LOW (Negative)', 'danger');
+						                    notify('','If you get this WRONG, Pump will run Non-Stop!', 'warning');
+						                    saveSetting(PIN_PNP, 1);
+						                }else{
+						                	saveSetting(PIN_PNP, 0);
+						                }
+						            });
+						            $('#fileLittleFS').change(function() {
+						            	if(DEMOLOCK) {
+											PlantLogin();
+										}else{
+							                $('#formLittleFS').attr('action', 'http://' + window.location.hostname + "/update"); //force HTTP
+							                progressTimer(80, 1);
+							                document.getElementById('formLittleFS').submit();
+							            }
+						            });
+						            $('#fileFirmware').change(function() {
+						            	if(DEMOLOCK) {
+											PlantLogin();
+										}else{
+											$('#formFirmware').attr('action', 'http://' + window.location.hostname + "/update"); //force HTTP
+											document.getElementById('keep-eeprom-text').textContent="After firmware upgrade, keep current settings?";
+											document.querySelectorAll("#keep-EEPROM .modal-footer")[0].style.display = "";
+											$('.modal').modal('hide');
+											var modal = new bootstrap.Modal(document.getElementById('keep-EEPROM'));
+											modal.show();
+											document.getElementById('keep-eeprom-yes').onclick = function() {
+												deleteCookies();
+												//document.cookie = 'WIFI_MODE=' + data['nvram'][WIFI_MODE];
+												document.cookie = 'WIFI_HIDE=' + data['nvram'][WIFI_HIDE];
+												document.cookie = 'WIFI_PHY_MODE=' + data['nvram'][WIFI_PHY_MODE];
+												document.cookie = 'WIFI_PHY_POWER=' + data['nvram'][WIFI_PHY_POWER];
+												document.cookie = 'WIFI_CHANNEL=' + data['nvram'][WIFI_CHANNEL];
+												document.cookie = 'WIFI_SSID=' + data['nvram'][WIFI_SSID];
+												document.cookie = 'WIFI_USERNAME=' + data['nvram'][WIFI_USERNAME];
+												//document.cookie = 'WIFI_PASSWORD=' + data['nvram'][WIFI_PASSWORD];
+												document.cookie = 'DATA_LOG=' + data['nvram'][DATA_LOG];
+												document.cookie = 'LOG_INTERVAL=' + data['nvram'][LOG_INTERVAL];
+												document.cookie = 'NETWORK_DHCP=' + data['nvram'][NETWORK_DHCP];
+												document.cookie = 'NETWORK_IP=' + data['nvram'][NETWORK_IP];
+												document.cookie = 'NETWORK_SUBNET=' + data['nvram'][NETWORK_SUBNET];
+												document.cookie = 'NETWORK_GATEWAY=' + data['nvram'][NETWORK_GATEWAY];
+												document.cookie = 'NETWORK_DNS=' + data['nvram'][NETWORK_DNS];
+												document.cookie = 'PLANT_POT_SIZE=' + data['nvram'][PLANT_POT_SIZE];
+												document.cookie = 'PLANT_SOIL_MOISTURE=' + data['nvram'][PLANT_SOIL_MOISTURE];
+												document.cookie = 'PLANT_MANUAL_TIMER=' + data['nvram'][PLANT_MANUAL_TIMER];
+												document.cookie = 'PLANT_SOIL_TYPE=' + data['nvram'][PLANT_SOIL_TYPE];
+												document.cookie = 'DEEP_SLEEP=' + data['nvram'][NETWORK_DNS];
+												document.cookie = 'EMAIL_ALERT=' + data['nvram'][EMAIL_ALERT];
+												document.cookie = 'SMTP_SERVER=' + data['nvram'][SMTP_SERVER];
+												document.cookie = 'SMTP_USERNAME=' + data['nvram'][SMTP_USERNAME];
+												document.cookie = 'PLANT_NAME=' + data['nvram'][PLANT_NAME];
+												document.cookie = 'ALERTS=' + data['nvram'][ALERTS];
+												document.cookie = 'TIMEZONE_OFFSET=' + data['nvram'][TIMEZONE_OFFSET];
+												document.cookie = 'DEMO_AVAILABILITY=' + data['nvram'][DEMO_AVAILABILITY];
+												document.cookie = 'PIN_PNP=' + data['nvram'][PIN_PNP];
+					                			progressTimer(20, 2);
+							                	document.getElementById('formFirmware').submit();
+					            			}
+					            			document.getElementById('keep-eeprom-no').onclick = function() {
+					            				deleteCookies();
+					            				if(data['nvram'][PIN_PNP] != 0) {
+					            					document.cookie = 'PIN_PNP=' + data['nvram'][PIN_PNP];
+					            				}
+					                			progressTimer(20, 2);
+							                	document.getElementById('formFirmware').submit();
+					            			}
+							            }
+						            });
 
 						            $('#Availability-Slider').roundSlider({
 						                //svgMode: true,
@@ -549,24 +663,6 @@ function loadSVG(svgfile) {
 				                } catch (error) {}
 				            }
 
-				            $('#fileLittleFS').change(function() {
-				            	if(DEMOLOCK) {
-									PlantLogin();
-								}else{
-					                $('#formLittleFS').attr('action', 'http://' + window.location.hostname + "/update"); //force HTTP
-					                progressTimer(80, 1);
-					                document.getElementById('formLittleFS').submit();
-					            }
-				            });
-				            $('#fileFirmware').change(function() {
-				            	if(DEMOLOCK) {
-									PlantLogin();
-								}else{
-					                $('#formFirmware').attr('action', 'http://' + window.location.hostname + "/update"); //force HTTP
-					                progressTimer(20, 1);
-					                document.getElementById('formFirmware').submit();
-					            }
-				            });
 				            $('#browseLittleFS').click(function() {
 				            	if(DEMOLOCK) {
 									PlantLogin();
@@ -694,8 +790,10 @@ function AlertSet(alerts) {
     }
     var l = '0';
     var x = document.getElementById('led-enabled');
-	if (x.style.display == 'block') {
-		l = '1';
+    if (x) {
+		if (x.style.display == 'block') {
+			l = '1';
+		}
 	}
 	$('#Alerts').val(alerts.join("") + l);
 };
@@ -783,11 +881,13 @@ function NVRAMtoSVG(data)
     }else{
         document.getElementById('graph-enabled').style.display = 'none';
     } */
-    if(data['nvram'][ALERTS].charAt(8) == '1') {
-        document.getElementById('led-enabled').style.display = 'block';
-    }else{
-        document.getElementById('led-enabled').style.display = 'none';
-    }
+    if(document.getElementById('led-enabled')) {
+	    if(data['nvram'][ALERTS].charAt(8) == '1') {
+	        document.getElementById('led-enabled').style.display = 'block';
+	    }else{
+	        document.getElementById('led-enabled').style.display = 'none';
+	    }
+	}
     if (data['nvram'][PLANT_MANUAL_TIMER] == '0') {
     	document.getElementById('timer-enabled').style.display = 'none';
     	document.getElementById('timer-disabled').style.display = 'block';
@@ -803,8 +903,9 @@ function NVRAMtoSVG(data)
     document.getElementById('timer-text').textContent = data['nvram'][PLANT_MANUAL_TIMER];
     document.getElementById('power-text').textContent = data['nvram'][DEEP_SLEEP];
     document.getElementById('soil-type-color').style.fill = soil_type_color[data['nvram'][PLANT_SOIL_TYPE]];
-    document.getElementById('soil-text').style.fill = soil_type_color[data['nvram'][PLANT_SOIL_TYPE]];
     document.getElementById('soil-type-text').textContent = soil_type_labels[data['nvram'][PLANT_SOIL_TYPE]];
+    if(document.getElementById('soil-text'))
+    	document.getElementById('soil-text').style.fill = soil_type_color[data['nvram'][PLANT_SOIL_TYPE]];
 };
 
 function formValidate() {
@@ -1180,6 +1281,16 @@ function progressTimer(speed, bar, callback)
 	    document.getElementsByClassName('progress-bar')[bar].style.width = timerUploadCounter + '%';
     }, speed);
 };
+
+function deleteCookies()
+{
+	var result = document.cookie;
+	var cookieArray = result.split(";");
+	for(var i=0;i<cookieArray.length;i++){
+	   var keyValArr = cookieArray[i].split("=");
+	   document.cookie=keyValArr[0]+"=; expires=Thu, 01 Jan 1970 00:00:00 UTC";
+	}
+}
 
 function generateWiFiQR()
 {
