@@ -197,6 +197,7 @@ struct {
 
 uint32_t loopTimer = 0;  //loop() slow down
 uint32_t webTimer = 0;  //track last webpage access
+uint32_t calibrationTimer = 0; //track setup() time
 
 bool testPump = false;
 bool testSMTP = false;
@@ -444,11 +445,6 @@ void setup() {
     nvram.toCharArray(ALERTS, sizeof(nvram));
     nvram = NVRAM_Read(_DEMO_AVAILABILITY);
     nvram.toCharArray(DEMO_AVAILABILITY, sizeof(nvram));
-    DEMO_PASSWORD = NVRAM_Read(_DEMO_PASSWORD);
-    WIRELESS_MODE = NVRAM_Read(_WIRELESS_MODE).toInt();
-    WIRELESS_CHANNEL = NVRAM_Read(_WIRELESS_CHANNEL).toInt();
-    WIRELESS_PHY_MODE = NVRAM_Read(_WIRELESS_PHY_MODE).toInt();
-    WIRELESS_PHY_POWER = NVRAM_Read(_WIRELESS_PHY_POWER).toInt();
     ESP.rtcUserMemoryRead(32, (uint32_t *)&rtcData, sizeof(rtcData));
     ADCMODE = get_adc();
     if (ADCMODE == ADC_VCC) {                                               //Measure VCC this runtime
@@ -488,6 +484,10 @@ void setup() {
     }
     setupWebServer();
   }
+  calibrationTimer = millis();
+#if DEBUG
+  Serial.printf("Boot calibration (milliseconds):%u\n", calibrationTimer);
+#endif
   offsetTiming();
 }
 
@@ -495,6 +495,11 @@ void setup() {
 void setupWiFi(uint8_t timeout) {
 
   blinky(200, 3, 0);  //Alive blink
+
+  WIRELESS_MODE = NVRAM_Read(_WIRELESS_MODE).toInt();
+  WIRELESS_CHANNEL = NVRAM_Read(_WIRELESS_CHANNEL).toInt();
+  WIRELESS_PHY_MODE = NVRAM_Read(_WIRELESS_PHY_MODE).toInt();
+  WIRELESS_PHY_POWER = NVRAM_Read(_WIRELESS_PHY_POWER).toInt();
 
   //Forcefull Wakeup
   //-------------------
@@ -768,6 +773,7 @@ void setupWebServer() {
                 info.maxOpenFiles,
                 info.maxPathLength);
 #endif
+  DEMO_PASSWORD = NVRAM_Read(_DEMO_PASSWORD);
   //==============================================
   //Async Web Server HTTP_GET, HTTP_POST, HTTP_ANY
   //==============================================
@@ -1790,8 +1796,8 @@ void offsetTiming() {
 
   PLANT_MANUAL_TIMER = NVRAM_Read(_PLANT_MANUAL_TIMER).toInt();
 
-  if (ALERTS[8] == '1')
-    DEEP_SLEEP = 15;
+  //if (ALERTS[8] == '1')
+  //  DEEP_SLEEP = 900; //15 minutes
 
   //Sleep set and Logging is OFF
   /*
@@ -1803,17 +1809,22 @@ void offsetTiming() {
     DEEP_SLEEP = 1800;                            //30 min
   } else {  //Always ON or Logging ON
   */
-  //Warning: ESP8266 will crash if devided by zero
-  PLANT_MANUAL_TIMER = PLANT_MANUAL_TIMER * 3600 / (LOG_INTERVAL + DEEP_SLEEP + PLANT_MANUAL_TIMER);  //wait hours to loops
-  delayBetweenAlertEmails = 1 * 3600 / (LOG_INTERVAL + DEEP_SLEEP);                                   //1 hours as loops of seconds
-  delayBetweenRefillReset = 2 * 3600 / (LOG_INTERVAL + DEEP_SLEEP);                                   //2 hours as loops of seconds
-  delayBetweenOverfloodReset = 8 * 3600 / (LOG_INTERVAL + DEEP_SLEEP);                                //8 hours as loops of seconds
+  uint16_t loopTime = (LOG_INTERVAL + DEEP_SLEEP); //as total seconds
+  //if(loopTime == 0) //Warning: ESP8266 will crash if devided by zero
+  //  loopTime = 1;
+  PLANT_MANUAL_TIMER = (PLANT_MANUAL_TIMER * 3600 - PLANT_POT_SIZE) / loopTime; //wait hours (minus pump on time) to loops
+  delayBetweenAlertEmails = 1 * 3600 / loopTime;             //1 hours as loops of seconds
+  delayBetweenRefillReset = 2 * 3600 / loopTime;             //2 hours as loops of seconds
+  delayBetweenOverfloodReset = 8 * 3600 / loopTime;          //8 hours as loops of seconds
   //}
 
   DEEP_SLEEP_S = DEEP_SLEEP;      //store in seconds - no need to convert in loop()
   LOG_INTERVAL_S = LOG_INTERVAL;  //store in seconds - no need to convert in loop()
 
-  DEEP_SLEEP = DEEP_SLEEP * 1000000;   //microseconds micros()
+  DEEP_SLEEP = DEEP_SLEEP * 1000;   //milliseconds millis()
+  if(DEEP_SLEEP > 1)
+    DEEP_SLEEP = DEEP_SLEEP - calibrationTimer; //next sleep, compensate for processing delay during setup()
+  DEEP_SLEEP = DEEP_SLEEP * 1000;      //microseconds micros()
   LOG_INTERVAL = LOG_INTERVAL * 1000;  //milliseconds millis()
 }
 
