@@ -66,23 +66,35 @@ document.addEventListener('DOMContentLoaded', function(event)
 
 	if(document.cookie != "")
 	{
-		document.getElementById('keep-eeprom-text').textContent="Restoring settings ...";
-		document.querySelectorAll("#keep-EEPROM .modal-footer")[0].style.display = "none";
-		var modal = new bootstrap.Modal(document.getElementById('keep-EEPROM'));
-		modal.show();
-	    progressTimer(62,2,function() {
-        	$('.modal').modal('hide');
-        	notify('','EEPROM restored with no passwords', 'danger');
-		});
-		var ArrayCookies = document.cookie.split(";");
-		for (i = 0; i < ArrayCookies.length; i++) {
-	        var c_name = ArrayCookies[i].substr(0, ArrayCookies[i].indexOf("="));
-	        var c_value = ArrayCookies[i].substr(ArrayCookies[i].indexOf("=") + 1);
-	        c_name = c_name.replace(/^\s+|\s+$/g, "");
+		var ArrayCookies = {};
+		try {
+			ArrayCookies = document.cookie.split(";");
+			for (i = 0; i < ArrayCookies.length; i++) {
+		        var c_name = ArrayCookies[i].substr(0, ArrayCookies[i].indexOf("="));
+		        var c_value = ArrayCookies[i].substr(ArrayCookies[i].indexOf("=") + 1);
+		        c_name = c_name.replace(/^\s+|\s+$/g, "");
 
-	        //console.log(c_name + '(' + eval(c_name) + ') = ' + unescape(c_value));
-	        saveSetting(eval(c_name), unescape(c_value));
-	    }
+		        //console.log(c_name + '(' + eval(c_name) + ') = ' + unescape(c_value));
+		        saveSetting(eval(c_name), unescape(c_value));
+		    }
+	   	}catch(error){
+	    	notify('',error, 'danger');
+	    }finally{
+	    	if(ArrayCookies.length > 1)
+	    	{
+	    		document.getElementById('keep-eeprom-text').textContent="Restoring settings ...";
+				document.querySelectorAll("#keep-EEPROM .modal-footer")[0].style.display = "none";
+				var modal = new bootstrap.Modal(document.getElementById('keep-EEPROM'));
+				modal.show();
+			  	progressTimer(62,2,function() {
+		        	$('.modal').modal('hide');
+		        	notify('','EEPROM restored', 'success');
+		        	setTimeout(function() {
+				   		notify('','Passwords must be set again', 'warning');
+				    }, 4000);
+				});
+			}
+		}
 	    deleteCookies();
 	}
 
@@ -633,7 +645,8 @@ function loadSVG(svgfile) {
 					            				if(data['nvram'][PIN_PNP] != 0) {
 					            					document.cookie = 'PIN_PNP=' + data['nvram'][PIN_PNP];
 					            				}
-					                			progressTimer(20, 2);
+					            				new bootstrap.Modal(document.getElementById('wireless-Settings')).show();
+					                			progressTimer(20, 1);
 							                	document.getElementById('formFirmware').submit();
 					            			}
 							            }
@@ -1288,7 +1301,7 @@ function deleteCookies()
 	var cookieArray = result.split(";");
 	for(var i=0;i<cookieArray.length;i++){
 	   var keyValArr = cookieArray[i].split("=");
-	   document.cookie=keyValArr[0]+"=; expires=Thu, 01 Jan 1970 00:00:00 UTC";
+	   document.cookie=keyValArr[0]+"=; expires=Thu, 01 Jan 1970 00:00:00 UTC; SameSite=Lax";
 	}
 }
 
