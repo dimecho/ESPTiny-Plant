@@ -66,11 +66,19 @@ NOTE for HTTPS
 #endif
 //#include <ArduinoOTA.h>
 #include <EEPROM.h>
-#include <NTPClient.h>
+#ifdef ESP32
+#include <ESP32Ticker.h>
+#include <WiFi.h>
+#include <AsyncTCP.h>
+#include <AsyncUDP.h>
+#elif defined(ESP8266)
+#include <Ticker.h>
 #include <ESP8266WiFi.h>
-#include <WiFiUDP.h>
 #include <ESPAsyncTCP.h>
 #include <ESPAsyncUDP.h>
+#endif
+#include <NTPClient.h>
+#include <WiFiUDP.h>
 extern "C" {
 #include "user_interface.h"
 #include "wpa2_enterprise.h"
@@ -197,7 +205,6 @@ struct {
 
 uint32_t loopTimer = 0;  //loop() slow down
 uint32_t webTimer = 0;  //track last webpage access
-uint32_t calibrationTimer = 0; //track setup() time
 
 bool testPump = false;
 bool testSMTP = false;
@@ -273,7 +280,7 @@ const int NVRAM_Map[] = {
 uint8_t WIRELESS_MODE = 0;  //WIRELESS_AP = 0, WIRELESS_STA(WPA2) = 1, WIRELESS_STA(WPA2 ENT) = 2, WIRELESS_STA(WEP) = 3
 //uint8_t WIRELESS_HIDE = 0;
 uint8_t WIRELESS_PHY_MODE = 3;   //WIRELESS_PHY_MODE_11B = 1, WIRELESS_PHY_MODE_11G = 2, WIRELESS_PHY_MODE_11N = 3
-uint8_t WIRELESS_PHY_POWER = 5;  //Max = 20.5dBm (some ESP modules 24.0dBm) should be multiples of 0.25
+uint8_t WIRELESS_PHY_POWER = 6;  //Max = 20.5dBm (some ESP modules 24.0dBm) should be multiples of 0.25
 uint8_t WIRELESS_CHANNEL = 7;
 //String WIRELESS_SSID = "Plant";
 //char WIRELESS_USERNAME[] = "";
@@ -484,9 +491,8 @@ void setup() {
     }
     setupWebServer();
   }
-  calibrationTimer = millis();
 #if DEBUG
-  Serial.printf("Boot calibration (milliseconds):%u\n", calibrationTimer);
+  Serial.printf("Boot calibration (milliseconds):%u\n", millis());
 #endif
   offsetTiming();
 }
@@ -779,7 +785,11 @@ void setupWebServer() {
   //==============================================
   server.on("/api", HTTP_GET, [](AsyncWebServerRequest *request) {
     if (request->hasParam("adc")) {
+      #ifdef ESP8266
+      uint16_t moisture = sensorRead_ESP8266(sensorPin);
+      #else
       uint16_t moisture = sensorRead(sensorPin);
+      #endif
       request->send(200, text_plain, String(moisture));
       /*}else if (request->hasParam("chipid", true)) {
         AsyncResponseStream *response = request->beginResponseStream(text_plain);
@@ -1208,7 +1218,11 @@ void loop() {
     IMPORTANT!
     Make sure that the input voltage on the A0 pin doesn’t exceed 1.0V
   */
+  #ifdef ESP8266
+  uint16_t moisture = sensorRead_ESP8266(sensorPin);
+  #else
   uint16_t moisture = sensorRead(sensorPin);
+  #endif
 
   if (ALERTS[8] == '1') {
 #if THREADED
@@ -1287,7 +1301,7 @@ void loop() {
     //Always ON based on day of week (power cosumption AP = ~70mA STA = ~20mA)
     if (DEMO_AVAILABILITY[rtcData.ntpWeek] == '1' && h >= ON_TIME && h < OFF_TIME) {
       WiFi.forceSleepWake();  //try to get true mode as MODEM_SLEEP causes WIFI_OFF
-      delay(1);
+      delay(1);               //must delay after WiFi.forceSleepWake()
 
       if (WiFi.getMode() == WIFI_OFF) {
 #if DEBUG
@@ -1304,12 +1318,12 @@ void loop() {
 #if DEBUG
       Serial.println("WiFi OFF");
 #endif
-      DEEP_SLEEP = NVRAM_Read(_DEEP_SLEEP).toInt();
+      DEEP_SLEEP = NVRAM_Read(_DEEP_SLEEP).toInt() * 60;
       offsetTiming();
     }
     //----------------------------------------
     if (PLANT_MANUAL_TIMER == 0) {
-      if (moisture <= 32) {  //Sensor Not in Soil
+      if (moisture <= 14) {  //Sensor Not in Soil
         blinky(200, 4, 0);
         if (ALERTS[2] == '1')
           smtpSend("Low Sensor", String(moisture));
@@ -1317,7 +1331,11 @@ void loop() {
         /*
           loopback wire from water jug to A0 powered from GPIO12
         */
-        //moisture = sensorRead(watersensorPin);
+        //#ifdef ESP8266
+        //uint16_t moisture = sensorRead_ESP8266(watersensorPin);
+        //#else
+        //uint16_t moisture = sensorRead(watersensorPin);
+        //#endif
 
         if (rtcData.emptyBottle < 3) {
           rtcData.moistureLog += moisture;
@@ -1346,10 +1364,10 @@ void loop() {
       Serial.printf("Water Timer: %u\n", rtcData.waterTime);
 #endif
       //We need to split deep sleep as 32-bit unsigned integer is 4294967295 or 0xffffffff max ~71 minutes
-      if (rtcData.waterTime >= PLANT_MANUAL_TIMER) {
-        runPump();
+      if (rtcData.waterTime > PLANT_MANUAL_TIMER) {
         rtcData.emptyBottle = 0;  //assume no sensor with manual timer
         rtcData.waterTime = 0;
+        runPump();
       }
       rtcData.waterTime++;
     }
@@ -1493,27 +1511,38 @@ void runPump() {
   rtcData.emptyBottle++;  //Sensorless Empty Detection
 
   dataLog("T:" + String(PLANT_MANUAL_TIMER) + ",M:" + String(PLANT_SOIL_MOISTURE));
+
+  calibrateDeepSleep(); //next sleep compensate for pump runtime
 }
 
-uint16_t sensorRead(uint8_t enablePin) {
+#ifdef ESP8266
+uint16_t sensorRead_ESP8266(uint16_t enablePin) {
+    uint16_t result = 1024;
+
+    //A0 conflicts with WiFi Module (to reflect accurate readings from GUI turn ON WiFi during ADC)
+    //-----------------
+    if (WiFi.getMode() == WIFI_OFF) {
+      WiFi.mode(WIFI_AP); //WiFi.begin();
+      result = sensorRead(enablePin);
+      WiFi.mode(WIFI_OFF);
+    }else{
+      result = sensorRead(enablePin);
+    }
+    return result;
+}
+#endif
+
+uint16_t sensorRead(uint16_t enablePin) {
   uint16_t result = 1024;
 
   if (ADCMODE == ADC_TOUT) {
 
-    //A0 conflicts with WiFi Module
-    //-----------------
-    /*
-    if (WiFi.getMode() != WIFI_OFF) {
-      WiFi.forceSleepBegin();
-      //delay(1);
-    }
-    */
     /*
       adcAttachPin(moistureSensorPin);
       analogReadResolution(11);
       analogSetAttenuation(ADC_6db);
     */
-    //analogRead(moistureSensorPin);  //Discharge any capacitance
+    analogRead(moistureSensorPin);  //Discharge any capacitance
 
     pinMode(moistureSensorPin, INPUT);
     digitalWrite(moistureSensorPin, LOW); //Internal pull-up OFF
@@ -1527,12 +1556,7 @@ uint16_t sensorRead(uint8_t enablePin) {
     */
     digitalWrite(enablePin, LOW);  //OFF
     digitalWrite(moistureSensorPin, HIGH); //Internal pull-up ON (20k resistor)
-    /*
-    if (WiFi.getMode() != WIFI_OFF) {
-      WiFi.forceSleepWake();
-      //delay(1);
-    }
-    */
+
 #if DEBUG
     Serial.printf("Deep Sleep: %u\n", DEEP_SLEEP);
     Serial.printf("Plant Timer: %u\n", PLANT_MANUAL_TIMER);
@@ -1789,6 +1813,14 @@ void turnNPNorPNP(uint8_t state) {
   }
 }
 
+void calibrateDeepSleep() {
+  if(DEEP_SLEEP > 1) {
+    uint32_t internalRunTime = millis() * 1000; //microseconds micros()
+    if(DEEP_SLEEP > internalRunTime)
+      DEEP_SLEEP = DEEP_SLEEP - internalRunTime;
+  }
+}
+
 void offsetTiming() {
 
   //ESP8266 Bootloader 2.2.2 - 1 hour interval = 2x 30 min intervals (double)
@@ -1812,7 +1844,7 @@ void offsetTiming() {
   uint16_t loopTime = (LOG_INTERVAL + DEEP_SLEEP); //as total seconds
   //if(loopTime == 0) //Warning: ESP8266 will crash if devided by zero
   //  loopTime = 1;
-  PLANT_MANUAL_TIMER = (PLANT_MANUAL_TIMER * 3600 - PLANT_POT_SIZE) / loopTime; //wait hours (minus pump on time) to loops
+  PLANT_MANUAL_TIMER = (PLANT_MANUAL_TIMER * 3600) / loopTime; //wait hours (minus pump on time) to loops
   delayBetweenAlertEmails = 1 * 3600 / loopTime;             //1 hours as loops of seconds
   delayBetweenRefillReset = 2 * 3600 / loopTime;             //2 hours as loops of seconds
   delayBetweenOverfloodReset = 8 * 3600 / loopTime;          //8 hours as loops of seconds
@@ -1821,11 +1853,11 @@ void offsetTiming() {
   DEEP_SLEEP_S = DEEP_SLEEP;      //store in seconds - no need to convert in loop()
   LOG_INTERVAL_S = LOG_INTERVAL;  //store in seconds - no need to convert in loop()
 
-  DEEP_SLEEP = DEEP_SLEEP * 1000;   //milliseconds millis()
-  if(DEEP_SLEEP > 1)
-    DEEP_SLEEP = DEEP_SLEEP - calibrationTimer; //next sleep, compensate for processing delay during setup()
+  DEEP_SLEEP = DEEP_SLEEP * 1000;      //milliseconds millis()
   DEEP_SLEEP = DEEP_SLEEP * 1000;      //microseconds micros()
   LOG_INTERVAL = LOG_INTERVAL * 1000;  //milliseconds millis()
+
+  calibrateDeepSleep(); //compensate for processing delay during setup()
 }
 
 /*
