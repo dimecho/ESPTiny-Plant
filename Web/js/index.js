@@ -57,7 +57,7 @@ var ALERTS = 27;
 var DEMO_PASSWORD = 28;
 var TIMEZONE_OFFSET = 29;
 var DEMO_AVAILABILITY = 30;
-var PIN_PNP = 31;
+var PNP_ADC = 31;
 var DEMOLOCK = false;
 
 document.addEventListener('DOMContentLoaded', function(event)
@@ -505,7 +505,11 @@ function loadSVG(svgfile) {
 				                    $('#EnableLog').val(data['nvram'][DATA_LOG]);
 				                    $('#EnableLogCheckbox').prop('checked', bool_value);
 				                    $('#EnableLogInterval').val(data['nvram'][LOG_INTERVAL]);
-				                    $('#EnablePNP').val(data['nvram'][PIN_PNP]);
+
+				                    var pnp_adc = data['nvram'][PNP_ADC] + '00';
+
+				                    $('#EnablePNP').val(pnp_adc.charAt(0));
+				                    $('#ADCSensitivity').val(pnp_adc.charAt(1));
 				            		
 				                    var rangeslider_parameters = {
 								        skin: 'big',
@@ -522,8 +526,16 @@ function loadSVG(svgfile) {
 								        step: 1,
 								        min: 0,
 								        max: 1,
-								        from: data['nvram'][PIN_PNP],
+								        from: pnp_adc.charAt(0),
 								        values: ["NPN", "PNP"]
+								    };
+								    var adcslider_parameters = {
+								        skin: 'big',
+								        grid: true,
+								        step: 1,
+								        min: 0,
+								        max: 8,
+								        from: pnp_adc.charAt(1)
 								    };
 				                    if (typeof ionRangeSlider !== "function") {
 				                    	var stylesheet = document.createElement('link');
@@ -535,12 +547,14 @@ function loadSVG(svgfile) {
 										script.onload = function() {
 											$('#EnableLogInterval').ionRangeSlider(rangeslider_parameters);
 											$('#EnablePNP').ionRangeSlider(pnpslider_parameters);
+											$('#ADCSensitivity').ionRangeSlider(adcslider_parameters);
 										};
 										script.src = 'js/rangeslider.js';
 										document.head.appendChild(script);
 									}else{
 										$('#EnableLogInterval').ionRangeSlider(rangeslider_parameters);
 										$('#EnablePNP').ionRangeSlider(pnpslider_parameters);
+										$('#ADCSensitivity').ionRangeSlider(adcslider_parameters);
 									}
 
 				                    bool_value = data['nvram'][NETWORK_DHCP] == '1' ? true : false;
@@ -583,9 +597,16 @@ function loadSVG(svgfile) {
 						                if(this.value == 'PNP') {
 						                    notify('','PNP Transistor! Controled with LOW (Negative)', 'danger');
 						                    notify('','If you get this WRONG, Pump will run Non-Stop!', 'warning');
-						                    saveSetting(PIN_PNP, 1);
+						                    saveSetting(PNP_ADC, '1' + document.getElementById('ADCSensitivity').value);
 						                }else{
-						                	saveSetting(PIN_PNP, 0);
+						                	saveSetting(PNP_ADC, '0' + document.getElementById('ADCSensitivity').value);
+						                }
+						            });
+						            $('#ADCSensitivity').on('input', function() {
+						                if(document.getElementById('EnablePNP').value == 'PNP') {
+						                    saveSetting(PNP_ADC, '1' + this.value);
+						                }else{
+						                	saveSetting(PNP_ADC, '0' + this.value);
 						                }
 						            });
 						            $('#fileLittleFS').change(function() {
@@ -636,14 +657,14 @@ function loadSVG(svgfile) {
 												document.cookie = 'ALERTS=' + data['nvram'][ALERTS];
 												document.cookie = 'TIMEZONE_OFFSET=' + data['nvram'][TIMEZONE_OFFSET];
 												document.cookie = 'DEMO_AVAILABILITY=' + data['nvram'][DEMO_AVAILABILITY];
-												document.cookie = 'PIN_PNP=' + data['nvram'][PIN_PNP];
+												document.cookie = 'PNP_ADC=' + data['nvram'][PNP_ADC];
 					                			progressTimer(20, 2);
 							                	document.getElementById('formFirmware').submit();
 					            			}
 					            			document.getElementById('keep-eeprom-no').onclick = function() {
 					            				deleteCookies();
-					            				if(data['nvram'][PIN_PNP] != 0) {
-					            					document.cookie = 'PIN_PNP=' + data['nvram'][PIN_PNP];
+					            				if(data['nvram'][PNP_ADC] != 0) {
+					            					document.cookie = 'PNP_ADC=' + data['nvram'][PNP_ADC];
 					            				}
 					            				new bootstrap.Modal(document.getElementById('wireless-Settings')).show();
 					                			progressTimer(20, 1);

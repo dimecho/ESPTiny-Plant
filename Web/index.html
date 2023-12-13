@@ -479,33 +479,34 @@
 							<div class="tab-pane fade" id="tabFirmware" role="tabpanel">
 							  	<div class="container">
 		                            <div class="row">
-		                            	<div class="col-lg-3 col-12">
-			                                <form method="POST" action="/update" enctype="multipart/form-data" id="formLittleFS">
-					                            <input type="file" accept=".bin,.signed" name="filesystem" id="fileLittleFS" hidden />
-					                            <input type="submit" hidden />
-					                        </form>
-		                                    <button class="btn btn-primary w-100" type="button" id="browseLittleFS">Flash LittleFS</button>
-		                                </div>
-		                                <div class="col-lg-3 col-12">
-					                        <form method="POST" action="/update" enctype="multipart/form-data" id="formFirmware">
-					                            <input type="file" accept=".bin,.signed" name="firmware" id="fileFirmware" hidden />
-					                            <input type="submit" hidden />
-					                        </form>
-		                                    <button class="btn btn-primary w-100" type="button" id="browseFirmware">Flash Firmware</button>
-		                                </div>
+		                            	<div class="col-lg-6 col-12">
+				                            <div class="row mb-2">
+				                            	<div class="col-lg-6 col-12">
+					                                <form method="POST" action="/update" enctype="multipart/form-data" id="formLittleFS">
+							                            <input type="file" accept=".bin,.signed" name="filesystem" id="fileLittleFS" hidden />
+							                            <input type="submit" hidden />
+							                        </form>
+							                        <button class="btn btn-primary w-100" type="button" id="browseLittleFS">Flash LittleFS</button>
+							                    </div>
+							                    <div class="col-lg-6 col-12">
+							                        <form method="POST" action="/update" enctype="multipart/form-data" id="formFirmware">
+							                            <input type="file" accept=".bin,.signed" name="firmware" id="fileFirmware" hidden />
+							                            <input type="submit" hidden />
+							                        </form>
+				                                    <button class="btn btn-primary w-100" type="button" id="browseFirmware">Flash Firmware</button>
+				                                </div>
+				                            </div>
+				                            <input type="text" id="EnablePNP" name="EnablePNP" data-provider="slider">
+					                        <input type="text" id="ADCSensitivity" name="ADCSensitivity" data-provider="slider">
+			                        	</div>
 		                                <div class="col-lg-6 col-12">
-		                                	<small>GUI Version: 1.0.3</small><br/>
+		                                	<small>GUI Version: 1.0.4</small><br/>
 		                                    <small id="coreVersion">Core Version: 3.0.2</small><br/>
 		                                    <small id="sdkVersion">SDK Version: 2.2.2</small><br/>
 		                                    <small id="fsVersion">LittleFS Version: 1.3.0</small><br/>
 		                                    <small id="firmwareVersion">Firmware Version: 1.0</small><br/>
 		                                    <small id="iram">IRAM: 0</small><br/>
 		                                    <small id="dram">DRAM: 0</small>
-		                                </div>
-		                            </div>
-		                            <div class="row mt-2">
-		                            	<div class="col-lg-6 col-12">
-		                            	 	<input type="text" id="EnablePNP" name="EnablePNP" data-provider="slider">
 		                                </div>
 		                            </div>
 		                            <div class="row mt-2">

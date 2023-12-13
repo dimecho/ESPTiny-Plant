@@ -10,7 +10,7 @@ Remember: Brand new ESP-12 short GPIO0 to GND (flash mode) then UART TX/RX
 #define DEBUG 0
 #define THREADED 0
 //#define ARDUINO_SIGNING 0
-#define EEPROM_ID 0x3BDAB916  //Identify Sketch by EEPROM
+#define EEPROM_ID 0x3BDAB917  //Identify Sketch by EEPROM
 #define ASYNCWEBSERVER_SSL 0
 /*
 NOTE for HTTPS
@@ -240,7 +240,7 @@ bool testSMTP = false;
 #define _DEMO_PASSWORD 28
 #define _TIMEZONE_OFFSET 29
 #define _DEMO_AVAILABILITY 30
-#define _PIN_PNP 31
+#define _PNP_ADC 31
 
 const int NVRAM_Map[] = {
   16,  //_EEPROM_ID
@@ -274,12 +274,12 @@ const int NVRAM_Map[] = {
   32,  //_DEMO_PASSWORD
   16,  //_TIMEZONE_OFFSET
   16,  //_DEMO_AVAILABILITY
-  16   //_PIN_PNP
+  16   //_PNP_ADC
 };
 
 uint8_t WIRELESS_MODE = 0;  //WIRELESS_AP = 0, WIRELESS_STA(WPA2) = 1, WIRELESS_STA(WPA2 ENT) = 2, WIRELESS_STA(WEP) = 3
 //uint8_t WIRELESS_HIDE = 0;
-uint8_t WIRELESS_PHY_MODE = 3;   //WIRELESS_PHY_MODE_11B = 1, WIRELESS_PHY_MODE_11G = 2, WIRELESS_PHY_MODE_11N = 3
+uint8_t WIRELESS_PHY_MODE = 1;   //WIRELESS_PHY_MODE_11B = 1, WIRELESS_PHY_MODE_11G = 2, WIRELESS_PHY_MODE_11N = 3
 uint8_t WIRELESS_PHY_POWER = 6;  //Max = 20.5dBm (some ESP modules 24.0dBm) should be multiples of 0.25
 uint8_t WIRELESS_CHANNEL = 7;
 //String WIRELESS_SSID = "Plant";
@@ -319,7 +319,7 @@ uint8_t ON_TIME = 0;                      //from 6am
 uint8_t OFF_TIME = 0;                     //to 6pm
 uint16_t LOG_INTERVAL_S = 0;
 uint16_t DEEP_SLEEP_S = 0;
-uint16_t PIN_PNP = 0;                      //LOW = NPN, HIGH = PNP
+char PNP_ADC[] = "01";                     //0=NPN|1=PNP, ADC sensitivity
 //uint8_t ADC_ERROR_OFFSET = 64;           //WAKE_RF_DISABLED offset
 
 WiFiUDP ntpUDP;
@@ -442,7 +442,7 @@ void setup() {
     NVRAM_Write(_TIMEZONE_OFFSET, "-28800");
     NVRAM_Write(_DEMO_AVAILABILITY, DEMO_AVAILABILITY);
     //==========
-    NVRAM_Write(_PIN_PNP,  String(PIN_PNP)); //TODO: based in flash ID
+    NVRAM_Write(_PNP_ADC,  PNP_ADC); //TODO: based in flash ID
 
     memset(&rtcData, 0, sizeof(rtcData));  //reset RTC memory
     LittleFS.format();
@@ -812,7 +812,7 @@ void setupWebServer() {
         AsyncWebServerResponse *response = request->beginResponse(text_html, 3, [](uint8_t *buffer, size_t maxLen, size_t index) -> size_t {
           if (index) {
             //delay(100);
-            NVRAM_Write(_PIN_PNP, String(PIN_PNP));
+            NVRAM_Write(_PNP_ADC, PNP_ADC);
             ESP.restart();
             return 0;
           }
@@ -1542,7 +1542,9 @@ uint16_t sensorRead(uint16_t enablePin) {
       analogReadResolution(11);
       analogSetAttenuation(ADC_6db);
     */
-    analogRead(moistureSensorPin);  //Discharge any capacitance
+    for (uint8_t i = 0; i <= (uint8_t)PNP_ADC[1]; i++) {
+      analogRead(moistureSensorPin);  //Discharge any capacitance
+    }
 
     pinMode(moistureSensorPin, INPUT);
     digitalWrite(moistureSensorPin, LOW); //Internal pull-up OFF
@@ -1800,12 +1802,13 @@ void NVRAM_Read_Config() {
   PLANT_TYPE = NVRAM_Read(_PLANT_TYPE).toInt();
 
   //==========
-  PIN_PNP = NVRAM_Read(_PIN_PNP).toInt();
+  String nvram = NVRAM_Read(_PNP_ADC);
+  nvram.toCharArray(PNP_ADC, sizeof(nvram));
   turnNPNorPNP(0);
 }
 
 void turnNPNorPNP(uint8_t state) {
-  if (PIN_PNP == 1 && state == 0) {
+  if (PNP_ADC[0] == '1' && state == 0) {
     pinMode(pumpPin, INPUT_PULLUP); //Float the pin for PNP off
   }else{
     digitalWrite(pumpPin, state);
