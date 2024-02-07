@@ -12,6 +12,7 @@ Remember: Brand new ESP-12 short GPIO0 to GND (flash mode) then UART TX/RX
 //#define ARDUINO_SIGNING 0
 #define EEPROM_ID 0x3BDAB917  //Identify Sketch by EEPROM
 #define ASYNCWEBSERVER_SSL 0
+#define ASYNCWEBSERVER_DNS 0
 /*
 NOTE for HTTPS
 
@@ -95,7 +96,9 @@ ESP_Mail_Session session;
 SMTP_Message message;
 
 #include <ESPAsyncWebServer.h>
+#if ASYNCWEBSERVER_DNS
 #include <ESPAsyncDNSServer.h>
+#endif
 //#include <CapacitiveSensor.h>
 //#include <time.h>
 
@@ -111,8 +114,9 @@ const uint8_t SSLCertificate[] = {};  //0xA9, ...
 AsyncWebServer server(80);
 #endif
 
+#if ASYNCWEBSERVER_DNS
 AsyncDNSServer dnsServer;
-
+#endif
 //ESP-01
 //Pin 1 = Rx = GPIO3
 //Pin 8 = Tx = GPIO1
@@ -279,8 +283,8 @@ const int NVRAM_Map[] = {
 
 uint8_t WIRELESS_MODE = 0;  //WIRELESS_AP = 0, WIRELESS_STA(WPA2) = 1, WIRELESS_STA(WPA2 ENT) = 2, WIRELESS_STA(WEP) = 3
 //uint8_t WIRELESS_HIDE = 0;
-uint8_t WIRELESS_PHY_MODE = 1;   //WIRELESS_PHY_MODE_11B = 1, WIRELESS_PHY_MODE_11G = 2, WIRELESS_PHY_MODE_11N = 3
-uint8_t WIRELESS_PHY_POWER = 6;  //Max = 20.5dBm (some ESP modules 24.0dBm) should be multiples of 0.25
+uint8_t WIRELESS_PHY_MODE = 2;   //WIRELESS_PHY_MODE_11B = 1, WIRELESS_PHY_MODE_11G = 2, WIRELESS_PHY_MODE_11N = 3
+uint8_t WIRELESS_PHY_POWER = 10;  //Max = 20.5dBm (some ESP modules 24.0dBm) should be multiples of 0.25
 uint8_t WIRELESS_CHANNEL = 7;
 //String WIRELESS_SSID = "Plant";
 //char WIRELESS_USERNAME[] = "";
@@ -339,10 +343,6 @@ void setup() {
   //WPA2 Enterpise stability
   //disable_extra4k_at_link_time(); //use official/legacy ram location for user stack
 
-  //ESP8266 SDK 2.2.2 Deep Sleep is 32bit about 2,147,483,647 = 35 min
-  //ESP8266 SDK 2.4.1 Deep Sleep is 64bit about 12,731,80,9786 = 3h 30min
-  //Serial.println("deepSleepMax: " + uint64ToString(ESP.deepSleepMax()));
-
   /*
     REANSON_DEFAULT_RST = 0, // normal startup by power on
     REANSON_WDT_RST = 1, // hardware watch dog reset
@@ -372,6 +372,9 @@ void setup() {
 #if DEBUG
   Serial.begin(UART_BAUDRATE, SERIAL_8N1);
   Serial.setDebugOutput(true);
+  //ESP8266 SDK 2.2.2 Deep Sleep is 32bit about 2,147,483,647 = 35 min
+  //ESP8266 SDK 2.4.1 Deep Sleep is 64bit about 12,731,80,9786 = 3h 30min
+  Serial.println("deepSleepMax: " + uint64ToString(ESP.deepSleepMax()));
   //printMemory();
 #endif
 
@@ -482,7 +485,7 @@ void setup() {
       LOG_INTERVAL = 300;                    //prevent WiFi from sleeping 5 minutes
       ALERTS[0] = '1';                       //email DHCP IP
       ALERTS[1] = '0';                       //low voltage
-      memset(&rtcData, 0, sizeof(rtcData));  //reset RTC memory
+      memset(&rtcData, 0, sizeof(rtcData));  //reset RTC memory (set all zero)
       blinky(2000, 1, 0);
       setupWiFi(22);
       //ArduinoOTA.begin();
@@ -495,6 +498,7 @@ void setup() {
   Serial.printf("Boot calibration (milliseconds):%u\n", millis());
 #endif
   offsetTiming();
+  calibrateDeepSleep(); //compensate for processing delay during setup()
 }
 
 //This is a power expensive function 80+mA
@@ -573,9 +577,10 @@ void setupWiFi(uint8_t timeout) {
     //==========
     //DNS Server
     //==========
+#if ASYNCWEBSERVER_DNS
     dnsServer.setErrorReplyCode(AsyncDNSReplyCode::NoError);
     dnsServer.start(53, "*", WiFi.softAPIP());
-
+#endif
     NETWORK_IP = WiFi.softAPIP().toString();
 
   } else {
@@ -1364,7 +1369,7 @@ void loop() {
       Serial.printf("Water Timer: %u\n", rtcData.waterTime);
 #endif
       //We need to split deep sleep as 32-bit unsigned integer is 4294967295 or 0xffffffff max ~71 minutes
-      if (rtcData.waterTime > PLANT_MANUAL_TIMER) {
+      if (rtcData.waterTime >= PLANT_MANUAL_TIMER) {
         rtcData.emptyBottle = 0;  //assume no sensor with manual timer
         rtcData.waterTime = 0;
         runPump();
@@ -1859,8 +1864,6 @@ void offsetTiming() {
   DEEP_SLEEP = DEEP_SLEEP * 1000;      //milliseconds millis()
   DEEP_SLEEP = DEEP_SLEEP * 1000;      //microseconds micros()
   LOG_INTERVAL = LOG_INTERVAL * 1000;  //milliseconds millis()
-
-  calibrateDeepSleep(); //compensate for processing delay during setup()
 }
 
 /*
