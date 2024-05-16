@@ -195,7 +195,7 @@ function loadSVG(svgfile) {
 			            adc.open('GET', 'api?adc=1', true);
 			            adc.send();
 			            adc.onloadend = function() {
-						    if(xhr.status == 200) {
+						    if(adc.status == 200) {
 						    	var a = parseInt(adc.responseText);
 						    	
 						    	if(a > 1010 && a < 1024)
@@ -506,10 +506,13 @@ function loadSVG(svgfile) {
 				                    $('#EnableLogCheckbox').prop('checked', bool_value);
 				                    $('#EnableLogInterval').val(data['nvram'][LOG_INTERVAL]);
 
-				                    var pnp_adc = data['nvram'][PNP_ADC] + '00';
+				                    var pnp_adc = data['nvram'][PNP_ADC] + '000';
 
 				                    $('#EnablePNP').val(pnp_adc.charAt(0));
 				                    $('#ADCSensitivity').val(pnp_adc.charAt(1));
+				                    bool_value = pnp_adc.charAt(2) == '1' ? true : false;
+				                    $('#WaterLevel').val(pnp_adc.charAt(2));
+				                    $('#WaterLevelCheckbox').prop('checked', bool_value);
 				            		
 				                    var rangeslider_parameters = {
 								        skin: 'big',
@@ -597,16 +600,16 @@ function loadSVG(svgfile) {
 						                if(this.value == 'PNP') {
 						                    notify('','PNP Transistor! Controled with LOW (Negative)', 'danger');
 						                    notify('','If you get this WRONG, Pump will run Non-Stop!', 'warning');
-						                    saveSetting(PNP_ADC, '1' + document.getElementById('ADCSensitivity').value);
+						                    saveSetting(PNP_ADC, '1' + document.getElementById('ADCSensitivity').value + document.getElementById('WaterLevel').value);
 						                }else{
-						                	saveSetting(PNP_ADC, '0' + document.getElementById('ADCSensitivity').value);
+						                	saveSetting(PNP_ADC, '0' + document.getElementById('ADCSensitivity').value + document.getElementById('WaterLevel').value);
 						                }
 						            });
 						            $('#ADCSensitivity').on('input', function() {
 						                if(document.getElementById('EnablePNP').value == 'PNP') {
-						                    saveSetting(PNP_ADC, '1' + this.value);
+						                    saveSetting(PNP_ADC, '1' + this.value + document.getElementById('WaterLevel').value);
 						                }else{
-						                	saveSetting(PNP_ADC, '0' + this.value);
+						                	saveSetting(PNP_ADC, '0' + this.value + document.getElementById('WaterLevel').value);
 						                }
 						            });
 						            $('#fileLittleFS').change(function() {
@@ -1143,6 +1146,47 @@ function autoWiFiPower()
     }else{
     	document.getElementById('WiFiPower').value = 1;
     }
+};
+
+function testSoil()
+{
+    var adc = new XMLHttpRequest();
+    adc.open('GET', 'api?adc=1', true);
+    adc.send();
+    adc.onloadend = function() {
+	    if(adc.status == 200) {
+	    	var a = parseInt(adc.responseText);
+	    	notify('', 'Soil Moisture = ' + a, 'success');
+		}
+	}
+};
+
+function testWater()
+{
+    if(document.getElementById('WaterLevel').value == '0')
+    {
+    	notify('', 'Enable Water Sensor in Firmware', 'danger');
+    	notify('', 'Hardware Mod is Required!', 'warning');
+    }else{
+    	var adc = new XMLHttpRequest();
+	    adc.open('GET', 'api?adc=2', true);
+	    adc.send();
+	    adc.onloadend = function() {
+		    if(adc.status == 200) {
+		    	var a = parseInt(adc.responseText);
+		    	if(a > 1000) {
+		    		notify('', 'Water Level Above Pump', 'success');
+		    	}else{
+		    		notify('', 'Water Level Below Pump', 'danger');
+		    	}
+			}
+		}
+    }
+};
+
+function testBattery()
+{
+
 };
 
 function testLED()

@@ -10,7 +10,7 @@ Remember: Brand new ESP-12 short GPIO0 to GND (flash mode) then UART TX/RX
 #define DEBUG 0
 #define THREADED 0
 //#define ARDUINO_SIGNING 0
-#define EEPROM_ID 0x3BDAB917  //Identify Sketch by EEPROM
+#define EEPROM_ID 0x3BDAB918  //Identify Sketch by EEPROM
 #define ASYNCWEBSERVER_SSL 0
 #define ASYNCWEBSERVER_DNS 0
 /*
@@ -98,6 +98,8 @@ SMTP_Message message;
 #include <ESPAsyncWebServer.h>
 #if ASYNCWEBSERVER_DNS
 #include <ESPAsyncDNSServer.h>
+#else
+#include <ESP8266mDNS.h>
 #endif
 //#include <CapacitiveSensor.h>
 //#include <time.h>
@@ -323,7 +325,7 @@ uint8_t ON_TIME = 0;                      //from 6am
 uint8_t OFF_TIME = 0;                     //to 6pm
 uint16_t LOG_INTERVAL_S = 0;
 uint16_t DEEP_SLEEP_S = 0;
-char PNP_ADC[] = "01";                     //0=NPN|1=PNP, ADC sensitivity
+char PNP_ADC[] = "010";                    //0=NPN|1=PNP, ADC sensitivity, Water Level Sensor 0=Disable|1=Enable
 //uint8_t ADC_ERROR_OFFSET = 64;           //WAKE_RF_DISABLED offset
 
 WiFiUDP ntpUDP;
@@ -578,8 +580,13 @@ void setupWiFi(uint8_t timeout) {
     //DNS Server
     //==========
 #if ASYNCWEBSERVER_DNS
-    dnsServer.setErrorReplyCode(AsyncDNSReplyCode::NoError);
-    dnsServer.start(53, "*", WiFi.softAPIP());
+    dnsServer.setTTL(300);
+    dnsServer.setErrorReplyCode(AsyncDNSReplyCode::ServerFailure);
+    dnsServer.start(53, "captive.apple.com", WiFi.softAPIP());
+    //dnsServer.setErrorReplyCode(AsyncDNSReplyCode::NoError);
+    //dnsServer.start(53, "*", WiFi.softAPIP());
+#else
+      MDNS.begin(WIRELESS_SSID);
 #endif
     NETWORK_IP = WiFi.softAPIP().toString();
 
@@ -790,10 +797,16 @@ void setupWebServer() {
   //==============================================
   server.on("/api", HTTP_GET, [](AsyncWebServerRequest *request) {
     if (request->hasParam("adc")) {
+      uint8_t adc = request->getParam(0)->value().toInt();
+      if (adc == 1) {
+        adc = sensorPin;
+      }else{
+        adc = watersensorPin;
+      }
       #ifdef ESP8266
-      uint16_t moisture = sensorRead_ESP8266(sensorPin);
+      uint16_t moisture = sensorRead_ESP8266(adc);
       #else
-      uint16_t moisture = sensorRead(sensorPin);
+      uint16_t moisture = sensorRead(adc);
       #endif
       request->send(200, text_plain, String(moisture));
       /*}else if (request->hasParam("chipid", true)) {
@@ -999,7 +1012,7 @@ void setupWebServer() {
         return request->requestAuthentication();
 #endif
     String updateURL = "http://" + NETWORK_IP + "/update";
-    String updateHTML = "<!DOCTYPE html><html><body><form method=POST action='" + updateURL + "' enctype='multipart/form-data'><input type=file accept='.bin,.signed' name=firmware><input type=submit value='Update Firmware'></form><br><form method=POST action='" + updateURL + "' enctype='multipart/form-data'><input type=file accept='.bin,.signed' name=filesystem><input type=submit value='Update Filesystem'></form></body></html>";
+    String updateHTML = "<!DOCTYPE html><html><body><form method=POST action='" + updateURL + "' enctype='multipart/form-data' accept-charset='UTF-8'><input type=file accept='.bin,.signed' name=firmware><input type=submit value='Update Firmware'></form><br><form method=POST action='" + updateURL + "' enctype='multipart/form-data'><input type=file accept='.bin,.signed' name=filesystem><input type=submit value='Update Filesystem'></form></body></html>";
     AsyncWebServerResponse *response = request->beginResponse(200, text_html, updateHTML);
     request->send(response);
   });
@@ -1336,11 +1349,16 @@ void loop() {
         /*
           loopback wire from water jug to A0 powered from GPIO12
         */
-        //#ifdef ESP8266
-        //uint16_t moisture = sensorRead_ESP8266(watersensorPin);
-        //#else
-        //uint16_t moisture = sensorRead(watersensorPin);
-        //#endif
+        if (PNP_ADC[2] == '1') {
+        #ifdef ESP8266
+          moisture = sensorRead_ESP8266(watersensorPin);
+        #else
+          moisture = sensorRead(watersensorPin);
+        #endif
+          if(moisture < 1000) {
+            rtcData.emptyBottle = 11;
+          }
+        }
 
         if (rtcData.emptyBottle < 3) {
           rtcData.moistureLog += moisture;
