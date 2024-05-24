@@ -970,19 +970,39 @@ function testPump()
 	        	if(xhr.responseText == "Locked") {
 	        		PlantLogin();
 	        	}else{
-	        		notify('', 'Running Pump ...', 'warning');
-		            progressTimer(62,0,function() {
-		            	if(xhr.clearlog == "...") {
-							testPumpLoopback(true);
-						}else{
-							testPumpLoopback(false);
+	        		if(document.getElementById('WaterLevel').value == 1) {
+				    	var adc = new XMLHttpRequest();
+					    adc.open('GET', 'api?adc=2', true);
+					    adc.send();
+					    adc.onloadend = function() {
+						    if(adc.status == 200) {
+						    	if(adc.responseText > 0) {
+						    		testPumpRun();
+						    	}else{
+						    		notify('', 'Check Water Level Connection', 'danger');
+						    	}
+							}
 						}
-					});
+				    }else{
+						testPumpRun();
+		        	}
 	        	}
 	        }else{
 	        	notify('', 'Pump Test Failed', 'danger');
 	        }
 	    };
+	});
+};
+
+function testPumpRun()
+{
+	notify('', 'Running Pump ...', 'warning');
+	progressTimer(62,0,function() {
+		if(xhr.clearlog == "...") {
+			testPumpLoopback(true);
+		}else{
+			testPumpLoopback(false);
+		}
 	});
 };
 
@@ -1163,7 +1183,7 @@ function testSoil()
 
 function testWater()
 {
-    if(document.getElementById('WaterLevel').value == '0')
+    if(document.getElementById('WaterLevel').value == 0)
     {
     	notify('', 'Enable Water Sensor in Firmware', 'danger');
     	notify('', 'Hardware Mod is Required!', 'warning');
@@ -1173,8 +1193,7 @@ function testWater()
 	    adc.send();
 	    adc.onloadend = function() {
 		    if(adc.status == 200) {
-		    	var a = parseInt(adc.responseText);
-		    	if(a > 1000) {
+		    	if(adc.responseText > 0) {
 		    		notify('', 'Water Level Above Pump', 'success');
 		    	}else{
 		    		notify('', 'Water Level Below Pump', 'danger');

@@ -126,17 +126,23 @@ AsyncDNSServer dnsServer;
 #if defined ARDUINO_ESP8266_NODEMCU_ESP12 || defined ARDUINO_ESP8266_NODEMCU_ESP12E || defined ARDUINO_ESP8266_GENERIC
 #define pumpPin 5  //Output (D1 NodeMCU)
 #else
-#define pumpPin 3  //RX Output
+#define pumpPin 3  //Output
 #endif
 #if defined ARDUINO_ESP8266_NODEMCU_ESP12 || defined ARDUINO_ESP8266_NODEMCU_ESP12E || defined ARDUINO_ESP8266_GENERIC
 #define sensorPin 4  //Output (D2 NodeMCU)
 #else
-#define sensorPin 1  //TX Output
+#define sensorPin 1  //Output
 #endif
 #if defined ARDUINO_ESP8266_NODEMCU_ESP12 || defined ARDUINO_ESP8266_NODEMCU_ESP12E || defined ARDUINO_ESP8266_GENERIC
-#define watersensorPin 12  //Output (D6 NodeMCU)
+#define watersensorPin_25 14  //Output (D5 NodeMCU)
+#define watersensorPin_50 12  //Output (D6 NodeMCU)
+#define watersensorPin_75 13  //Output (D7 NodeMCU)
+#define watersensorPin_100 15 //Output (D8 NodeMCU)
 #else
-#define watersensorPin 3  //RX Output
+#define watersensorPin_25 3  //Output
+#define watersensorPin_50 3  //Output
+#define watersensorPin_75 3  //Output
+#define watersensorPin_100 3 //Output
 #endif
 #if defined ARDUINO_ESP8266_NODEMCU_ESP12 || defined ARDUINO_ESP8266_NODEMCU_ESP12E || defined ARDUINO_ESP8266_GENERIC
 #define ledPin 2  //Output (D4 NodeMCU)
@@ -798,16 +804,16 @@ void setupWebServer() {
   server.on("/api", HTTP_GET, [](AsyncWebServerRequest *request) {
     if (request->hasParam("adc")) {
       uint8_t adc = request->getParam(0)->value().toInt();
+      uint16_t moisture = 0;
       if (adc == 1) {
-        adc = sensorPin;
+        #ifdef ESP8266
+        moisture = sensorRead_ESP8266(sensorPin);
+        #else
+        moisture = sensorRead(sensorPin);
+        #endif
       }else{
-        adc = watersensorPin;
+        moisture = waterLevelRead();
       }
-      #ifdef ESP8266
-      uint16_t moisture = sensorRead_ESP8266(adc);
-      #else
-      uint16_t moisture = sensorRead(adc);
-      #endif
       request->send(200, text_plain, String(moisture));
       /*}else if (request->hasParam("chipid", true)) {
         AsyncResponseStream *response = request->beginResponseStream(text_plain);
@@ -1346,20 +1352,6 @@ void loop() {
         if (ALERTS[2] == '1')
           smtpSend("Low Sensor", String(moisture));
       } else if (moisture < PLANT_SOIL_MOISTURE) {  //Water Plant
-        /*
-          loopback wire from water jug to A0 powered from GPIO12
-        */
-        if (PNP_ADC[2] == '1') {
-        #ifdef ESP8266
-          moisture = sensorRead_ESP8266(watersensorPin);
-        #else
-          moisture = sensorRead(watersensorPin);
-        #endif
-          if(moisture < 1000) {
-            rtcData.emptyBottle = 11;
-          }
-        }
-
         if (rtcData.emptyBottle < 3) {
           rtcData.moistureLog += moisture;
           runPump();
@@ -1515,27 +1507,56 @@ void runPump() {
     }
     arraymap++;
   }
+  uint16_t water = 100;
+  /*
+    loopback wire from water jug to A0 powered from GPIO12
+  */
+  if (PNP_ADC[2] == '1') {
+    water = waterLevelRead();
+  }
   //===================
-  turnNPNorPNP(1); //ON
-  do {
-    if (pulse[duration] == 1) {
-      turnNPNorPNP(1); //ON
-    } else {
-      turnNPNorPNP(0); //OFF
-    }
-    delay(1000);
-    duration--;
-  } while (duration > 0);
-  turnNPNorPNP(0); //OFF
+  if(water > 0) {
+    turnNPNorPNP(1); //ON
+    do {
+      if (pulse[duration] == 1) {
+        turnNPNorPNP(1); //ON
+      } else {
+        turnNPNorPNP(0); //OFF
+      }
+      delay(1000);
+      duration--;
+    } while (duration > 0);
+    turnNPNorPNP(0); //OFF
 
-  if (ALERTS[3] == '1')
+    if (ALERTS[3] == '1')
     smtpSend("Run Pump", String(PLANT_POT_SIZE));
 
+    dataLog("T:" + String(PLANT_MANUAL_TIMER) + ",M:" + String(PLANT_SOIL_MOISTURE));
+  }
   rtcData.emptyBottle++;  //Sensorless Empty Detection
 
-  dataLog("T:" + String(PLANT_MANUAL_TIMER) + ",M:" + String(PLANT_SOIL_MOISTURE));
-
   calibrateDeepSleep(); //next sleep compensate for pump runtime
+}
+
+uint16_t waterLevelRead() {
+  uint16_t level = 100;
+  uint16_t water = sensorRead(watersensorPin_100);
+  if(water < 1000) {
+    level = 75;
+    water = sensorRead(watersensorPin_75);
+    if(water < 1000) {
+      level = 50;
+      water = sensorRead(watersensorPin_50);
+      if(water < 1000) {
+        level = 25;
+        water = sensorRead(watersensorPin_25);
+        if(water < 1000) {
+          level = 0;
+        }
+      }
+    }
+  }
+  return level;
 }
 
 #ifdef ESP8266
