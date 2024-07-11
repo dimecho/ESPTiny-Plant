@@ -10,7 +10,7 @@ Remember: Brand new ESP-12 short GPIO0 to GND (flash mode) then UART TX/RX
 #define DEBUG 0
 #define THREADED 0
 //#define ARDUINO_SIGNING 0
-#define EEPROM_ID 0x3BDAB918  //Identify Sketch by EEPROM
+#define EEPROM_ID 0xAB01  //Identify Sketch by EEPROM
 #define ASYNCWEBSERVER_SSL 0
 #define ASYNCWEBSERVER_DNS 0
 /*
@@ -42,9 +42,10 @@ NOTE for HTTPS
   compiler.cpp.extra_flags=-DASYNCWEBSERVER_REGEX=1
 */
 
-#define SPIFFS LittleFS
+#include <FS.h>
 #include <LittleFS.h>
-#include <Updater.h>
+#define SPIFFS LittleFS
+
 //#define ATOMIC_FS_UPDATE  //gzip works with 4MB (FS: 1MB, OTA ~1019kB)
 /*
   Notes: signed and gzip binary do not work well together, SDK 3.0.x seem to break gzip
@@ -56,36 +57,42 @@ NOTE for HTTPS
 
   build.extra_flags=-DESP8266 -DATOMIC_FS_UPDATE
 */
-
 /*
 #if FLASH_MAP_SUPPORT && ADRUINO_SIGNING
   FLASH_MAP_SETUP_CONFIG(FLASH_MAP_OTA_FS) //-DFLASH_MAP_SUPPORT=1
 #endif
 */
-#if (ARDUINO_ESP8266_MAJOR <= 3 && ARDUINO_ESP8266_MINOR < 1)
-#include <StreamString.h>
-#endif
+//#include <Arduino.h>
 //#include <ArduinoOTA.h>
 #include <EEPROM.h>
 #ifdef ESP32
-#include <ESP32Ticker.h>
+#include "driver/temp_sensor.h"
+#define U_FS U_SPIFFS
+//#define fs_info LittleFS
+//#include <ESP32Ticker.h>
 #include <WiFi.h>
 #include <AsyncTCP.h>
 #include <AsyncUDP.h>
+//#include <ESP32httpUpdate.h>
+#include <Update.h>
+#include <StreamString.h>
 #elif defined(ESP8266)
-#include <Ticker.h>
 #include <ESP8266WiFi.h>
 #include <ESPAsyncTCP.h>
 #include <ESPAsyncUDP.h>
+#include <Updater.h>
+#if (ARDUINO_ESP8266_MAJOR <= 3 && ARDUINO_ESP8266_MINOR < 1)
+#include <StreamString.h>
 #endif
-#include <NTPClient.h>
-#include <WiFiUDP.h>
 extern "C" {
 #include "user_interface.h"
 #include "wpa2_enterprise.h"
 }
 //#include <coredecls.h> //for disable_extra4k_at_link_timer()
 #include <umm_malloc/umm_heap_select.h>
+#endif
+#include <NTPClient.h>
+#include <WiFiUDP.h>
 
 //IMPORTANT: ESP8266 that don't have external SRAM/PSRAM chip installed choose the MMU option 3, 16KB cache + 48KB IRAM and 2nd Heap (shared)
 #include <ESP_Mail_Client.h>  //ESP-12E SRAM:64KB
@@ -99,7 +106,11 @@ SMTP_Message message;
 #if ASYNCWEBSERVER_DNS
 #include <ESPAsyncDNSServer.h>
 #else
+#ifdef ESP32
+#include <ESPmDNS.h>
+#elif defined(ESP8266)
 #include <ESP8266mDNS.h>
+#endif
 #endif
 //#include <CapacitiveSensor.h>
 //#include <time.h>
@@ -133,27 +144,42 @@ AsyncDNSServer dnsServer;
 #else
 #define sensorPin 1  //Output
 #endif
-#if defined ARDUINO_ESP8266_NODEMCU_ESP12 || defined ARDUINO_ESP8266_NODEMCU_ESP12E || defined ARDUINO_ESP8266_GENERIC
-#define watersensorPin_25 14  //Output (D5 NodeMCU)
-#define watersensorPin_50 12  //Output (D6 NodeMCU)
-#define watersensorPin_75 13  //Output (D7 NodeMCU)
-#define watersensorPin_100 15 //Output (D8 NodeMCU)
+#ifdef ARDUINO_ESP8266_GENERIC
+#define watersensorPin_25 14   //Output
+#define watersensorPin_50 12   //Output
+#define watersensorPin_75 13   //Output
+#define watersensorPin_100 13  //Output
+#elif defined(ARDUINO_ESP8266_NODEMCU_ESP12) || defined(ARDUINO_ESP8266_NODEMCU_ESP12E)
+#define watersensorPin_25 14   //Output (D5 NodeMCU)
+#define watersensorPin_50 12   //Output (D6 NodeMCU)
+#define watersensorPin_75 13   //Output (D7 NodeMCU)
+#define watersensorPin_100 15  //Output (D8 NodeMCU)
 #else
-#define watersensorPin_25 3  //Output
-#define watersensorPin_50 3  //Output
-#define watersensorPin_75 3  //Output
-#define watersensorPin_100 3 //Output
+#define watersensorPin_25 15   //Output
+#define watersensorPin_50 15   //Output
+#define watersensorPin_75 15   //Output
+#define watersensorPin_100 15  //Output
 #endif
 #if defined ARDUINO_ESP8266_NODEMCU_ESP12 || defined ARDUINO_ESP8266_NODEMCU_ESP12E || defined ARDUINO_ESP8266_GENERIC
 #define ledPin 2  //Output (D4 NodeMCU)
+#elif defined(ESP32)
+#define ledPin 15  //Output
 #else
 #define ledPin 1  //Output
 #endif
-#define moistureSensorPin A0  //Input
-//#define deepsleepPin                16  //GPIO16 to RESET (D0 NodeMCU)
+#ifdef ESP32
+#include <esp_adc_cal.h>
+#define analogDigitalPin ADC1_CHANNEL_0  //GPIO_NUM_39 //Input
+void initTempSensor(){
+    temp_sensor_config_t temp_sensor = TSENS_CONFIG_DEFAULT();
+    temp_sensor.dac_offset = TSENS_DAC_L2;  // TSENS_DAC_L2 is default; L4(-40°C ~ 20°C), L2(-10°C ~ 80°C), L1(20°C ~ 100°C), L0(50°C ~ 125°C)
+    temp_sensor_set_config(temp_sensor);
+    temp_sensor_start();
+}
+#elif defined(ESP8266)
+#define analogDigitalPin A0  //Input
 
-#define UART_BAUDRATE 115200
-
+uint32_t ADCMODE;  //Global variable
 //ADC_MODE(ADC_TOUT); //Sensor input measuring
 //ADC_MODE(ADC_VCC);  //Self voltage measuring
 ADC_MODE(get_adc());  //Analog to Digital Converter (cannot be both)
@@ -165,7 +191,11 @@ uint32_t get_adc() {
   if ((adc_mode != ADC_VCC) && (adc_mode != ADC_TOUT)) return ADC_TOUT;
   return adc_mode;
 }
-uint32_t ADCMODE;  //Global variable
+#endif
+
+//#define deepsleepPin                16  //GPIO16 to RESET (D0 NodeMCU)
+
+#define UART_BAUDRATE 115200
 
 #if THREADED
 #include <Ticker.h>
@@ -216,9 +246,9 @@ struct {
 } rtcData;
 
 uint32_t loopTimer = 0;  //loop() slow down
-uint32_t webTimer = 0;  //track last webpage access
+uint32_t webTimer = 0;   //track last webpage access
 
-bool testPump = false;
+uint8_t testPump = 0;  //0 = stop, 1= run (timed), 2 = run (continues)
 bool testSMTP = false;
 
 #define _EEPROM_ID 0
@@ -271,11 +301,11 @@ const int NVRAM_Map[] = {
   16,  //_NETWORK_SUBNET
   16,  //_NETWORK_GATEWAY
   16,  //_NETWORK_DNS
-  16,   //_PLANT_POT_SIZE
-  16,   //_PLANT_SOIL_MOISTURE
+  16,  //_PLANT_POT_SIZE
+  16,  //_PLANT_SOIL_MOISTURE
   32,  //_PLANT_MANUAL_TIMER
-  16,   //_PLANT_SOIL_TYPE
-  16,   //_PLANT_TYPE
+  16,  //_PLANT_SOIL_TYPE
+  16,  //_PLANT_TYPE
   32,  //_DEEP_SLEEP
   64,  //_EMAIL_ALERT
   64,  //_SMTP_SERVER
@@ -291,7 +321,7 @@ const int NVRAM_Map[] = {
 
 uint8_t WIRELESS_MODE = 0;  //WIRELESS_AP = 0, WIRELESS_STA(WPA2) = 1, WIRELESS_STA(WPA2 ENT) = 2, WIRELESS_STA(WEP) = 3
 //uint8_t WIRELESS_HIDE = 0;
-uint8_t WIRELESS_PHY_MODE = 2;   //WIRELESS_PHY_MODE_11B = 1, WIRELESS_PHY_MODE_11G = 2, WIRELESS_PHY_MODE_11N = 3
+uint8_t WIRELESS_PHY_MODE = 2;    //WIRELESS_PHY_MODE_11B = 1, WIRELESS_PHY_MODE_11G = 2, WIRELESS_PHY_MODE_11N = 3
 uint8_t WIRELESS_PHY_POWER = 10;  //Max = 20.5dBm (some ESP modules 24.0dBm) should be multiples of 0.25
 uint8_t WIRELESS_CHANNEL = 7;
 //String WIRELESS_SSID = "Plant";
@@ -331,7 +361,7 @@ uint8_t ON_TIME = 0;                      //from 6am
 uint8_t OFF_TIME = 0;                     //to 6pm
 uint16_t LOG_INTERVAL_S = 0;
 uint16_t DEEP_SLEEP_S = 0;
-char PNP_ADC[] = "010";                    //0=NPN|1=PNP, ADC sensitivity, Water Level Sensor 0=Disable|1=Enable
+char PNP_ADC[] = "010";  //0=NPN|1=PNP, ADC sensitivity, Water Level Sensor 0=Disable|1=Enable
 //uint8_t ADC_ERROR_OFFSET = 64;           //WAKE_RF_DISABLED offset
 
 WiFiUDP ntpUDP;
@@ -340,10 +370,10 @@ NTPClient timeClient(ntpUDP);
 void setup() {
   //pinMode(deepsleepPin, WAKEUP_PULLUP);
 
-  pinMode(pumpPin, INPUT_PULLUP); //Float the pin until set NPN or PNP
+  pinMode(pumpPin, INPUT_PULLUP);  //Float the pin until set NPN or PNP
 
-  digitalWrite(sensorPin, LOW);
-  pinMode(sensorPin, OUTPUT);
+  //digitalWrite(sensorPin, LOW);
+  //pinMode(sensorPin, OUTPUT);
 
   //Needed after deepSleep for ESP8266 Core 3.0.x. Otherwise error: pll_cal exceeds 2ms
   //delay(1);
@@ -415,6 +445,8 @@ void setup() {
       }
     }
     WiFi.scanDelete();
+    LittleFS.begin(true);
+    LittleFS.format();
 
     NVRAM_Erase();
     NVRAM_Write(_EEPROM_ID, String(EEPROM_ID));
@@ -453,30 +485,46 @@ void setup() {
     NVRAM_Write(_TIMEZONE_OFFSET, "-28800");
     NVRAM_Write(_DEMO_AVAILABILITY, DEMO_AVAILABILITY);
     //==========
-    NVRAM_Write(_PNP_ADC,  PNP_ADC); //TODO: based in flash ID
-
+    NVRAM_Write(_PNP_ADC, PNP_ADC);  //TODO: based in flash ID
     memset(&rtcData, 0, sizeof(rtcData));  //reset RTC memory
-    LittleFS.format();
   } else {
     NVRAM_Read_Config();
     String nvram = NVRAM_Read(_ALERTS);
     nvram.toCharArray(ALERTS, sizeof(nvram));
     nvram = NVRAM_Read(_DEMO_AVAILABILITY);
     nvram.toCharArray(DEMO_AVAILABILITY, sizeof(nvram));
+#ifdef ESP8266
     ESP.rtcUserMemoryRead(32, (uint32_t *)&rtcData, sizeof(rtcData));
     ADCMODE = get_adc();
     if (ADCMODE == ADC_VCC) {                                               //Measure VCC this runtime
       ESP.rtcUserMemoryWrite(100, (uint32_t *)ADC_TOUT, sizeof(ADC_TOUT));  //Next time measure ADC sensor
     }
+#else
+    //printf("Opening Non-Volatile Storage (NVS) ... ");
+    //nvs_handle_t rtcData;
+    //nvs_open("storage", NVS_READWRITE, &rtcData);
+    //nvs_set_i32(rtcData, "100", ADC_TOUT);
+#endif
   }
   //EEPROM.end();
 
   ON_TIME = String(DEMO_AVAILABILITY).substring(7, 9).toInt();
   OFF_TIME = String(DEMO_AVAILABILITY).substring(9, 11).toInt();
   PLANT_NAME = NVRAM_Read(_PLANT_NAME);
-
+#ifdef ESP32
+  uint8_t wakeupReason = esp_reset_reason();  // ESP.getResetReason();
+  initTempSensor();
+  float result = 0;
+  temp_sensor_read_celsius(&result);
+#if DEBUG
+  Serial.print("Temperature: ");
+  Serial.print(result);
+  Serial.println(" °C");
+#endif
+#else
   struct rst_info *rstInfo = system_get_rst_info();
   uint8_t wakeupReason = rstInfo->reason;
+#endif
 
 #if DEBUG
   Serial.printf("Wakeup Reason:%u\n", wakeupReason);
@@ -506,7 +554,7 @@ void setup() {
   Serial.printf("Boot calibration (milliseconds):%u\n", millis());
 #endif
   offsetTiming();
-  calibrateDeepSleep(); //compensate for processing delay during setup()
+  calibrateDeepSleep();  //compensate for processing delay during setup()
 }
 
 //This is a power expensive function 80+mA
@@ -533,11 +581,15 @@ void setupWiFi(uint8_t timeout) {
   //-------------------
 
   WiFi.persistent(false);  //Do not write settings to memory
-  WiFi.setPhyMode((WiFiPhyMode_t)WIRELESS_PHY_MODE);
-
   //0    (for lowest RF power output, supply current ~ 70mA
   //20.5 (for highest RF power output, supply current ~ 80mA
+#ifdef ESP8266
+  WiFi.setPhyMode((WiFiPhyMode_t)WIRELESS_PHY_MODE);
   WiFi.setOutputPower(WIRELESS_PHY_POWER);
+#else
+  WiFi.setTxPower((wifi_power_t)WIRELESS_PHY_POWER);
+  //btStop();
+#endif
 
   const String WIRELESS_SSID = NVRAM_Read(_WIRELESS_SSID);
   const String WIRELESS_PASSWORD = NVRAM_Read(_WIRELESS_PASSWORD);
@@ -592,7 +644,7 @@ void setupWiFi(uint8_t timeout) {
     //dnsServer.setErrorReplyCode(AsyncDNSReplyCode::NoError);
     //dnsServer.start(53, "*", WiFi.softAPIP());
 #else
-      MDNS.begin(WIRELESS_SSID);
+    MDNS.begin(WIRELESS_SSID);
 #endif
     NETWORK_IP = WiFi.softAPIP().toString();
 
@@ -604,7 +656,11 @@ void setupWiFi(uint8_t timeout) {
     //WiFi.enableSTA(true);
     //WiFi.enableAP(false);
     WiFi.mode(WIFI_STA);
+#ifdef ESP8266
     WiFi.setAutoConnect(false);
+#else
+    WiFi.setAutoReconnect(false);
+#endif
     WiFi.disconnect();
 
     uint8_t NETWORK_DHCP = NVRAM_Read(_NETWORK_DHCP).toInt();
@@ -613,6 +669,7 @@ void setupWiFi(uint8_t timeout) {
     }
     WiFi.hostname(PLANT_NAME);
 
+#ifdef ESP8266
     if (WIRELESS_MODE == 2) {  // WPA2-Enterprise
       typedef enum {
         EAP_TLS,
@@ -628,10 +685,10 @@ void setupWiFi(uint8_t timeout) {
       //memcpy(wifi_config.password, "", 0);	                                      // only for WPA2-Enterprise
       wifi_station_set_config(&wifi_config);
 #if DEBUG
-      Serial.printf("Beacon Interval: %d\n", wifi_config.beacon_interval);
-      Serial.printf("Max Connections: %d\n", wifi_config.max_connection);
+      //Serial.printf("Beacon Interval: %d\n", wifi_config.beacon_interval);
+      //Serial.printf("Max Connections: %d\n", wifi_config.max_connection);
       Serial.printf("Threshold RSSI: %d\n", wifi_config.threshold.rssi);
-      Serial.printf("Threshold Authmode: %d\n"), (uint8_t)wifi_config.threshold.authmode);
+      //Serial.printf("Threshold Authmode: %d\n"), (uint8_t)wifi_config.threshold.authmode);
 #endif
       wifi_station_set_wpa2_enterprise_auth(true);
       //wifi_station_set_reconnect_policy(true);
@@ -695,12 +752,14 @@ void setupWiFi(uint8_t timeout) {
       //  timeout = 22;
       //}
     } else {
-
       if (WIRELESS_MODE == 3)
         WiFi.enableInsecureWEP();  //Old School
 
       WiFi.begin(WIRELESS_SSID, WIRELESS_PASSWORD);  //Connect to the WiFi network
     }
+#else
+    WiFi.begin(WIRELESS_SSID, WIRELESS_PASSWORD);  //Connect to the WiFi network
+#endif
 
     //No wifi-scan required when RF channel and AP mac-address is provided
     //uint8_t WIRELESS_BSSID[6] = { 0xF8, 0x1E, 0xDF, 0xFE, 0xE9, 0x39 };
@@ -771,20 +830,22 @@ void setupWiFi(uint8_t timeout) {
 #endif
   }
 
+#ifdef ESP8266
   //TCP timer rate raised from 250ms to 3s
   //WiFi.setSleepMode(WIFI_LIGHT_SLEEP);   //Light sleep is like modem sleep, but also turns off the system clock.
   //WiFi.setSleepMode(WIFI_MODEM_SLEEP);   //Modem sleep disables WiFi between DTIM beacon intervals.
   WiFi.setSleepMode(WIFI_MODEM_SLEEP, 10);  //Station wakes up every (DTIM-interval * listenInterval) This saves power but station interface may miss broadcast data.
+#endif
 }
 
 void setupWebServer() {
   //LittleFSConfig config;
   //LittleFS.setConfig(config);
-  if (!LittleFS.begin()) {
+  if (!LittleFS.begin(true)) {
 #if DEBUG
     Serial.println("LittleFS Mount Failed");
 #endif
-    return;
+    //return;
   }
 #if DEBUG
   FSInfo info;
@@ -803,16 +864,16 @@ void setupWebServer() {
   //==============================================
   server.on("/api", HTTP_GET, [](AsyncWebServerRequest *request) {
     if (request->hasParam("adc")) {
-      uint8_t adc = request->getParam(0)->value().toInt();
+      uint8_t adc = request->getParam("adc")->value().toInt();
       uint16_t moisture = 0;
       if (adc == 1) {
-        #ifdef ESP8266
+#ifdef ESP8266
         moisture = sensorRead_ESP8266(sensorPin);
-        #else
-        moisture = sensorRead(sensorPin);
-        #endif
-      }else{
-        moisture = waterLevelRead();
+#else
+          moisture = sensorRead(sensorPin);
+#endif
+      } else {
+        moisture = waterLevelRead(adc);
       }
       request->send(200, text_plain, String(moisture));
       /*}else if (request->hasParam("chipid", true)) {
@@ -820,9 +881,9 @@ void setupWebServer() {
         response->printf("Chip ID = 0x%08X\n", ESP.getChipId());
         request->send(response);*/
     } else if (request->hasParam("ntp")) {
-      rtcData.ntpWeek = request->getParam(0)->value().toInt();
-      rtcData.ntpHour = request->getParam(1)->value().toInt();
-      rtcData.runTime = request->getParam(2)->value().toInt() * 60;
+      rtcData.ntpWeek = request->getParam("week")->value().toInt();
+      rtcData.ntpHour = request->getParam("hour")->value().toInt();
+      rtcData.runTime = request->getParam("minute")->value().toInt() * 60;
 #if DEBUG
       Serial.printf("NTP Week: %u\n", rtcData.ntpWeek);
       Serial.printf("NTP Hour: %u\n", rtcData.ntpHour);
@@ -851,7 +912,7 @@ void setupWebServer() {
         //Cannot do inline with webserver, not enough ESP.getFreeHeap()
         //smtpSend("Test", String(EEPROM_ID));
       } else if (request->hasParam("pump")) {
-        testPump = true;
+        testPump = request->getParam("pump")->value().toInt();
         request->send(200, text_plain, String(PLANT_POT_SIZE));
         /*
         AsyncWebServerResponse *response = request->beginResponse(text_html, 3, [](uint8_t *buffer, size_t maxLen, size_t index) -> size_t {
@@ -865,7 +926,7 @@ void setupWebServer() {
         request->send(response);
         */
       } else if (request->hasParam("empty")) {
-        uint8_t water = request->getParam(0)->value().toInt();
+        uint8_t water = request->getParam("empty")->value().toInt();
         rtcData.emptyBottle = water;
         if (water > 3) {
           rtcData.waterTime = delayBetweenOverfloodReset + 1;
@@ -890,7 +951,7 @@ void setupWebServer() {
   });
   /*
   server.on("/adc2", HTTP_GET, [](AsyncWebServerRequest *request) {
-    //CapacitiveSensor cs = CapacitiveSensor(sensorPin, moistureSensorPin);
+    //CapacitiveSensor cs = CapacitiveSensor(sensorPin, analogDigitalPin);
     //cs.set_CS_AutocaL_Millis(0xFFFFFFFF); // turn off autocalibrate
     uint16_t moisture = cs.capacitiveSensor(30);
     request->send(200, text_plain, String(moisture));
@@ -920,7 +981,7 @@ void setupWebServer() {
     }
   });
   server.on("/login", HTTP_POST, [](AsyncWebServerRequest *request) {
-    if (request->getParam(0)->value() == DEMO_PASSWORD) {
+    if (request->getParam("password", true)->value() == DEMO_PASSWORD) {
       DEMO_PASSWORD[0] = 0;  //reset
     }
     request->redirect("/index.html");
@@ -928,16 +989,16 @@ void setupWebServer() {
   server.on("/nvram.json", HTTP_GET, [](AsyncWebServerRequest *request) {
     if (request->params() > 0) {
       if (DEMO_PASSWORD == "") {
-        uint8_t i = request->getParam(0)->value().toInt();
+        uint8_t i = request->getParam("offset")->value().toInt();
         if (request->hasParam("alert")) {
-          ALERTS[i] = request->getParam(1)->value().toInt();
+          ALERTS[i] = request->getParam("alert")->value().toInt();
           NVRAM_Write(_ALERTS, ALERTS);
         } else {
-          NVRAM_Write(i, request->getParam(1)->value());
+          NVRAM_Write(i, request->getParam("value")->value());
           NVRAM_Read_Config();
         }
         offsetTiming();
-        request->send(200, text_plain, request->getParam(1)->value());
+        request->send(200, text_plain, request->getParam("value")->value());
       } else {
         request->send(200, text_html, locked_html);
       }
@@ -1018,7 +1079,7 @@ void setupWebServer() {
         return request->requestAuthentication();
 #endif
     String updateURL = "http://" + NETWORK_IP + "/update";
-    String updateHTML = "<!DOCTYPE html><html><body><form method=POST action='" + updateURL + "' enctype='multipart/form-data' accept-charset='UTF-8'><input type=file accept='.bin,.signed' name=firmware><input type=submit value='Update Firmware'></form><br><form method=POST action='" + updateURL + "' enctype='multipart/form-data'><input type=file accept='.bin,.signed' name=filesystem><input type=submit value='Update Filesystem'></form></body></html>";
+    String updateHTML = "<!DOCTYPE html><html><body><form method=POST action='" + updateURL + "' enctype='multipart/form-data'><input type=file accept='.bin,.signed' name=firmware><input type=submit value='Update Firmware'></form><br><form method=POST action='" + updateURL + "' enctype='multipart/form-data'><input type=file accept='.bin,.signed' name=filesystem><input type=submit value='Update Filesystem'></form></body></html>";
     AsyncWebServerResponse *response = request->beginResponse(200, text_html, updateHTML);
     request->send(response);
   });
@@ -1067,8 +1128,7 @@ void setupWebServer() {
     },
     WebUpload);
 
-  server.on(
-    "/tls", HTTP_POST, [](AsyncWebServerRequest *request) {
+  server.on("/upload", HTTP_POST, [](AsyncWebServerRequest *request) {
       if (DEMO_PASSWORD != "")
         if (!request->authenticate("", DEMO_PASSWORD.c_str()))
           return request->requestAuthentication();
@@ -1205,8 +1265,9 @@ void loop() {
   //ArduinoOTA.handle();
   //delay(LOG_INTERVAL);
 
- if (testPump) {
-    testPump = false;
+  if (testPump > 0) {
+    if (testPump == 1)
+      testPump = 0;
     runPump();
   } else if (testSMTP) {
     testSMTP = false;
@@ -1216,6 +1277,7 @@ void loop() {
   if (millis() - loopTimer < LOG_INTERVAL) return;
   rtcData.runTime += LOG_INTERVAL_S;  //track time since NTP sync (as seconds)
 
+#ifdef ESP8266
   //Measure voltage every 10000s runtime (~2.5 hours)
   if (ALERTS[1] == '1' && rtcData.runTime % 10000 == 0) {
     if (ADCMODE == ADC_TOUT) {
@@ -1237,16 +1299,17 @@ void loop() {
     }
     ESP.restart();  //Reboot to switch ADC_MODE
   }
+#endif
 
-  /*
+/*
     IMPORTANT!
     Make sure that the input voltage on the A0 pin doesn’t exceed 1.0V
   */
-  #ifdef ESP8266
+#ifdef ESP8266
   uint16_t moisture = sensorRead_ESP8266(sensorPin);
-  #else
+#else
   uint16_t moisture = sensorRead(sensorPin);
-  #endif
+#endif
 
   if (ALERTS[8] == '1') {
 #if THREADED
@@ -1324,8 +1387,13 @@ void loop() {
 #endif
     //Always ON based on day of week (power cosumption AP = ~70mA STA = ~20mA)
     if (DEMO_AVAILABILITY[rtcData.ntpWeek] == '1' && h >= ON_TIME && h < OFF_TIME) {
+#ifdef ESP8266
       WiFi.forceSleepWake();  //try to get true mode as MODEM_SLEEP causes WIFI_OFF
-      delay(1);               //must delay after WiFi.forceSleepWake()
+#else
+      if (WiFi.getSleep() == true)
+        WiFi.setSleep(false);  //try to get true mode as MODEM_SLEEP causes WIFI_OFF
+#endif
+      delay(1);  //must delay after WiFi.forceSleepWake()
 
       if (WiFi.getMode() == WIFI_OFF) {
 #if DEBUG
@@ -1347,7 +1415,7 @@ void loop() {
     }
     //----------------------------------------
     if (PLANT_MANUAL_TIMER == 0) {
-      if (moisture <= 14) {  //Sensor Not in Soil
+      if (moisture <= 20) {  //Sensor Not in Soil
         blinky(200, 4, 0);
         if (ALERTS[2] == '1')
           smtpSend("Low Sensor", String(moisture));
@@ -1402,11 +1470,17 @@ void readySleep() {
   //GPIO16 (D0) needs to be tied to RST to wake from deepSleep
   if (DEEP_SLEEP_S > 1) {
     rtcData.runTime += DEEP_SLEEP_S;  //add sleep time, when we wake up will be accurate.
+    WiFi.disconnect();                //disassociate properly (easier to reconnect)
+                                      //delay(100);
+#ifdef ESP8266
     ESP.rtcUserMemoryWrite(32, (uint32_t *)&rtcData, sizeof(rtcData));
-    WiFi.disconnect();  //disassociate properly (easier to reconnect)
-    delay(100);
     //https://github.com/esp8266/Arduino/issues/8728 (WAKE_RF_DISABLED changes ADC behaviour)
     ESP.deepSleep(DEEP_SLEEP, WAKE_RF_DISABLED);  //Will wake up without radio
+#else
+    WiFi.setSleep(true);       //Will wake up without radio
+    esp_sleep_enable_timer_wakeup(DEEP_SLEEP);
+    esp_deep_sleep_start();
+#endif
     //TODO: Check state and use WAKE_RF_DEFAULT for second stage
     //ESP.deepSleep(DEEP_SLEEP, WAKE_RF_DEFAULT);
   }
@@ -1450,27 +1524,38 @@ void readySleep() {
 
 String indexSVG(String dir) {
   String out = "";
-
+#ifdef ESP8266
   Dir files = LittleFS.openDir(dir);
   while (files.next()) {
     if (files.fileName().endsWith("svg")) {
       out += files.fileName() + "\n";
     }
   }
+#else
+  File root = LittleFS.open(dir);
+  File file = root.openNextFile();
+  while (file) {
+    String fileName = file.name();
+    if (!file.isDirectory() && fileName.endsWith("svg")) {
+      out += fileName;
+      out += "\n";
+    }
+    file = root.openNextFile();
+  }
+#endif
   out = out.substring(0, (out.length() - 2));
   return out;
 }
 
 void dataLog(String text) {
   if (DATA_LOG == 1) {
-    FSInfo fs_info;
-    LittleFS.info(fs_info);
-    if ((fs_info.usedBytes + text.length() + 1) < fs_info.totalBytes) {
-      File file = LittleFS.open("data.log", "a");
+    File file = LittleFS.open("data.log", "a");
+    if (file) {
       file.print(text);
       file.print('\n');
       file.close();
     } else {
+      file.close();
       LittleFS.remove("data.log");
     }
   }
@@ -1512,103 +1597,135 @@ void runPump() {
     loopback wire from water jug to A0 powered from GPIO12
   */
   if (PNP_ADC[2] == '1') {
-    water = waterLevelRead();
+    water = waterLevelRead(2);
   }
   //===================
-  if(water > 0) {
-    turnNPNorPNP(1); //ON
+  if (water > 0) {
+    turnNPNorPNP(1);  //ON
     do {
       if (pulse[duration] == 1) {
-        turnNPNorPNP(1); //ON
+        turnNPNorPNP(1);  //ON
       } else {
-        turnNPNorPNP(0); //OFF
+        turnNPNorPNP(0);  //OFF
       }
       delay(1000);
       duration--;
     } while (duration > 0);
-    turnNPNorPNP(0); //OFF
+    turnNPNorPNP(0);  //OFF
 
     if (ALERTS[3] == '1')
-    smtpSend("Run Pump", String(PLANT_POT_SIZE));
+      smtpSend("Run Pump", String(PLANT_POT_SIZE));
 
     dataLog("T:" + String(PLANT_MANUAL_TIMER) + ",M:" + String(PLANT_SOIL_MOISTURE));
   }
   rtcData.emptyBottle++;  //Sensorless Empty Detection
 
-  calibrateDeepSleep(); //next sleep compensate for pump runtime
+  calibrateDeepSleep();  //next sleep compensate for pump runtime
 }
 
-uint16_t waterLevelRead() {
-  uint16_t level = 100;
+uint16_t waterLevelRead(uint8_t sensor) {
+  uint8_t level = 100;
   uint16_t water = sensorRead(watersensorPin_100);
-  if(water < 1000) {
+  if (water < 32) {
     level = 75;
     water = sensorRead(watersensorPin_75);
-    if(water < 1000) {
+    if (water < 32) {
       level = 50;
       water = sensorRead(watersensorPin_50);
-      if(water < 1000) {
+      if (water < 32) {
         level = 25;
         water = sensorRead(watersensorPin_25);
-        if(water < 1000) {
+        if (water < 32) {
           level = 0;
         }
       }
     }
   }
-  return level;
+#if DEBUG
+  Serial.printf("Water Level: %u\n", level);
+  Serial.printf("Water Sensor: %u\n", water);
+#endif
+  if (sensor == 3) {
+    return water;
+  } else {
+    return level;
+  }
 }
 
 #ifdef ESP8266
 uint16_t sensorRead_ESP8266(uint16_t enablePin) {
-    uint16_t result = 1024;
+  uint16_t result = 1024;
 
-    //A0 conflicts with WiFi Module (to reflect accurate readings from GUI turn ON WiFi during ADC)
-    //-----------------
-    if (WiFi.getMode() == WIFI_OFF) {
-      WiFi.mode(WIFI_AP); //WiFi.begin();
-      result = sensorRead(enablePin);
-      WiFi.mode(WIFI_OFF);
-    }else{
-      result = sensorRead(enablePin);
-    }
-    return result;
+  //A0 conflicts with WiFi Module (to reflect accurate readings from GUI turn ON WiFi during ADC)
+  //-----------------
+  if (WiFi.getMode() == WIFI_OFF) {
+    WiFi.mode(WIFI_AP);  //WiFi.begin();
+    result = sensorRead(enablePin);
+    WiFi.mode(WIFI_OFF);
+  } else {
+    result = sensorRead(enablePin);
+  }
+  return result;
 }
 #endif
 
-uint16_t sensorRead(uint16_t enablePin) {
+uint16_t sensorRead(uint8_t enablePin) {
   uint16_t result = 1024;
 
-  if (ADCMODE == ADC_TOUT) {
+  //ESP8266 ADC pin 0 to 1.1 volt
+  //ESP32ADC pin 0 to 3.3 volt
 
-    /*
-      adcAttachPin(moistureSensorPin);
-      analogReadResolution(11);
-      analogSetAttenuation(ADC_6db);
+#ifdef ESP32
+  /*
+    analogReadResolution(12);             // Sets the sample bits and read resolution, default is 12-bit (0 - 4095), range is 9 - 12 bits
+    analogSetWidth(12);                   // Sets the sample bits and read resolution, default is 12-bit (0 - 4095), range is 9 - 12 bits
+                                          //  9-bit gives an ADC range of 0-511
+                                          // 10-bit gives an ADC range of 0-1023
+                                          // 11-bit gives an ADC range of 0-2047
+                                          // 12-bit gives an ADC range of 0-4095
+    analogSetCycles(8);                   // Set number of cycles per sample, default is 8 and provides an optimal result, range is 1 - 255
+    analogSetSamples(1);                  // Set number of samples in the range, default is 1, it has an effect on sensitivity has been multiplied
+    analogSetClockDiv(1);                 // Set the divider for the ADC clock, default is 1, range is 1 - 255
+    analogSetAttenuation(ADC_11db);       // Sets the input attenuation for ALL ADC inputs, default is ADC_11db, range is ADC_0db, ADC_2_5db, ADC_6db, ADC_11db
+    analogSetPinAttenuation(VP,ADC_11db); // Sets the input attenuation, default is ADC_11db, range is ADC_0db, ADC_2_5db, ADC_6db, ADC_11db
+                                          // ADC_0db provides no attenuation so IN/OUT = 1 / 1 an input of 3 volts remains at 3 volts before ADC measurement
+                                          // ADC_2_5db provides an attenuation so that IN/OUT = 1 / 1.34 an input of 3 volts is reduced to 2.238 volts before ADC measurement
+                                          // ADC_6db provides an attenuation so that IN/OUT = 1 / 2 an input of 3 volts is reduced to 1.500 volts before ADC measurement
+                                          // ADC_11db provides an attenuation so that IN/OUT = 1 / 3.6 an input of 3 volts is reduced to 0.833 volts before ADC measurement
+    adcAttachPin(VP);                     // Attach a pin to ADC (also clears any other analog mode that could be on), returns TRUE/FALSE result 
+    adcStart(VP);                         // Starts an ADC conversion on attached pin's bus
+    adcBusy(VP);                          // Check if conversion on the pin's ADC bus is currently running, returns TRUE/FALSE result 
+    adcEnd(VP);                           // Get the result of the conversion (will wait if it have not finished), returns 16-bit integer result
     */
-    for (uint8_t i = 0; i <= (uint8_t)PNP_ADC[1]; i++) {
-      analogRead(moistureSensorPin);  //Discharge any capacitance
-    }
+  //adcAttachPin(analogDigitalPin);
+  //analogSetClockDiv(255); // 1338mS
+#endif
+  pinMode(analogDigitalPin, INPUT);
+  digitalWrite(analogDigitalPin, LOW);  //Internal pull-up OFF
 
-    pinMode(moistureSensorPin, INPUT);
-    digitalWrite(moistureSensorPin, LOW); //Internal pull-up OFF
-    digitalWrite(enablePin, HIGH);  //ON
+  pinMode(enablePin, OUTPUT);
+  digitalWrite(enablePin, HIGH);  //ON
 
-    result = analogRead(moistureSensorPin);  //readADC()
-    /*
-    if (WiFi.getMode() == WIFI_OFF) {
-      result -= ADC_ERROR_OFFSET;
-    }
-    */
-    digitalWrite(enablePin, LOW);  //OFF
-    digitalWrite(moistureSensorPin, HIGH); //Internal pull-up ON (20k resistor)
+  uint8_t sensitivity = (uint8_t)PNP_ADC[1] + 1;
+  for (uint8_t i = 0; i <= sensitivity; i++) {
+    result += analogRead(analogDigitalPin);  //Discharge any capacitance
+  }
+  result /= sensitivity;  //Average
+  /*
+  if (WiFi.getMode() == WIFI_OFF) {
+    result -= ADC_ERROR_OFFSET;
+  }
+  */
+  digitalWrite(enablePin, LOW);          //OFF
+  digitalWrite(analogDigitalPin, HIGH);  //Internal pull-up ON (20k resistor)
 
 #if DEBUG
-    Serial.printf("Deep Sleep: %u\n", DEEP_SLEEP);
-    Serial.printf("Plant Timer: %u\n", PLANT_MANUAL_TIMER);
-    Serial.printf("Sensor: %u\n", result);
+  Serial.printf("Sensor Pin: %u\n", enablePin);
+  Serial.printf("Analog Pin: %u\n", analogDigitalPin);
+  Serial.printf("Deep Sleep: %u\n", DEEP_SLEEP);
+  Serial.printf("Plant Timer: %u\n", PLANT_MANUAL_TIMER);
+  Serial.printf("Sensor: %u\n", result);
 #endif
-  }
 
   return result;
 }
@@ -1626,7 +1743,7 @@ uint16_t readADC() {
     uint16_t result = 1024;
     for (uint8_t i = 0; i < 8; i++) {
       //delay(1);
-      int a = analogRead(moistureSensorPin);
+      int a = analogRead(analogDigitalPin);
       if (a < result) {
         result = a;
       }
@@ -1637,7 +1754,7 @@ uint16_t readADC() {
   //=============
   uint16_t result = 0;
   for (uint8_t i = 0; i < 8; i++) {
-    result += analogRead(moistureSensorPin);
+    result += analogRead(analogDigitalPin);
   }
   result = result / 8;  //Average 8
   //result = (result >> 4); //Average 16 using Shift 4
@@ -1701,16 +1818,22 @@ void blinky(uint16_t timer, uint16_t duration, uint8_t threaded) {
     blinkDuration = duration;
 
     /*
-        LED swapped HIGH with LOW
-        LED is shared with GPIO2. ESP will need GPIO2 on HIGH level in order to boot.
-      */
+    Most ESP8266 LED swapped HIGH with LOW
+    LED is shared with GPIO2. ESP8266 will need GPIO2 on HIGH level in order to boot.
+    */
     //Note: This loop will Resume after restart if blinking was in progress
     while (blinkDuration > 0 && blinkDuration < 65535) {
-      //digitalWrite(ledPin, HIGH); //ON
-      digitalWrite(ledPin, LOW);  //ON
+#if ESP32
+      digitalWrite(ledPin, HIGH);  //ON
+#else
+    digitalWrite(ledPin, LOW);   //ON
+#endif
       delay(timer);
-      //digitalWrite(ledPin, LOW); //OFF
-      digitalWrite(ledPin, HIGH);  //OFF
+#if ESP32
+      digitalWrite(ledPin, LOW);  //OFF
+#else
+    digitalWrite(ledPin, HIGH);  //OFF
+#endif
       delay(timer);
       blinkDuration--;  //after restart will be uninitialized 65536
 #if DEBUG
@@ -1727,25 +1850,43 @@ void blinky(uint16_t timer, uint16_t duration, uint8_t threaded) {
 String NVRAM(uint8_t from, uint8_t to, uint8_t *maskValues) {
 
   String out = "{\n\t\"nvram\": [\"";
+#ifdef ESP8266
   out += ESP.getCoreVersion();  //ESP.getFullVersion();
+#else
+  out += ESP_ARDUINO_VERSION_MAJOR;
+  out += ".";
+  out += ESP_ARDUINO_VERSION_MINOR;
+  out += ".";
+  out += ESP_ARDUINO_VERSION_PATCH;
+#endif
   out += "|";
   out += ESP.getSdkVersion();
   out += "|";
+#ifdef ESP8266
   out += LFS_VERSION;
+#else
+  out += "0.0.0";
+#endif
   out += "|";
   out += _VERSION;
   out += "|";
   {
+#ifdef ESP8266
     HeapSelectIram ephemeral;
-    out += ESP.getFreeHeap();
+#endif
+    out += ESP.getFreeHeap();  //esp_himem_get_free_size()
 #if DEBUG
     Serial.printf("IRAM free: %6d bytes\r\n", ESP.getFreeHeap());
 #endif
   }
   out += "|";
   {
+#ifdef ESP8266
     HeapSelectDram ephemeral;
     out += ESP.getFreeHeap();
+#else
+    out += ESP.getFreePsram();
+#endif
 #if DEBUG
     Serial.printf("DRAM free: %6d bytes\r\n", ESP.getFreeHeap());
 #endif
@@ -1853,17 +1994,17 @@ void NVRAM_Read_Config() {
 
 void turnNPNorPNP(uint8_t state) {
   if (PNP_ADC[0] == '1' && state == 0) {
-    pinMode(pumpPin, INPUT_PULLUP); //Float the pin for PNP off
-  }else{
+    pinMode(pumpPin, INPUT_PULLUP);  //Float the pin for PNP off
+  } else {
     digitalWrite(pumpPin, state);
     pinMode(pumpPin, OUTPUT);
   }
 }
 
 void calibrateDeepSleep() {
-  if(DEEP_SLEEP > 1) {
-    uint32_t internalRunTime = millis() * 1000; //microseconds micros()
-    if(DEEP_SLEEP > internalRunTime)
+  if (DEEP_SLEEP > 1) {
+    uint32_t internalRunTime = millis() * 1000;  //microseconds micros()
+    if (DEEP_SLEEP > internalRunTime)
       DEEP_SLEEP = DEEP_SLEEP - internalRunTime;
   }
 }
@@ -1888,13 +2029,13 @@ void offsetTiming() {
     DEEP_SLEEP = 1800;                            //30 min
   } else {  //Always ON or Logging ON
   */
-  uint16_t loopTime = (LOG_INTERVAL + DEEP_SLEEP); //as total seconds
+  uint16_t loopTime = (LOG_INTERVAL + DEEP_SLEEP);  //as total seconds
   //if(loopTime == 0) //Warning: ESP8266 will crash if devided by zero
   //  loopTime = 1;
-  PLANT_MANUAL_TIMER = (PLANT_MANUAL_TIMER * 3600) / loopTime; //wait hours (minus pump on time) to loops
-  delayBetweenAlertEmails = 1 * 3600 / loopTime;             //1 hours as loops of seconds
-  delayBetweenRefillReset = 2 * 3600 / loopTime;             //2 hours as loops of seconds
-  delayBetweenOverfloodReset = 8 * 3600 / loopTime;          //8 hours as loops of seconds
+  PLANT_MANUAL_TIMER = (PLANT_MANUAL_TIMER * 3600) / loopTime;  //wait hours (minus pump on time) to loops
+  delayBetweenAlertEmails = 1 * 3600 / loopTime;                //1 hours as loops of seconds
+  delayBetweenRefillReset = 2 * 3600 / loopTime;                //2 hours as loops of seconds
+  delayBetweenOverfloodReset = 8 * 3600 / loopTime;             //8 hours as loops of seconds
   //}
 
   DEEP_SLEEP_S = DEEP_SLEEP;      //store in seconds - no need to convert in loop()
@@ -1952,17 +2093,24 @@ void WebUpload(AsyncWebServerRequest *request, String filename, size_t index, ui
     ESP.rtcUserMemoryWrite(32, (uint32_t *)&rtcData, sizeof(rtcData));
     */
     blinkDuration = 0;
-
+#ifdef ESP8266
     Update.runAsync(true);  // tell the updaterClass to run in async mode
-
+#endif
     if (filename.indexOf("fs") != -1) {
       //if (request->hasParam("filesystem", true)) {
+#ifdef ESP8266
       close_all_fs();
+#endif
 
+#ifdef ESP32
+      //https://github.com/ayushsharma82/ElegantOTA/blob/master/src/ElegantOTA.cpp
+      size_t fsSize = UPDATE_SIZE_UNKNOWN;
+#elif defined(ESP8266)
 #if (ARDUINO_ESP8266_MAJOR >= 3 && ARDUINO_ESP8266_MINOR >= 1)
       size_t fsSize = ((size_t)FS_end - (size_t)FS_start);  //3.1.x
 #else
       size_t fsSize = ((size_t)&_FS_end - (size_t)&_FS_start);
+#endif
 #endif
 #if DEBUG
       Serial.printf("Free Filesystem Space: %u\n", fsSize);
@@ -1994,6 +2142,8 @@ void WebUpload(AsyncWebServerRequest *request, String filename, size_t index, ui
 
 void onUpload(AsyncWebServerRequest *request, String filename, size_t index, uint8_t *data, size_t len, bool final) {
   if (!index) {
+    if (filename.endsWith("svg") || filename.endsWith("css"))
+      filename = "svg/" + filename;
     request->_tempFile = LittleFS.open(filename, "w");
   }
   if (len) {
@@ -2079,7 +2229,7 @@ void smtpSend(String subject, String body) {
     WiFi.mode(WIFI_OFF);
 }
 
-/*
+#if DEBUG
 String uint64ToString(uint64_t input) {
   String result = "";
   uint8_t base = 10;
@@ -2089,14 +2239,14 @@ String uint64ToString(uint64_t input) {
     input /= base;
 
     if (c < 10)
-      c +='0';
+      c += '0';
     else
       c += 'A' - 10;
     result = c + result;
   } while (input);
   return result;
 }
-*/
+#endif
 //prints all rtcMemory, including the leading crc32
 /*
   void printMemory() {

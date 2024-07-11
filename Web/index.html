@@ -92,6 +92,9 @@
 							    <button class="nav-link" data-bs-toggle="tab" data-bs-target="#tabDemo" type="button" role="tab" aria-selected="false">Settings</button>
 							</li>
 							<li class="nav-item" role="presentation">
+							    <button class="nav-link" data-bs-toggle="tab" data-bs-target="#tabLayout" type="button" role="tab" aria-selected="false">Layout</button>
+							</li>
+							<li class="nav-item" role="presentation">
 							    <button class="nav-link" data-bs-toggle="tab" data-bs-target="#tabTest" type="button" role="tab" aria-selected="false">Test</button>
 							</li>
 							<li class="nav-item" role="presentation">
@@ -436,20 +439,44 @@
 									<button type="button" class="btn btn-success" id="demo-settings-ok">Save</button>
 								</form>
 							</div>
+							<div class="tab-pane fade" id="tabLayout" role="tabpanel">
+							  	<div class="container" id="listLayout">
+							  		<div class="row"><div class="col"></div></div>
+		                            <div class="row">
+		                            	<div class="col">
+				                            <div class="row mb-2">
+				                            	<div class="col-lg-4 col-12">
+					                                <form method="POST" action="/layout" enctype="multipart/form-data" id="formLayout">
+							                            <input type="file" accept=".svg,.css" name="filesystem" id="fileLayout" hidden />
+							                            <input type="submit" hidden />
+							                        </form>
+							                        <button class="btn btn-primary w-100" type="button" id="browseLayout">Upload Layout</button>
+							                    </div>
+							                    <div class="col-lg-4 col-12">
+				                                    <button class="btn btn-success w-100" type="button" id="defaultLayout">Set Default</button>
+				                                </div>
+							                    <div class="col-lg-4 col-12">
+				                                    <button class="btn btn-danger w-100" type="button" id="removeLayout">Remove Layout</button>
+				                                </div>
+				                            </div>
+			                        	</div>
+		                            </div>
+	                            </div>
+							</div>
 							<div class="tab-pane fade" id="tabTest" role="tabpanel">
 							  	<div class="container">
 		                            <div class="row">
 		                                <div class="col">
-		                                    <button class="btn btn-success w-100" type="button" id="testPump" onclick="testPump()">Test Pump</button>
+		                                    <button class="btn btn-success w-100" type="button" id="testPump" onclick="testPump(1)">Test Pump</button>
+		                                </div>
+		                                <div class="col">
+		                                    <button class="btn btn-success w-100" type="button" id="testWiFi" onclick="testWiFi()">Test WiFi</button>
 		                                </div>
 		                                <div class="col">
 		                                    <button class="btn btn-success w-100" type="button" id="testBattery" onclick="testBattery()">Test Battery</button>
 		                                </div>
 		                                <div class="col">
 		                                    <button class="btn btn-success w-100" type="button" id="testSleep">Test Sleep</button>
-		                                </div>
-		                                <div class="col">
-		                                    <button class="btn btn-success w-100" type="button" id="testLED" onclick="testLED()">Test LED</button>
 		                                </div>
 		                            </div>
 		                            <div class="row m-2"></div>
@@ -470,14 +497,16 @@
 		                            <div class="row m-2"></div>
 		                            <div class="row">
 		                            	<div class="col">
+		                                    <button class="btn btn-success w-100" type="button" id="testLED" onclick="testLED()">Test LED</button>
+		                                </div>
+		                            	<div class="col">
 		                                    <button class="btn btn-success w-100" type="button" id="testSoil" onclick="testSoil()">Test Soil Sensor</button>
 		                                </div>
 		                                <div class="col">
 		                                    <button class="btn btn-success w-100" type="button" id="testWater" onclick="testWater()">Test Water Sensor</button>
 		                                </div>
 		                                <div class="col">
-		                                </div>
-		                                <div class="col">
+		                                	 <button class="btn btn-warning w-100" type="button" id="flushWater" onclick="flushWater()">Flush Water</button>
 		                                </div>
 		                            </div>
 		                            <div class="row mt-4">
@@ -573,7 +602,7 @@
                 <div class="modal-content">
                     <div class="modal-header">
                         <h5 class="modal-title">EEPROM</h5>
-                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                        <button type="button" class="btn-close btn-close-dark" data-bs-dismiss="modal" aria-label="Close"></button>
                     </div>
                     <div class="modal-body">
                     	<span id="keep-eeprom-text"></span>
@@ -595,11 +624,45 @@
                 		<div class="form-group">
                             <div class="input-group">
                                 <div class="input-group-addon"><i class="p-3"></i></div>
-                                <input type="password" id="DemoPassword" name="DemoPassword" class="form-control" placeholder="Password" required />
+                                <input type="password" id="DemoPassword" name="password" class="form-control" placeholder="Password" required />
                             </div>
                         </div>
 		            </form>
 		            <button type="submit" class="btn btn-success" id="demo-lock-ok">Login</button>
+                </div>
+            </div>
+        </div>
+        <div class="modal zindex-modal" id="test-Pump">
+            <div class="modal-dialog modal-dialog-centered">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title">Test Pump</h5>
+                        <button type="button" class="btn-close btn-close-dark" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body">
+                    	<input type="text" id="test-pump-delay" name="test-pump-delay" data-provider="slider">
+				        Delay Test in Seconds <span id="test-pump-delay-timer"></span>
+		    		</div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-success" id="test-pump-start">Run Pump Test</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="modal zindex-modal" id="flush-Water">
+            <div class="modal-dialog modal-dialog-centered">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title">Flush Water</h5>
+                        <button type="button" class="btn-close btn-close-dark" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body">
+                    	<p>Empty large water containers.</p><span class="badge bg-warning">Warning:</span> Pump will run until stopped!
+		    		</div>
+                    <div class="modal-footer">
+                    	<button type="button" class="btn btn-danger" id="flush-water-stop">Stop Pump</button>
+                        <button type="button" class="btn btn-success" id="flush-water-start">Start Pump</button>
+                    </div>
                 </div>
             </div>
         </div>

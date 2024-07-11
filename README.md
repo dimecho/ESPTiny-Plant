@@ -2,13 +2,13 @@
 
 # ESPTiny Plant (WiFi Edition)
 
-Monitor soil moisture and water plant. Portable and high efficiency with lithium-ion batteries.
+Automatic plant watering.
 
 This is the next evolution from the original [ATtiny13 Plant](https://github.com/dimecho/ATtiny13-Plant).
 
 - WiFi (Web Interface) :seedling: [View Demo](https://dimecho.github.io/ESPTiny-Plant/Web/index.html)
 - Battery Deep Sleep (20μA)
-- Modular PCB (ESP-12E Module, TP4056)
+- Modular PCB (ESP8266/ESP32, TP4056)
 
 <p align="center">
 
@@ -32,14 +32,14 @@ This is the next evolution from the original [ATtiny13 Plant](https://github.com
 
 | Part  | Value       | Function      |
 | ----- |:-----------:| -------------:|
-| IC1   | ESP-12E/F/S | WiFi		  |
+| IC1   | ESP 8266/32 | WiFi		  |
 | R1    | 10k         | CPU Enable	  |
 | R2 	| 470R		  | Deep Sleep	  |
-| R3 	| 220k   	  | Sensor        |
-| R4 	| 10k   	  | Sensor (A0)   |
+| R3 	| 220k   	  | Sensor (out)  |
+| R4 	| 10k   	  | Sensor (in)   |
 | R5 	| 1.2k   	  | Pump	      |
-| T1    | 2N4401 NPN  | Pump          |
-| REG1 	| HT7333 LDO  | Regulator     |
+| T1    | NPN/PNP     | Pump          |
+| REG1 	| HT7333      | Regulator     |
 | -     | 3.7-4.2V    | Battery		  |
 | -     | TP4056      | Charger		  |
 
@@ -58,12 +58,10 @@ For 12V Battery use HT7533**-2** Regulator
 Sketch (Firmware)
 
 1. Install [Arduino IDE](https://www.arduino.cc/en/main/software)
-2. Arduino/File -> Preferences -> Additional Boards Manager URLs: http://arduino.esp8266.com/stable/package_esp8266com_index.json
-3. Tools -> Boards -> Board Manager -> esp8266 -> Install
-4. Tools -> Boards -> NodeMCU 1.0 -> Flash Size -> 4M (2M SPIFFS)
+2. Arduino/File -> Preferences -> Additional Boards Manager URLs: https://espressif.github.io/arduino-esp32/package_esp32_index.json, https://arduino.esp8266.com/stable/package_esp8266com_index.json
+3. Tools -> Boards -> Board Manager -> esp8266/esp32 -> Install
+4. Tools -> Boards -> NodeMCU -> Flash Size -> 4M (2M SPIFFS)
 5. Sketch -> Export compiled Binary
-
-Firmware Binary: `build/esp8266.esp8266.nodemcuv2/ESPTiny-Plant.ino.bin`
 
 Additional Libraries
 

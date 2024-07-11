@@ -2,26 +2,63 @@
 
 cd "$(dirname "$0")"
 
-for dir in $(find ~/Library/Arduino15/packages/esp8266/hardware/esp8266 -depth 1 -type d); do
-    esp8266="$(basename $dir)"
+echo "\x1b[32m\n1) ESP8266 \n2) ESP32\n\x1b[0m\nEnter 1 or 2"
+read esp
+if [ $esp = 1 ]; then
+    esp_path=~/Library/Arduino15/packages/esp8266/hardware/esp8266
+else
+    esp_path=~/Library/Arduino15/packages/esp32/hardware/esp32
+    esp_tool_path=~/Library/Arduino15/packages/esp32/tools/esptool_py
+fi
+
+for dir in $(find $esp_path -depth 1 -type d); do
+    esp_version="$(basename $dir)"
     break
 done
 
-echo " > Flash Filesystem (LittleFS)? (y/n)"
+for dir in $(find $esp_tool_path -depth 1 -type d); do
+    esp_tool_version="$(basename $dir)"
+    break
+done
+
+if ! [ -f $(which python) ]; then
+    echo "...Issue with Python, Fix?"
+    sudo mkdir -p -m 775 /usr/local/bin
+    sudo ln -s -f $(which python3) /usr/local/bin/python
+fi
+
+echo " > Over The Air (OTA)? (y/n)"
 read yn
 if [ $yn = y ]; then
-    echo " > Over The Air (OTA)? (y/n)"
-    read yn
-    if [ $yn = y ]; then
-        ~/Library/Arduino15/packages/esp8266/hardware/esp8266/$esp8266/tools/espota.py -r -i 192.168.8.8 -p 8266 -s -f build/flash-littlefs.bin.signed
-    else
-        shopt -s nocasematch
+    $esp_path/$esp_version/tools/espota.py -r -i 192.168.8.8 -p 8266 -s -f build/flash-littlefs.bin
+else
+    shopt -s nocasematch
+    echo "\x1b[32m\n1) USB to Serial (TTL)\n2) Native USB\n\x1b[0m\nEnter 1 or 2"
+    read connect
 
-        cu=$(ls /dev/cu.* && ls /dev/tty.usb*)
-        for serial in $cu; do
+    if [ $connect = 1 ]; then
+        hdw=$(ls /dev/cu.* && ls /dev/tty.usb*)
+        for serial in $hdw; do
             if [[ $serial == *usb* ]] || [[ $serial == *ch34* ]] || [[ $serial == *pl23* ]] ; then
                 echo $serial
-                ~/Library/Arduino15/packages/esp8266/hardware/esp8266/$esp8266/tools/esptool/esptool.py --port $serial --baud 115200 write_flash 0x100000 build/flash-littlefs.bin.signed
+                if [ $esp = 1 ]; then
+                    $esp_path/$esp_version/tools/esptool/esptool.py --port $serial --baud 115200 write_flash 0x100000 build/flash-littlefs.bin
+                else
+                    $esp_tool_path/$esp_tool_version/esptool --port $serial --baud 115200 write_flash 0x210000 build/flash-littlefs.bin
+                fi
+                break
+            fi
+        done
+    else
+        hdw=$(ls /dev/cu.usb*)
+        for usb in $hdw; do
+            if [[ $usb == *usb* ]]; then
+                echo $usb
+                if [ $esp = 1 ]; then
+                    $esp_path/$esp_version/tools/esptool/esptool.py --port $usb --baud 115200 write_flash 0x100000 build/flash-littlefs.bin
+                else
+                    sudo $esp_tool_path/$esp_tool_version/esptool --port $usb --baud 115200 write_flash 0x210000 build/flash-littlefs.bin
+                fi
                 break
             fi
         done

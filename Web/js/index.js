@@ -197,7 +197,6 @@ function loadSVG(svgfile) {
 			            adc.onloadend = function() {
 						    if(adc.status == 200) {
 						    	var a = parseInt(adc.responseText);
-						    	
 						    	if(a > 1010 && a < 1024)
 			                    {
 			                        notify('', 'Detecting Excess Moisture!', 'danger');
@@ -214,7 +213,27 @@ function loadSVG(svgfile) {
 			                    document.getElementById('moisture-adc').textContent = a;
 							}
 						}
-				        
+						document.getElementById('water-text').textContent = '';
+						var pnp_adc = nvram.response['nvram'][PNP_ADC] + '000';
+						if(pnp_adc.charAt(2) == '1') {
+							document.getElementById('water').setAttribute('style', 'visibility:visible');
+	                    	var water = new XMLHttpRequest();
+				            water.open('GET', 'api?adc=2', true);
+				            water.send();
+				            water.onloadend = function() {
+							    if(water.status == 200) {
+							    	var a = parseInt(water.responseText);
+							    	if(!isNaN(a) && a > 0) {
+							    		document.getElementById('water-text').textContent = water.responseText + '%';
+							    	}else{
+							    		document.getElementById('water-text').textContent = 'Empty';
+							    		document.getElementById('water-level').style.visibility = 'hidden';
+							    		document.getElementById('water-shadow').style.visibility = 'hidden';
+										document.getElementById('water-reflection').setAttribute('transform', 'matrix(1 0 0 1 0 -1500)');
+							    	}
+								}
+							}
+	                    }
 				        document.getElementById('background').onclick = function() {
 					    	var modal = new bootstrap.Modal(document.getElementById('plant-Type'));
 				            modal.show();
@@ -513,7 +532,6 @@ function loadSVG(svgfile) {
 				                    bool_value = pnp_adc.charAt(2) == '1' ? true : false;
 				                    $('#WaterLevel').val(pnp_adc.charAt(2));
 				                    $('#WaterLevelCheckbox').prop('checked', bool_value);
-				            		
 				                    var rangeslider_parameters = {
 								        skin: 'big',
 								        grid: true,
@@ -537,7 +555,7 @@ function loadSVG(svgfile) {
 								        grid: true,
 								        step: 1,
 								        min: 0,
-								        max: 8,
+								        max: 9,
 								        from: pnp_adc.charAt(1)
 								    };
 				                    if (typeof ionRangeSlider !== "function") {
@@ -958,40 +976,64 @@ function resetFlash()
 	window.open('api?reset=1');
 };
 
-function testPump()
+function testPump(arg)
 {
-	testPumpLoopback(false, function(log) {
-		var xhr = new XMLHttpRequest();
-		xhr.clearlog = log.responseText;
-		xhr.open('GET', 'api?pump=1', true);
-	    xhr.send();
-	    xhr.onload = function() {
-	        if (xhr.status == 200) {
-	        	if(xhr.responseText == "Locked") {
-	        		PlantLogin();
-	        	}else{
-	        		if(document.getElementById('WaterLevel').value == 1) {
-				    	var adc = new XMLHttpRequest();
-					    adc.open('GET', 'api?adc=2', true);
-					    adc.send();
-					    adc.onloadend = function() {
-						    if(adc.status == 200) {
-						    	if(adc.responseText > 0) {
-						    		testPumpRun();
-						    	}else{
-						    		notify('', 'Check Water Level Connection', 'danger');
-						    	}
+	var delayslider_parameters = {
+        skin: 'big',
+        grid: true,
+        step: 1,
+        min: 0,
+        max: 60,
+        from: 0
+    };
+	$('#test-pump-delay').ionRangeSlider(delayslider_parameters);
+
+	$('.modal').modal('hide');
+	var modal = new bootstrap.Modal(document.getElementById('test-Pump'));
+	modal.show();
+	document.getElementById('test-pump-start').onclick = function() {
+    	testPumpLoopback(false, function(log) {
+			var xhr = new XMLHttpRequest();
+			xhr.clearlog = log.responseText;
+			xhr.open('GET', 'api?pump=' + arg, true);
+		    xhr.send();
+		    xhr.onload = function() {
+		        if (xhr.status == 200) {
+		        	if(xhr.responseText == "Locked") {
+		        		PlantLogin();
+		        	}else{
+		        		if(document.getElementById('WaterLevel').value == 1) {
+					    	var adc = new XMLHttpRequest();
+						    adc.open('GET', 'api?adc=2', true);
+						    adc.send();
+						    adc.onloadend = function() {
+							    if(adc.status == 200) {
+							    	if(adc.responseText > 0) {
+							    		testPumpRun();
+							    	}else{
+							    		notify('', 'Check Water Level Connection', 'danger');
+							    	}
+								}
 							}
-						}
-				    }else{
-						testPumpRun();
+					    }else{
+					    	var t = document.getElementById('test-pump-delay').value;
+					    	var x = setInterval(function() {
+							  document.getElementById('test-pump-delay-timer').innerHTML = '(' + t + ')';
+							  if (t < 0) {
+							    clearInterval(x);
+							    document.getElementById('test-pump-delay-timer').innerHTML = '';
+							    testPumpRun();
+							  }
+							  t--;
+							}, 1000);
+			        	}
 		        	}
-	        	}
-	        }else{
-	        	notify('', 'Pump Test Failed', 'danger');
-	        }
-	    };
-	});
+		        }else{
+		        	notify('', 'Pump Test Failed', 'danger');
+		        }
+		    };
+		});
+	}
 };
 
 function testPumpRun()
@@ -1201,6 +1243,19 @@ function testWater()
 			}
 		}
     }
+};
+
+function flushWater()
+{
+	$('.modal').modal('hide');
+	var modal = new bootstrap.Modal(document.getElementById('flush-Water'));
+	modal.show();
+	document.getElementById('flush-water-start').onclick = function() {
+    	testPump(2);
+	}
+	document.getElementById('flush-water-stop').onclick = function() {
+    	testPump(0);
+	}
 };
 
 function testBattery()

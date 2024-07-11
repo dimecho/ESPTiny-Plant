@@ -1,11 +1,37 @@
 #!/bin/sh
 
 cd "$(dirname "$0")"
+echo "\x1b[32m\n1) ESP8266 \n2) ESP32\n\x1b[0m\nEnter 1 or 2"
+read esp
+if [ $esp = 1 ]; then
+    esp_path_hardware=~/Library/Arduino15/packages/esp8266/hardware/esp8266
+    esp_path_littlefs=~/Library/Arduino15/packages/esp8266/tools/mklittlefs
+else
+    esp_path_hardware=~/Library/Arduino15/packages/esp32/hardware/esp32
+    esp_path_littlefs=~/Library/Arduino15/packages/esp32/tools/mklittlefs
+fi
+
+for dir in $(find $esp_path_hardware -depth 1 -type d); do
+    esp_version="$(basename $dir)"
+    break
+done
+
+for dir in $(find $esp_path_littlefs -depth 1 -type d); do
+    gcc="$(basename $dir)"
+    break
+done
+
+if ! [ -f $(which python) ]; then
+    echo "...Issue with Python, Fix?"
+    sudo mkdir -p -m 775 /usr/local/bin
+    sudo ln -s -f $(which python3) /usr/local/bin/python
+fi
 
 #Copy Web Files
 rm -rf data
 cp -rf Web data
 rm -rf data/img
+rm -rf data/svg/extra
 rm -rf data/nvram.json
 rm -rf data/svg/index.html
 mkdir data/img
@@ -15,6 +41,14 @@ purgecss --css data/bootstrap.slate.css --content data/*.html --whitelist bg-suc
 purgecss --css data/roundslider.css --content data/*.html --whitelist --output data/css/roundslider.css
 purgecss --css data/rangeslider.css --content data/*.html --whitelist --output data/css/rangeslider.css
 purgecss --css data/igrowl.css --content data/*.html --whitelist --output data/css/igrowl.css
+
+echo " > Build with Extra SVG? (y/n)"
+read yn
+if [ $yn = y ]; then
+    for f in $(find Web/svg/extra -type f -name '*.*'); do
+        cp -rf $f data/svg
+    done
+fi
 
 #Compress Web Files
 echo " > Compress Javascript? (y/n)"
@@ -30,29 +64,27 @@ for f in $(find data -type f -name '*.*' ! -name '*.key' ! -name '*.cer'); do
     mv "$f.gz" "$f"
 done
 
-for dir in $(find ~/Library/Arduino15/packages/esp8266/hardware/esp8266 -depth 1 -type d); do
-    esp8266="$(basename $dir)"
-    break
-done
-
-for dir in $(find ~/Library/Arduino15/packages/esp8266/tools/mklittlefs/ -depth 1 -type d); do
-    gcc="$(basename $dir)"
-    break
-done
-
 #Build LittleFS
 mkdir -p build
 
-#Sign LittleFS
-#_signed_size:      2072576 - 8192 = 2064384
-#_signature:        256
-#_signature_length: 4
-~/Library/Arduino15/packages/esp8266/tools/mklittlefs/$gcc/mklittlefs -c ./data/ -b 8192 -p 256 -d 5 -s 2064384 ./build/flash-littlefs.bin
-~/Library/Arduino15/packages/esp8266/hardware/esp8266/$esp8266/tools/signing.py --mode sign --privatekey ./private.key --bin ./build/flash-littlefs.bin --out ./build/flash-littlefs.bin.signed
+if [ $esp = 1 ]; then
+    #Sign LittleFS
+    #_signed_size:      2072576 - 8192 = 2064384
+    #_signature:        256
+    #_signature_length: 4
+    $esp_path_littlefs/$gcc/mklittlefs -c ./data/ -b 8192 -p 256 -d 5 -s 2064384 ./build/flash-littlefs.bin
+    $esp_path_hardware/$esp_version/tools/signing.py --mode sign --privatekey ./private.key --bin ./build/flash-littlefs.bin --out ./build/flash-littlefs.bin.signed
 
-#_start:            0x00200000 (2097152)
-#_size:             0x001FA000 (2072576)
-~/Library/Arduino15/packages/esp8266/tools/mklittlefs/$gcc/mklittlefs -c ./data/ -b 8192 -p 256 -d 5 -s 2072576 ./build/flash-littlefs.bin
+    #_start:            0x00200000 (2097152)
+    #_size:             0x001FA000 (2072576)
+    $esp_path_littlefs/$gcc/mklittlefs -c ./data/ -b 8192 -p 256 -d 5 -s 2072576 ./build/flash-littlefs.bin
+else
+    #_start:            0x00210000 (2162688)
+    #_size:             0x001F0000 (2031616)
+    #$esp_path_littlefs/$gcc/mklittlefs -c ./data/ -b 4096 -p 256 -d 5 -s 2031616 ./build/flash-littlefs.bin
+
+    $esp_path_littlefs/$gcc/mklittlefs -c ./data/ -b 4096 -p 256 -d 5 -s 1036288 ./build/flash-littlefs.bin
+fi
 
 #Compress LittleFS
 #gzip -9 ./build/flash-littlefs.bin
