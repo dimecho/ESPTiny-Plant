@@ -20,7 +20,7 @@ This is the next evolution from the original [ATtiny13 Plant](https://github.com
 
 ## Download
 
-[ESP8266 Firmware](../../releases/download/latest/ESPTiny-Plant-Firmware.zip)
+[Firmware](../../releases/download/latest/ESPTiny-Plant-Firmware.zip)
 
 ## Connect
 
@@ -28,28 +28,19 @@ This is the next evolution from the original [ATtiny13 Plant](https://github.com
     Password: (blank)
     Interface: http://192.168.8.8
 
-## BOM (Bill of Materials)
-
-| Part  | Value       | Function      |
-| ----- |:-----------:| -------------:|
-| IC1   | ESP 8266/32 | WiFi		  |
-| R1    | 10k         | CPU Enable	  |
-| R2 	| 470R		  | Deep Sleep	  |
-| R3 	| 220k   	  | Sensor (out)  |
-| R4 	| 10k   	  | Sensor (in)   |
-| R5 	| 1.2k   	  | Pump	      |
-| T1    | NPN/PNP     | Pump          |
-| REG1 	| HT7333      | Regulator     |
-| -     | 3.7-4.2V    | Battery		  |
-| -     | TP4056      | Charger		  |
-
-For 12V Battery use HT7533**-2** Regulator
-
-## Technical
+## ESP32 Diagram
 
 <p align="center">
 
-![Technical](Web/img/technical.png?raw=true)
+![ESP32](Web/img/esp32s2.png?raw=true)
+
+</p>
+
+## ESP8266 Diagram
+
+<p align="center">
+
+![ESP8266](Web/img/esp8266.png?raw=true)
 
 </p>
 

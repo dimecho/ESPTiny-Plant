@@ -66,7 +66,6 @@ NOTE for HTTPS
 //#include <ArduinoOTA.h>
 #include <EEPROM.h>
 #ifdef ESP32
-#include "driver/temp_sensor.h"
 #define U_FS U_SPIFFS
 //#define fs_info LittleFS
 //#include <ESP32Ticker.h>
@@ -136,13 +135,13 @@ AsyncDNSServer dnsServer;
 
 #if defined ARDUINO_ESP8266_NODEMCU_ESP12 || defined ARDUINO_ESP8266_NODEMCU_ESP12E || defined ARDUINO_ESP8266_GENERIC
 #define pumpPin 5  //Output (D1 NodeMCU)
-#else
-#define pumpPin 3  //Output
+#else              //ESP32
+#define pumpPin 5  //Output
 #endif
 #if defined ARDUINO_ESP8266_NODEMCU_ESP12 || defined ARDUINO_ESP8266_NODEMCU_ESP12E || defined ARDUINO_ESP8266_GENERIC
 #define sensorPin 4  //Output (D2 NodeMCU)
-#else
-#define sensorPin 1  //Output
+#else                //ESP32
+#define sensorPin 4  //Output
 #endif
 #ifdef ARDUINO_ESP8266_GENERIC
 #define watersensorPin_25 14   //Output
@@ -154,28 +153,27 @@ AsyncDNSServer dnsServer;
 #define watersensorPin_50 12   //Output (D6 NodeMCU)
 #define watersensorPin_75 13   //Output (D7 NodeMCU)
 #define watersensorPin_100 15  //Output (D8 NodeMCU)
-#else
-#define watersensorPin_25 15   //Output
-#define watersensorPin_50 15   //Output
-#define watersensorPin_75 15   //Output
-#define watersensorPin_100 15  //Output
+#else                          //ESP32
+#define watersensorPin_25 14   //Output
+#define watersensorPin_50 13   //Output
+#define watersensorPin_75 10   //Output
+#define watersensorPin_100 8   //Output
 #endif
 #if defined ARDUINO_ESP8266_NODEMCU_ESP12 || defined ARDUINO_ESP8266_NODEMCU_ESP12E || defined ARDUINO_ESP8266_GENERIC
 #define ledPin 2  //Output (D4 NodeMCU)
 #elif defined(ESP32)
 #define ledPin 15  //Output
 #else
-#define ledPin 1  //Output
+#define ledPin LED_BUILTIN  //Output
 #endif
 #ifdef ESP32
+/*
+ * ADC2 can not be used when using WiFi
+ * GPIO 39 (Analog ADC1_CH0)
+ * GPIO 34 (Analog ADC1_CH6)
+*/
 #include <esp_adc_cal.h>
-#define analogDigitalPin ADC1_CHANNEL_0  //GPIO_NUM_39 //Input
-void initTempSensor(){
-    temp_sensor_config_t temp_sensor = TSENS_CONFIG_DEFAULT();
-    temp_sensor.dac_offset = TSENS_DAC_L2;  // TSENS_DAC_L2 is default; L4(-40°C ~ 20°C), L2(-10°C ~ 80°C), L1(20°C ~ 100°C), L0(50°C ~ 125°C)
-    temp_sensor_set_config(temp_sensor);
-    temp_sensor_start();
-}
+#define analogDigitalPin ADC1_CHANNEL_0  //Input
 #elif defined(ESP8266)
 #define analogDigitalPin A0  //Input
 
@@ -367,6 +365,15 @@ char PNP_ADC[] = "010";  //0=NPN|1=PNP, ADC sensitivity, Water Level Sensor 0=Di
 WiFiUDP ntpUDP;
 NTPClient timeClient(ntpUDP);
 
+#ifdef ESP32
+#include "driver/temperature_sensor.h"
+temperature_sensor_handle_t temp_handle = NULL;
+temperature_sensor_config_t temp_sensor = {
+  .range_min = 0,
+  .range_max = 50,
+};
+#endif
+
 void setup() {
   //pinMode(deepsleepPin, WAKEUP_PULLUP);
 
@@ -485,7 +492,7 @@ void setup() {
     NVRAM_Write(_TIMEZONE_OFFSET, "-28800");
     NVRAM_Write(_DEMO_AVAILABILITY, DEMO_AVAILABILITY);
     //==========
-    NVRAM_Write(_PNP_ADC, PNP_ADC);  //TODO: based in flash ID
+    NVRAM_Write(_PNP_ADC, PNP_ADC);        //TODO: based in flash ID
     memset(&rtcData, 0, sizeof(rtcData));  //reset RTC memory
   } else {
     NVRAM_Read_Config();
@@ -513,14 +520,7 @@ void setup() {
   PLANT_NAME = NVRAM_Read(_PLANT_NAME);
 #ifdef ESP32
   uint8_t wakeupReason = esp_reset_reason();  // ESP.getResetReason();
-  initTempSensor();
-  float result = 0;
-  temp_sensor_read_celsius(&result);
-#if DEBUG
-  Serial.print("Temperature: ");
-  Serial.print(result);
-  Serial.println(" °C");
-#endif
+  temperature_sensor_install(&temp_sensor, &temp_handle);
 #else
   struct rst_info *rstInfo = system_get_rst_info();
   uint8_t wakeupReason = rstInfo->reason;
@@ -880,6 +880,14 @@ void setupWebServer() {
         AsyncResponseStream *response = request->beginResponseStream(text_plain);
         response->printf("Chip ID = 0x%08X\n", ESP.getChipId());
         request->send(response);*/
+#ifdef ESP32
+    } else if (request->hasParam("temp")) {
+      float tempC = 0;
+      temperature_sensor_enable(temp_handle);
+      temperature_sensor_get_celsius(temp_handle, &tempC);
+      temperature_sensor_disable(temp_handle);
+      request->send(200, text_plain, String(tempC));
+#endif
     } else if (request->hasParam("ntp")) {
       rtcData.ntpWeek = request->getParam("week")->value().toInt();
       rtcData.ntpHour = request->getParam("hour")->value().toInt();
@@ -1128,7 +1136,8 @@ void setupWebServer() {
     },
     WebUpload);
 
-  server.on("/upload", HTTP_POST, [](AsyncWebServerRequest *request) {
+  server.on(
+    "/upload", HTTP_POST, [](AsyncWebServerRequest *request) {
       if (DEMO_PASSWORD != "")
         if (!request->authenticate("", DEMO_PASSWORD.c_str()))
           return request->requestAuthentication();
@@ -1671,34 +1680,30 @@ uint16_t sensorRead_ESP8266(uint16_t enablePin) {
 
 uint16_t sensorRead(uint8_t enablePin) {
   uint16_t result = 1024;
-
-  //ESP8266 ADC pin 0 to 1.1 volt
-  //ESP32ADC pin 0 to 3.3 volt
-
-#ifdef ESP32
   /*
-    analogReadResolution(12);             // Sets the sample bits and read resolution, default is 12-bit (0 - 4095), range is 9 - 12 bits
-    analogSetWidth(12);                   // Sets the sample bits and read resolution, default is 12-bit (0 - 4095), range is 9 - 12 bits
-                                          //  9-bit gives an ADC range of 0-511
-                                          // 10-bit gives an ADC range of 0-1023
-                                          // 11-bit gives an ADC range of 0-2047
-                                          // 12-bit gives an ADC range of 0-4095
-    analogSetCycles(8);                   // Set number of cycles per sample, default is 8 and provides an optimal result, range is 1 - 255
-    analogSetSamples(1);                  // Set number of samples in the range, default is 1, it has an effect on sensitivity has been multiplied
-    analogSetClockDiv(1);                 // Set the divider for the ADC clock, default is 1, range is 1 - 255
-    analogSetAttenuation(ADC_11db);       // Sets the input attenuation for ALL ADC inputs, default is ADC_11db, range is ADC_0db, ADC_2_5db, ADC_6db, ADC_11db
-    analogSetPinAttenuation(VP,ADC_11db); // Sets the input attenuation, default is ADC_11db, range is ADC_0db, ADC_2_5db, ADC_6db, ADC_11db
-                                          // ADC_0db provides no attenuation so IN/OUT = 1 / 1 an input of 3 volts remains at 3 volts before ADC measurement
-                                          // ADC_2_5db provides an attenuation so that IN/OUT = 1 / 1.34 an input of 3 volts is reduced to 2.238 volts before ADC measurement
-                                          // ADC_6db provides an attenuation so that IN/OUT = 1 / 2 an input of 3 volts is reduced to 1.500 volts before ADC measurement
-                                          // ADC_11db provides an attenuation so that IN/OUT = 1 / 3.6 an input of 3 volts is reduced to 0.833 volts before ADC measurement
-    adcAttachPin(VP);                     // Attach a pin to ADC (also clears any other analog mode that could be on), returns TRUE/FALSE result 
-    adcStart(VP);                         // Starts an ADC conversion on attached pin's bus
-    adcBusy(VP);                          // Check if conversion on the pin's ADC bus is currently running, returns TRUE/FALSE result 
-    adcEnd(VP);                           // Get the result of the conversion (will wait if it have not finished), returns 16-bit integer result
-    */
-  //adcAttachPin(analogDigitalPin);
-  //analogSetClockDiv(255); // 1338mS
+  * ESP8266 ADC pin 0 to 1.1 volt
+  * ESP32 ADC pin 0 to 3.3 volt
+  */
+#ifdef ESP32
+  analogReadResolution(10);  // Sets the sample bits and read resolution, default is 12-bit (0 - 4095), range is 9 - 12 bits
+  //analogSetWidth(10);                  // Sets the sample bits and read resolution, default is 12-bit (0 - 4095), range is 9 - 12 bits
+  // 9-bit gives an ADC range of 0-511
+  // 10-bit gives an ADC range of 0-1023
+  // 11-bit gives an ADC range of 0-2047
+  // 12-bit gives an ADC range of 0-4095
+  //analogSetCycles(8);                   // Set number of cycles per sample, default is 8 and provides an optimal result, range is 1 - 255
+  //analogSetSamples(1);                  // Set number of samples in the range, default is 1, it has an effect on sensitivity has been multiplied
+  //analogSetClockDiv(1);                 // Set the divider for the ADC clock, default is 1, range is 1 - 255
+  analogSetAttenuation(ADC_11db);  // Sets the input attenuation for ALL ADC inputs, default is ADC_11db, range is ADC_0db, ADC_2_5db, ADC_6db, ADC_11db
+  //analogSetPinAttenuation(analogDigitalPin,ADC_11db); // Sets the input attenuation, default is ADC_11db, range is ADC_0db, ADC_2_5db, ADC_6db, ADC_11db
+  // ADC_0db provides no attenuation so IN/OUT = 1 / 1 an input of 3 volts remains at 3 volts before ADC measurement
+  // ADC_2_5db provides an attenuation so that IN/OUT = 1 / 1.34 an input of 3 volts is reduced to 2.238 volts before ADC measurement
+  // ADC_6db provides an attenuation so that IN/OUT = 1 / 2 an input of 3 volts is reduced to 1.500 volts before ADC measurement
+  // ADC_11db provides an attenuation so that IN/OUT = 1 / 3.6 an input of 3 volts is reduced to 0.833 volts before ADC measurement
+  //adcAttachPin(analogDigitalPin);     // Attach a pin to ADC (also clears any other analog mode that could be on), returns TRUE/FALSE result
+  //adcStart(analogDigitalPin);         // Starts an ADC conversion on attached pin's bus
+  //adcBusy(analogDigitalPin);          // Check if conversion on the pin's ADC bus is currently running, returns TRUE/FALSE result
+  //adcEnd(analogDigitalPin);           // Get the result of the conversion (will wait if it have not finished), returns 16-bit integer result
 #endif
   pinMode(analogDigitalPin, INPUT);
   digitalWrite(analogDigitalPin, LOW);  //Internal pull-up OFF

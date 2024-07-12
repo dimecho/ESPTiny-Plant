@@ -170,9 +170,22 @@ function loadSVG(svgfile) {
 				index.onload = function(e) {
 					svgfile = 'bonsai.svg';
 					if(index.response != undefined) {
-						try{
-							var s = index.responseText.split('\n');
-							console.log(s);
+						try {
+							var list = document.getElementById('listLayout');
+							var s = index.responseText.split('\n').forEach(function (item) {
+								//console.log(item);
+								var listdiv = document.createElement('div');
+								listdiv.classList.add('form-check');
+							    var listlabel = document.createElement('label');
+							    listlabel.classList.add('form-check-label');
+							    listlabel.textContent = item;
+								var listcheckbox = document.createElement('input');
+								listcheckbox.setAttribute('type', 'checkbox');
+								listcheckbox.classList.add('form-check-input');
+								listdiv.appendChild(listcheckbox);
+								listdiv.appendChild(listlabel);
+								list.appendChild(listdiv);
+							});
 							svgfile = s[nvram.response['nvram'][PLANT_TYPE]]; //match index # to file name
 						}catch{}
 					}
@@ -200,7 +213,7 @@ function loadSVG(svgfile) {
 						    	if(a > 1010 && a < 1024)
 			                    {
 			                        notify('', 'Detecting Excess Moisture!', 'danger');
-			                        if(nvram.response['nvram'][17] > 12) {
+			                        if(nvram.response['nvram'][17] > 20) {
 			                            notify('', 'Lower Pot Size value', 'info');
 			                            notify('', 'Adjust sensor to soil height', 'info');
 			                        }else{
@@ -211,6 +224,20 @@ function loadSVG(svgfile) {
 			                    	//notify('', 'Current Moisture: ' + a, 'info');
 			                    }
 			                    document.getElementById('moisture-adc').textContent = a;
+
+			                    var ts = new XMLHttpRequest();
+					            ts.open('GET', 'api?temp=1', true);
+					            ts.send();
+					            ts.onloadend = function() {
+								    if(adc.status == 200) {
+								    	var t = parseInt(ts.responseText);
+								    	if(t > 0) {
+					                    	document.getElementById('moisture-adc').textContent = document.getElementById('moisture-adc').textContent + ' (' + t + '°C)';
+					                    }else if(t < 4) {
+					                        notify('', 'Water Freeze Warning', 'danger');
+					                    }
+									}
+								}
 							}
 						}
 						document.getElementById('water-text').textContent = '';
@@ -629,6 +656,13 @@ function loadSVG(svgfile) {
 						                }else{
 						                	saveSetting(PNP_ADC, '0' + this.value + document.getElementById('WaterLevel').value);
 						                }
+						            });
+						            $('#fileLayout').change(function() {
+						            	if(DEMOLOCK) {
+											PlantLogin();
+										}else{
+							                document.getElementById('formLayout').submit();
+							            }
 						            });
 						            $('#fileLittleFS').change(function() {
 						            	if(DEMOLOCK) {

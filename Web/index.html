@@ -440,27 +440,25 @@
 								</form>
 							</div>
 							<div class="tab-pane fade" id="tabLayout" role="tabpanel">
-							  	<div class="container" id="listLayout">
-							  		<div class="row"><div class="col"></div></div>
-		                            <div class="row">
-		                            	<div class="col">
-				                            <div class="row mb-2">
-				                            	<div class="col-lg-4 col-12">
-					                                <form method="POST" action="/layout" enctype="multipart/form-data" id="formLayout">
-							                            <input type="file" accept=".svg,.css" name="filesystem" id="fileLayout" hidden />
-							                            <input type="submit" hidden />
-							                        </form>
-							                        <button class="btn btn-primary w-100" type="button" id="browseLayout">Upload Layout</button>
-							                    </div>
-							                    <div class="col-lg-4 col-12">
-				                                    <button class="btn btn-success w-100" type="button" id="defaultLayout">Set Default</button>
-				                                </div>
-							                    <div class="col-lg-4 col-12">
-				                                    <button class="btn btn-danger w-100" type="button" id="removeLayout">Remove Layout</button>
-				                                </div>
-				                            </div>
-			                        	</div>
+							  	<div class="container">
+		                            <div class="row m-2">
+		                            	<div class="col-lg-4 col-12">
+			                                <form method="POST" action="/upload" enctype="multipart/form-data" id="formLayout">
+					                            <input type="file" accept=".svg,.css" name="filesystem" id="fileLayout" hidden />
+					                            <input type="submit" hidden />
+					                        </form>
+					                        <button class="btn btn-primary w-100" type="button" id="browseLayout">Upload Layout</button>
+					                    </div>
+					                    <div class="col-lg-4 col-12">
+		                                    <button class="btn btn-success w-100" type="button" id="defaultLayout">Set Default</button>
+		                                </div>
+					                    <div class="col-lg-4 col-12">
+		                                    <button class="btn btn-danger w-100" type="button" id="removeLayout">Remove Layout</button>
+		                                </div>
 		                            </div>
+		                            <div class="row mb-2">
+		                            	<div class="col-sm-10 offset-sm-2" id="listLayout"></div>
+				                    </div>
 	                            </div>
 							</div>
 							<div class="tab-pane fade" id="tabTest" role="tabpanel">
@@ -566,14 +564,14 @@
 		                            </div>
 		                            <div class="row mt-4">
 		                            	<div class="col-lg-3 col-12">
-			                                <form method="POST" action="/tls" enctype="multipart/form-data" id="formCertificate">
+			                                <form method="POST" action="/upload" enctype="multipart/form-data" id="formCertificate">
 					                            <input type="file" accept=".der,.cer" name="cert" id="fileCertificate" hidden />
 					                            <input type="submit" hidden />
 					                        </form>
 		                                    <button class="btn btn-primary w-100" type="button" id="browseCertificate">Certificate</button>
 		                                </div>
 		                                <div class="col-lg-3 col-12">
-					                        <form method="POST" action="/tls" enctype="multipart/form-data" id="formPrivateKey">
+					                        <form method="POST" action="/upload" enctype="multipart/form-data" id="formPrivateKey">
 					                            <input type="file" accept=".der,.key" name="key" id="filePrivateKey" hidden />
 					                            <input type="submit" hidden />
 					                        </form>
