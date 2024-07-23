@@ -59,6 +59,7 @@ var TIMEZONE_OFFSET = 29;
 var DEMO_AVAILABILITY = 30;
 var PNP_ADC = 31;
 var DEMOLOCK = false;
+var ESP32 = false;
 
 document.addEventListener('DOMContentLoaded', function(event)
 {
@@ -140,6 +141,33 @@ document.addEventListener('DOMContentLoaded', function(event)
 	};
 });
 
+function svgwaterLevelAdjust(v) {
+	document.getElementById('water').setAttribute('style', 'visibility:visible');
+	var water = new XMLHttpRequest();
+    water.open('GET', 'api?adc=2', true);
+    water.send();
+    water.onloadend = function() {
+	    if(water.status == 200) {
+	    	var a = parseInt(water.responseText);
+			if(!isNaN(a) && a > 0) {
+				document.getElementById('water-text').textContent = a + '%';
+				document.getElementById('water-level').style.visibility = 'visible';
+				document.getElementById('water-shadow').style.visibility = 'visible';
+				document.getElementById('water-reflection').setAttribute('transform', 'matrix(1 0 0 1 0 0)');
+			}else{
+				if(v == 1) {
+					document.getElementById('water-text').textContent = 'Empty';
+				}else{
+					document.getElementById('water-text').textContent = '';
+				}
+				document.getElementById('water-level').style.visibility = 'hidden';
+				document.getElementById('water-shadow').style.visibility = 'hidden';
+				document.getElementById('water-reflection').setAttribute('transform', 'matrix(1 0 0 1 0 -1500)');
+			}
+		}
+	}
+};
+
 function updateNTP() {
 	var d = new Date();
 	var ntp = new XMLHttpRequest();
@@ -163,6 +191,10 @@ function loadSVG(svgfile) {
 	    if (typeof SVGRect != undefined)
 	    {
 	    	if(nvram.response != undefined) {
+	    		
+	    		if(nvram.response['nvram'][0].indexOf('esp32') != -1) {
+	    			ESP32 = true;
+	    		}
 
  				//var index = new XMLHttpRequest();
 				index.open('GET', 'svg', true);
@@ -172,24 +204,31 @@ function loadSVG(svgfile) {
 					if(index.response != undefined) {
 						try {
 							var list = document.getElementById('listLayout');
-							var s = index.responseText.split('\n').forEach(function (item) {
+							var n = 0;
+							index.responseText.split('\n').forEach(function (item) {
 								//console.log(item);
-								var listdiv = document.createElement('div');
-								listdiv.classList.add('form-check');
-							    var listlabel = document.createElement('label');
-							    listlabel.classList.add('form-check-label');
-							    listlabel.textContent = item;
-								var listcheckbox = document.createElement('input');
-								listcheckbox.setAttribute('type', 'checkbox');
-								listcheckbox.classList.add('form-check-input');
-								listdiv.appendChild(listcheckbox);
-								listdiv.appendChild(listlabel);
-								list.appendChild(listdiv);
+								if(n == nvram.response['nvram'][PLANT_TYPE]) {
+									svgfile = item; //match index # to file name
+								}
+								if(item.indexOf('soil.') == -1) {
+									var listdiv = document.createElement('div');
+									listdiv.classList.add('form-check');
+								    var listlabel = document.createElement('label');
+								    listlabel.classList.add('form-check-label');
+								    listlabel.textContent = item;
+									var listcheckbox = document.createElement('input');
+									listcheckbox.setAttribute('type', 'checkbox');
+									listcheckbox.classList.add('form-check-input');
+									listdiv.appendChild(listcheckbox);
+									listdiv.appendChild(listlabel);
+									list.appendChild(listdiv);
+								}
+								n++;
 							});
-							svgfile = s[nvram.response['nvram'][PLANT_TYPE]]; //match index # to file name
 						}catch{}
 					}
 					document.getElementById('cssSVG').href = 'svg/' + svgfile.replace('.svg', '.css');
+					var pnp_adc = nvram.response['nvram'][PNP_ADC] + '000';
 
 				    // Request the SVG file
 				    var xhr = new XMLHttpRequest();
@@ -210,7 +249,7 @@ function loadSVG(svgfile) {
 			            adc.onloadend = function() {
 						    if(adc.status == 200) {
 						    	var a = parseInt(adc.responseText);
-						    	if(a > 1010 && a < 1024)
+						    	if((ESP32 && a > 4000 && a < 4095) || (!ESP32 && a > 1010 && a < 1024))
 			                    {
 			                        notify('', 'Detecting Excess Moisture!', 'danger');
 			                        if(nvram.response['nvram'][17] > 20) {
@@ -224,6 +263,8 @@ function loadSVG(svgfile) {
 			                    	//notify('', 'Current Moisture: ' + a, 'info');
 			                    }
 			                    document.getElementById('moisture-adc').textContent = a;
+			                    
+			                    svgwaterLevelAdjust(pnp_adc.charAt(2));
 
 			                    var ts = new XMLHttpRequest();
 					            ts.open('GET', 'api?temp=1', true);
@@ -240,27 +281,7 @@ function loadSVG(svgfile) {
 								}
 							}
 						}
-						document.getElementById('water-text').textContent = '';
-						var pnp_adc = nvram.response['nvram'][PNP_ADC] + '000';
-						if(pnp_adc.charAt(2) == '1') {
-							document.getElementById('water').setAttribute('style', 'visibility:visible');
-	                    	var water = new XMLHttpRequest();
-				            water.open('GET', 'api?adc=2', true);
-				            water.send();
-				            water.onloadend = function() {
-							    if(water.status == 200) {
-							    	var a = parseInt(water.responseText);
-							    	if(!isNaN(a) && a > 0) {
-							    		document.getElementById('water-text').textContent = water.responseText + '%';
-							    	}else{
-							    		document.getElementById('water-text').textContent = 'Empty';
-							    		document.getElementById('water-level').style.visibility = 'hidden';
-							    		document.getElementById('water-shadow').style.visibility = 'hidden';
-										document.getElementById('water-reflection').setAttribute('transform', 'matrix(1 0 0 1 0 -1500)');
-							    	}
-								}
-							}
-	                    }
+	                    
 				        document.getElementById('background').onclick = function() {
 					    	var modal = new bootstrap.Modal(document.getElementById('plant-Type'));
 				            modal.show();
@@ -347,9 +368,45 @@ function loadSVG(svgfile) {
 				            })
 				        }
 
+				        document.getElementById('water').onclick = function() {
+				        	var modal = new bootstrap.Modal(document.getElementById('water-Settings'));
+				            modal.show();
+				            
+				            $("#water-Slider").roundSlider({
+				                value: document.getElementById('WaterLevel').value,
+				                //svgMode: true,
+				                radius: 100,
+				                circleShape: "pie",
+				                width: 32,
+				                handleSize: "+64",
+				                handleShape: "dot",
+				                showTooltip: false,
+				                sliderType: "min-range",
+				                min: 0,
+				                max: 1,
+				                change: function (args) {
+				                	$('#WaterLevel').val(args.value);
+				                    saveSetting(PNP_ADC, pnp_adc.charAt(0) + pnp_adc.charAt(1) + args.value, function(lock) {
+				                    	if (lock != 'Locked') {
+				                    		svgwaterLevelAdjust(args.value);
+					                    }
+					                });
+				                }
+				            });
+				        }
+
 				        document.getElementById('moisture').onclick = function() {
 				        	var modal = new bootstrap.Modal(document.getElementById('moisture-Settings'));
 				            modal.show();
+				            
+				            var moistureMin = 200;
+				            var moistureMax = 1000;
+				            var moistureStep = 10;
+				            if(ESP32) {
+				            	moistureMin = 500;
+				            	moistureMax = 3000;
+				            	moistureStep = 50;
+				            }
 
 				            $("#moisture-Slider").roundSlider({
 				                value: document.getElementById('moisture-text').textContent,
@@ -359,8 +416,9 @@ function loadSVG(svgfile) {
 				                handleSize: "+64",
 				                handleShape: "dot",
 				                sliderType: "min-range",
-				                min: 200,
-				                max: 1000,
+				                min: moistureMin,
+				                max: moistureMax,
+				                step: moistureStep,
 				                change: function (args) {
 				                    document.getElementById('moisture-text').textContent = args.value;
 				                    saveSetting(PLANT_SOIL_MOISTURE, args.value);

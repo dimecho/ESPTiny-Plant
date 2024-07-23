@@ -9,6 +9,7 @@ Remember: Brand new ESP-12 short GPIO0 to GND (flash mode) then UART TX/RX
 
 #define DEBUG 0
 #define THREADED 0
+#define TIMECLIENT_NTP 0
 //#define ARDUINO_SIGNING 0
 #define EEPROM_ID 0xAB01  //Identify Sketch by EEPROM
 #define ASYNCWEBSERVER_SSL 0
@@ -75,6 +76,7 @@ NOTE for HTTPS
 //#include <ESP32httpUpdate.h>
 #include <Update.h>
 #include <StreamString.h>
+#include "time.h"
 #elif defined(ESP8266)
 #include <ESP8266WiFi.h>
 #include <ESPAsyncTCP.h>
@@ -90,8 +92,19 @@ extern "C" {
 //#include <coredecls.h> //for disable_extra4k_at_link_timer()
 #include <umm_malloc/umm_heap_select.h>
 #endif
+#if TIMECLIENT_NTP
 #include <NTPClient.h>
 #include <WiFiUDP.h>
+#endif
+/*
+#ifdef ESP32
+//#include <esp_bt.h>
+#include "BluetoothSerial.h"
+#if !defined(CONFIG_BT_ENABLED) || !defined(CONFIG_BLUEDROID_ENABLED)
+#error Bluetooth is not enabled! Please run 'make menuconfig' to and enable it
+#endif
+#endif
+*/
 
 //IMPORTANT: ESP8266 that don't have external SRAM/PSRAM chip installed choose the MMU option 3, 16KB cache + 48KB IRAM and 2nd Heap (shared)
 #include <ESP_Mail_Client.h>  //ESP-12E SRAM:64KB
@@ -169,11 +182,11 @@ AsyncDNSServer dnsServer;
 #ifdef ESP32
 /*
  * ADC2 can not be used when using WiFi
- * GPIO 39 (Analog ADC1_CH0)
- * GPIO 34 (Analog ADC1_CH6)
+ * GPIO 1 (Analog ADC1_CHANNEL_0)
+ * GPIO 2 (Analog ADC1_CHANNEL_1)
 */
-#include <esp_adc_cal.h>
-#define analogDigitalPin ADC1_CHANNEL_0  //Input
+//#include <esp_adc_cal.h>
+#define analogDigitalPin 2  //ADC1_CHANNEL_1  //Input
 #elif defined(ESP8266)
 #define analogDigitalPin A0  //Input
 
@@ -361,9 +374,10 @@ uint16_t LOG_INTERVAL_S = 0;
 uint16_t DEEP_SLEEP_S = 0;
 char PNP_ADC[] = "010";  //0=NPN|1=PNP, ADC sensitivity, Water Level Sensor 0=Disable|1=Enable
 //uint8_t ADC_ERROR_OFFSET = 64;           //WAKE_RF_DISABLED offset
-
+#if TIMECLIENT_NTP
 WiFiUDP ntpUDP;
 NTPClient timeClient(ntpUDP);
+#endif
 
 #ifdef ESP32
 #include "driver/temperature_sensor.h"
@@ -802,14 +816,16 @@ void setupWiFi(uint8_t timeout) {
     WiFi.setAutoReconnect(true);
 
     //NTP Client to get time
+#if TIMECLIENT_NTP
     timeClient.begin();
     timeClient.update();
     timeClient.setTimeOffset(NVRAM_Read(_TIMEZONE_OFFSET).toInt());
-
     //Offset runtime as current minutes (more accurate availability count)
     rtcData.runTime = timeClient.getMinutes() * 60;
     rtcData.ntpWeek = timeClient.getDay();
     rtcData.ntpHour = timeClient.getHours();
+#endif
+
 #if DEBUG
     Serial.print(timeClient.getDay());
     Serial.print("|");
@@ -1552,7 +1568,7 @@ String indexSVG(String dir) {
     file = root.openNextFile();
   }
 #endif
-  out = out.substring(0, (out.length() - 2));
+  out = out.substring(0, (out.length() - 1));
   return out;
 }
 
@@ -1635,21 +1651,23 @@ void runPump() {
 uint16_t waterLevelRead(uint8_t sensor) {
   uint8_t level = 100;
   uint16_t water = sensorRead(watersensorPin_100);
-  if (water < 32) {
+  
+  if (water < 255) {
     level = 75;
     water = sensorRead(watersensorPin_75);
-    if (water < 32) {
+    if (water < 255) {
       level = 50;
       water = sensorRead(watersensorPin_50);
-      if (water < 32) {
+      if (water < 255) {
         level = 25;
         water = sensorRead(watersensorPin_25);
-        if (water < 32) {
+        if (water < 255) {
           level = 0;
         }
       }
     }
   }
+
 #if DEBUG
   Serial.printf("Water Level: %u\n", level);
   Serial.printf("Water Sensor: %u\n", water);
@@ -1679,50 +1697,67 @@ uint16_t sensorRead_ESP8266(uint16_t enablePin) {
 #endif
 
 uint16_t sensorRead(uint8_t enablePin) {
-  uint16_t result = 1024;
+  uint16_t result = 0;
   /*
   * ESP8266 ADC pin 0 to 1.1 volt
   * ESP32 ADC pin 0 to 3.3 volt
   */
-#ifdef ESP32
-  analogReadResolution(10);  // Sets the sample bits and read resolution, default is 12-bit (0 - 4095), range is 9 - 12 bits
-  //analogSetWidth(10);                  // Sets the sample bits and read resolution, default is 12-bit (0 - 4095), range is 9 - 12 bits
-  // 9-bit gives an ADC range of 0-511
-  // 10-bit gives an ADC range of 0-1023
-  // 11-bit gives an ADC range of 0-2047
-  // 12-bit gives an ADC range of 0-4095
-  //analogSetCycles(8);                   // Set number of cycles per sample, default is 8 and provides an optimal result, range is 1 - 255
-  //analogSetSamples(1);                  // Set number of samples in the range, default is 1, it has an effect on sensitivity has been multiplied
-  //analogSetClockDiv(1);                 // Set the divider for the ADC clock, default is 1, range is 1 - 255
-  analogSetAttenuation(ADC_11db);  // Sets the input attenuation for ALL ADC inputs, default is ADC_11db, range is ADC_0db, ADC_2_5db, ADC_6db, ADC_11db
-  //analogSetPinAttenuation(analogDigitalPin,ADC_11db); // Sets the input attenuation, default is ADC_11db, range is ADC_0db, ADC_2_5db, ADC_6db, ADC_11db
-  // ADC_0db provides no attenuation so IN/OUT = 1 / 1 an input of 3 volts remains at 3 volts before ADC measurement
-  // ADC_2_5db provides an attenuation so that IN/OUT = 1 / 1.34 an input of 3 volts is reduced to 2.238 volts before ADC measurement
-  // ADC_6db provides an attenuation so that IN/OUT = 1 / 2 an input of 3 volts is reduced to 1.500 volts before ADC measurement
-  // ADC_11db provides an attenuation so that IN/OUT = 1 / 3.6 an input of 3 volts is reduced to 0.833 volts before ADC measurement
-  //adcAttachPin(analogDigitalPin);     // Attach a pin to ADC (also clears any other analog mode that could be on), returns TRUE/FALSE result
-  //adcStart(analogDigitalPin);         // Starts an ADC conversion on attached pin's bus
-  //adcBusy(analogDigitalPin);          // Check if conversion on the pin's ADC bus is currently running, returns TRUE/FALSE result
-  //adcEnd(analogDigitalPin);           // Get the result of the conversion (will wait if it have not finished), returns 16-bit integer result
-#endif
   pinMode(analogDigitalPin, INPUT);
-  digitalWrite(analogDigitalPin, LOW);  //Internal pull-up OFF
-
   pinMode(enablePin, OUTPUT);
   digitalWrite(enablePin, HIGH);  //ON
 
   uint8_t sensitivity = (uint8_t)PNP_ADC[1] + 1;
-  for (uint8_t i = 0; i <= sensitivity; i++) {
-    result += analogRead(analogDigitalPin);  //Discharge any capacitance
+
+#ifdef ESP32
+  analogReadResolution(12);  // Sets the sample bits and read resolution, default is 12-bit (0 - 4095), range is 9 - 12 bits
+  //analogSetWidth(10);                 // Sets the sample bits and read resolution, default is 12-bit (0 - 4095), range is 9 - 12 bits
+  // 9-bit gives an ADC range of 0-511
+  // 10-bit gives an ADC range of 0-1023
+  // 11-bit gives an ADC range of 0-2047
+  // 12-bit gives an ADC range of 0-4095
+  //analogSetCycles(8);                 // Set number of cycles per sample, default is 8 and provides an optimal result, range is 1 - 255
+  //analogSetSamples(1);                // Set number of samples in the range, default is 1, it has an effect on sensitivity has been multiplied
+  //analogSetClockDiv(1);               // Set the divider for the ADC clock, default is 1, range is 1 - 255
+  if(enablePin == sensorPin) {
+    analogSetAttenuation(ADC_6db);        // Sets the input attenuation for ALL ADC inputs, default is ADC_11db, range is ADC_0db, ADC_2_5db, ADC_6db, ADC_11db
+  }else{
+    analogSetAttenuation(ADC_0db);
+  }
+  //analogSetPinAttenuation(analogDigitalPin, ADC_6db);  // Sets the input attenuation, default is ADC_11db, range is ADC_0db, ADC_2_5db, ADC_6db, ADC_11db
+                                                       // ADC_0db provides no attenuation so IN/OUT = 1 / 1 an input of 3 volts remains at 3 volts before ADC measurement
+                                                       // ADC_2_5db provides an attenuation so that IN/OUT = 1 / 1.34 an input of 3 volts is reduced to 2.238 volts before ADC measurement
+                                                       // ADC_6db provides an attenuation so that IN/OUT = 1 / 2 an input of 3 volts is reduced to 1.500 volts before ADC measurement
+                                                       // ADC_11db provides an attenuation so that IN/OUT = 1 / 3.6 an input of 3 volts is reduced to 0.833 volts before ADC measurement
+  //analogSetVRefPin(25);               // Set pin to use for ADC calibration if the esp is not already calibrated (25, 26 or 27)
+  //analogSetClockDiv(255);             // Set the divider for the ADC clock. Default is 1, Range is 1 - 255
+  //adcAttachPin(analogDigitalPin);     // Attach a pin to ADC (also clears any other analog mode that could be on), returns TRUE/FALSE result
+  //adcStart(analogDigitalPin);         // Starts an ADC conversion on attached pin's bus
+  //adcBusy(analogDigitalPin);          // Check if conversion on the pin's ADC bus is currently running, returns TRUE/FALSE result
+  //adcEnd(analogDigitalPin);           // Get the result of the conversion (will wait if it have not finished), returns 16-bit integer result
+  digitalWrite(analogDigitalPin, HIGH);  //Internal pull-up ON (20k resistor)
+
+  sensitivity *= 4;
+  uint16_t minResult = 4095;
+  for (uint8_t i = 0; i < sensitivity; i++) {
+    result = analogRead(analogDigitalPin);
+    if (result < minResult) {
+      minResult = result;
+    }
+  }
+  result = minResult;  //Lowest
+#else
+  for (uint8_t i = 0; i < sensitivity; i++) {
+    result += analogRead(analogDigitalPin);
   }
   result /= sensitivity;  //Average
+#endif
   /*
   if (WiFi.getMode() == WIFI_OFF) {
     result -= ADC_ERROR_OFFSET;
   }
   */
   digitalWrite(enablePin, LOW);          //OFF
-  digitalWrite(analogDigitalPin, HIGH);  //Internal pull-up ON (20k resistor)
+  pinMode(enablePin, INPUT);             //Prevent from leaving floating to GND
 
 #if DEBUG
   Serial.printf("Sensor Pin: %u\n", enablePin);
@@ -1734,6 +1769,14 @@ uint16_t sensorRead(uint8_t enablePin) {
 
   return result;
 }
+/*
+uint32_t readADC_Cal(int ADC_Raw)
+{
+  esp_adc_cal_characteristics_t adc_chars;
+  esp_adc_cal_characterize(ADC_UNIT_1, ADC_ATTEN_DB_0, ADC_WIDTH_BIT_13, 1100, &adc_chars);
+  return(esp_adc_cal_raw_to_voltage(ADC_Raw, &adc_chars));
+}
+*/
 /*
 uint16_t readADC() {
   //0.1uF (103 or 104) cap between ADC and GND
@@ -1831,13 +1874,13 @@ void blinky(uint16_t timer, uint16_t duration, uint8_t threaded) {
 #if ESP32
       digitalWrite(ledPin, HIGH);  //ON
 #else
-    digitalWrite(ledPin, LOW);   //ON
+    digitalWrite(ledPin, LOW);          //ON
 #endif
       delay(timer);
 #if ESP32
       digitalWrite(ledPin, LOW);  //OFF
 #else
-    digitalWrite(ledPin, HIGH);  //OFF
+    digitalWrite(ledPin, HIGH);         //OFF
 #endif
       delay(timer);
       blinkDuration--;  //after restart will be uninitialized 65536
@@ -1857,12 +1900,14 @@ String NVRAM(uint8_t from, uint8_t to, uint8_t *maskValues) {
   String out = "{\n\t\"nvram\": [\"";
 #ifdef ESP8266
   out += ESP.getCoreVersion();  //ESP.getFullVersion();
+  out += " esp8266";
 #else
   out += ESP_ARDUINO_VERSION_MAJOR;
   out += ".";
   out += ESP_ARDUINO_VERSION_MINOR;
   out += ".";
   out += ESP_ARDUINO_VERSION_PATCH;
+  out += " esp32";
 #endif
   out += "|";
   out += ESP.getSdkVersion();
@@ -2187,7 +2232,9 @@ void smtpSend(String subject, String body) {
   smtp.debug(1);
   Serial.printf("Unix time: %u\n", timeClient.getEpochTime());
 #endif
+#if TIMECLIENT_NTP
   smtp.setSystemTime(timeClient.getEpochTime());  //timestamp (seconds since Jan 1, 1970)
+#endif
 
   String smtpServer = NVRAM_Read(_SMTP_SERVER);
   uint8_t smtpPort = 25;

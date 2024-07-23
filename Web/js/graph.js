@@ -141,7 +141,7 @@ function buildGraphMenu() {
 
     btn_clean.click(function() {
         var log = new XMLHttpRequest();
-        log.open('GET', 'clearlog', true);
+        log.open('GET', '/data.log?clear=1', true);
         log.send();
         log.onload = function() {
             if (log.status == 200) {
@@ -559,13 +559,13 @@ function resizeChart()
 {
     var newwidth = $('.chartAreaWrapper').width() + chart.width;
     $('.chartAreaWrapper2').width(newwidth);
-    $('.chartAreaWrapper').animate({scrollLeft:newwidth}, 1000);
+    //$('.chartAreaWrapper').animate({scrollLeft:newwidth}, 1000);
     
     var copyWidth = chart.scales['y-axis-0'].width - 10;
     var copyHeight = chart.scales['y-axis-0'].height + chart.scales['y-axis-0'].top + 10;
     ctxAxis.canvas.height = copyHeight;
     ctxAxis.canvas.width = copyWidth;
-    ctxAxis.drawImage(chart.chart.canvas, 0, 0, copyWidth, copyHeight, 0, 0, copyWidth, copyHeight);
+    ctxAxis.drawImage(chart.canvas, 0, 0, copyWidth, copyHeight, 0, 0, copyWidth, copyHeight);
 };
 
 function isEmpty( el ){

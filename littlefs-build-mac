@@ -42,16 +42,35 @@ purgecss --css data/roundslider.css --content data/*.html --whitelist --output d
 purgecss --css data/rangeslider.css --content data/*.html --whitelist --output data/css/rangeslider.css
 purgecss --css data/igrowl.css --content data/*.html --whitelist --output data/css/igrowl.css
 
-echo " > Build with Extra SVG? (y/n)"
+echo "> Build with Extra SVG? (y/n)"
 read yn
 if [ $yn = y ]; then
-    for f in $(find Web/svg/extra -type f -name '*.*'); do
-        cp -rf $f data/svg
+    n=1
+    echo "\x1b[32m"
+    for f in $(find Web/svg/extra -type f -name '*.svg'); do
+        echo "$n) $f"
+        ((++n))
     done
+    echo "\x1b[0m"
+    read svgfile
+    n=1
+    for f in $(find Web/svg/extra -type f -name '*.svg'); do
+        if [ $svgfile = $n ]; then
+            #extension="${f##*.}"
+            filename="${f%.*}"
+            cp -rf "$filename.svg" data/svg
+            cp -rf "$filename.css" data/svg
+        fi
+        ((++n))
+    done
+
+    #for f in $(find Web/svg/extra -type f -name '*.*'); do
+    #    cp -rf $f data/svg
+    #done
 fi
 
 #Compress Web Files
-echo " > Compress Javascript? (y/n)"
+echo "> Compress Javascript? (y/n)"
 read yn
 if [ $yn = y ]; then
     for f in $(find data -type f -name '*.js'); do
@@ -82,8 +101,8 @@ else
     #_start:            0x00210000 (2162688)
     #_size:             0x001F0000 (2031616)
     #$esp_path_littlefs/$gcc/mklittlefs -c ./data/ -b 4096 -p 256 -d 5 -s 2031616 ./build/flash-littlefs.bin
-
-    $esp_path_littlefs/$gcc/mklittlefs -c ./data/ -b 4096 -p 256 -d 5 -s 1036288 ./build/flash-littlefs.bin
+    #$esp_path_littlefs/$gcc/mklittlefs -c ./data/ -b 4096 -p 256 -d 5 -s 1036288 ./build/flash-littlefs.bin
+    $esp_path_littlefs/$gcc/mklittlefs -c ./data/ -b 4096 -p 256 -d 5 -s 518144 ./build/flash-littlefs.bin
 fi
 
 #Compress LittleFS
