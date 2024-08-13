@@ -1311,7 +1311,7 @@ void loop() {
     smtpSend("Test", String(EEPROM_ID, HEX));
   }
 
-  if (millis() - loopTimer < LOG_INTERVAL) return;
+  if (millis() - loopTimer <= LOG_INTERVAL) return;
   rtcData.runTime += LOG_INTERVAL_S;  //track time since NTP sync (as seconds)
 
 #ifdef ESP8266

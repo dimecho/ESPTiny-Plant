@@ -474,6 +474,10 @@ function loadSVG(svgfile) {
 				        	var modal = new bootstrap.Modal(document.getElementById('power-Settings'));
 				            modal.show();
 
+				            var sleepMax = 30;
+				            if(ESP32) {
+				            	sleepMax = 240;
+				            }
 				            $("#power-Slider").roundSlider({
 				                value: document.getElementById('power-text').textContent,
 				                //svgMode: true,
@@ -483,7 +487,7 @@ function loadSVG(svgfile) {
 				                handleShape: "dot",
 				                sliderType: "min-range",
 				                min: 0,
-				                max: 30,
+				                max: sleepMax,
 				                //step: 1,
 				                change: function (args) {
 				                	if(args.value == 0) {
