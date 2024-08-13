@@ -246,8 +246,19 @@ The bootloader command will be stored into the first 128 bytes of user RTC memor
 then it will be retrieved by eboot on boot. That means that user data present there will be lost.
 RTC offset: 128 / 4 = 32
 */
+#ifdef ESP32
+RTC_DATA_ATTR struct {
+  volatile int runTime;           //shedule tracking wifi on/off
+  volatile uint8_t ntpWeek;       //NTP day of week
+  volatile uint8_t ntpHour;       //NTP hour
+  volatile uint8_t emptyBottle;   //empty tracking
+  volatile uint16_t waterTime;    //pump tracking
+  volatile uint16_t moistureLog;  //moisture average tracking
+  volatile uint16_t alertTime;    //prevent email spam
+} rtcData;
+#else
 struct {
-  uint32_t runTime;      //shedule tracking wifi on/off
+  int runTime;           //shedule tracking wifi on/off
   uint8_t ntpWeek;       //NTP day of week
   uint8_t ntpHour;       //NTP hour
   uint8_t emptyBottle;   //empty tracking
@@ -255,9 +266,10 @@ struct {
   uint16_t moistureLog;  //moisture average tracking
   uint16_t alertTime;    //prevent email spam
 } rtcData;
+#endif
 
-uint32_t loopTimer = 0;  //loop() slow down
-uint32_t webTimer = 0;   //track last webpage access
+int loopTimer = 0;      //loop() slow down
+uint32_t webTimer = 0;  //track last webpage access
 
 uint8_t testPump = 0;  //0 = stop, 1= run (timed), 2 = run (continues)
 bool testSMTP = false;
@@ -350,7 +362,7 @@ uint16_t PLANT_SOIL_MOISTURE = 480;  //ADC value
 uint32_t PLANT_MANUAL_TIMER = 0;     //manual sleep timer - hours
 uint16_t PLANT_SOIL_TYPE = 2;        //['Sand', 'Clay', 'Dirt', 'Loam', 'Moss'];
 uint16_t PLANT_TYPE = 0;             //['Bonsai', 'Monstera', 'Palm'];
-uint32_t DEEP_SLEEP = 4;             //auto sleep timer - minutes
+int DEEP_SLEEP = 4;                  //auto sleep timer - minutes
 //=============================
 //String EMAIL_ALERT = "";
 //String SMTP_SERVER = "";
@@ -520,11 +532,11 @@ void setup() {
     if (ADCMODE == ADC_VCC) {                                               //Measure VCC this runtime
       ESP.rtcUserMemoryWrite(100, (uint32_t *)ADC_TOUT, sizeof(ADC_TOUT));  //Next time measure ADC sensor
     }
-#else
-    //printf("Opening Non-Volatile Storage (NVS) ... ");
-    //nvs_handle_t rtcData;
-    //nvs_open("storage", NVS_READWRITE, &rtcData);
-    //nvs_set_i32(rtcData, "100", ADC_TOUT);
+//#else
+//printf("Opening Non-Volatile Storage (NVS) ... ");
+//nvs_handle_t rtcData;
+//nvs_open("storage", NVS_READWRITE, &rtcData);
+//nvs_set_i32(rtcData, "100", ADC_TOUT);
 #endif
   }
   //EEPROM.end();
@@ -1320,7 +1332,9 @@ void loop() {
       //{
       smtpSend("Low Voltage", String(dvcc) + "v");
       //}
+#ifdef ESP8266
       ESP.rtcUserMemoryWrite(32, (uint32_t *)&rtcData, sizeof(rtcData));
+#endif
     }
     ESP.restart();  //Reboot to switch ADC_MODE
   }
@@ -1497,14 +1511,20 @@ void readySleep() {
     rtcData.runTime += DEEP_SLEEP_S;  //add sleep time, when we wake up will be accurate.
     WiFi.disconnect();                //disassociate properly (easier to reconnect)
                                       //delay(100);
-#ifdef ESP8266
+#ifdef ESP32
+    WiFi.setSleep(true);  //Will wake up without radio
+    esp_sleep_enable_timer_wakeup(DEEP_SLEEP);
+    //Special Hibernate Mode
+    if (DEEP_SLEEP_S == PLANT_POT_SIZE) {
+      esp_sleep_pd_config(ESP_PD_DOMAIN_RTC_SLOW_MEM, ESP_PD_OPTION_OFF);
+      esp_sleep_pd_config(ESP_PD_DOMAIN_RTC_FAST_MEM, ESP_PD_OPTION_OFF);
+      esp_sleep_pd_config(ESP_PD_DOMAIN_RTC_PERIPH, ESP_PD_OPTION_OFF);
+    }
+    esp_deep_sleep_start();
+#else
     ESP.rtcUserMemoryWrite(32, (uint32_t *)&rtcData, sizeof(rtcData));
     //https://github.com/esp8266/Arduino/issues/8728 (WAKE_RF_DISABLED changes ADC behaviour)
     ESP.deepSleep(DEEP_SLEEP, WAKE_RF_DISABLED);  //Will wake up without radio
-#else
-    WiFi.setSleep(true);       //Will wake up without radio
-    esp_sleep_enable_timer_wakeup(DEEP_SLEEP);
-    esp_deep_sleep_start();
 #endif
     //TODO: Check state and use WAKE_RF_DEFAULT for second stage
     //ESP.deepSleep(DEEP_SLEEP, WAKE_RF_DEFAULT);
@@ -1651,7 +1671,7 @@ void runPump() {
 uint16_t waterLevelRead(uint8_t sensor) {
   uint8_t level = 100;
   uint16_t water = sensorRead(watersensorPin_100);
-  
+
   if (water < 255) {
     level = 75;
     water = sensorRead(watersensorPin_75);
@@ -1718,16 +1738,16 @@ uint16_t sensorRead(uint8_t enablePin) {
   //analogSetCycles(8);                 // Set number of cycles per sample, default is 8 and provides an optimal result, range is 1 - 255
   //analogSetSamples(1);                // Set number of samples in the range, default is 1, it has an effect on sensitivity has been multiplied
   //analogSetClockDiv(1);               // Set the divider for the ADC clock, default is 1, range is 1 - 255
-  if(enablePin == sensorPin) {
-    analogSetAttenuation(ADC_6db);        // Sets the input attenuation for ALL ADC inputs, default is ADC_11db, range is ADC_0db, ADC_2_5db, ADC_6db, ADC_11db
-  }else{
+  if (enablePin == sensorPin) {
+    analogSetAttenuation(ADC_6db);  // Sets the input attenuation for ALL ADC inputs, default is ADC_11db, range is ADC_0db, ADC_2_5db, ADC_6db, ADC_11db
+  } else {
     analogSetAttenuation(ADC_0db);
   }
   //analogSetPinAttenuation(analogDigitalPin, ADC_6db);  // Sets the input attenuation, default is ADC_11db, range is ADC_0db, ADC_2_5db, ADC_6db, ADC_11db
-                                                       // ADC_0db provides no attenuation so IN/OUT = 1 / 1 an input of 3 volts remains at 3 volts before ADC measurement
-                                                       // ADC_2_5db provides an attenuation so that IN/OUT = 1 / 1.34 an input of 3 volts is reduced to 2.238 volts before ADC measurement
-                                                       // ADC_6db provides an attenuation so that IN/OUT = 1 / 2 an input of 3 volts is reduced to 1.500 volts before ADC measurement
-                                                       // ADC_11db provides an attenuation so that IN/OUT = 1 / 3.6 an input of 3 volts is reduced to 0.833 volts before ADC measurement
+  // ADC_0db provides no attenuation so IN/OUT = 1 / 1 an input of 3 volts remains at 3 volts before ADC measurement
+  // ADC_2_5db provides an attenuation so that IN/OUT = 1 / 1.34 an input of 3 volts is reduced to 2.238 volts before ADC measurement
+  // ADC_6db provides an attenuation so that IN/OUT = 1 / 2 an input of 3 volts is reduced to 1.500 volts before ADC measurement
+  // ADC_11db provides an attenuation so that IN/OUT = 1 / 3.6 an input of 3 volts is reduced to 0.833 volts before ADC measurement
   //analogSetVRefPin(25);               // Set pin to use for ADC calibration if the esp is not already calibrated (25, 26 or 27)
   //analogSetClockDiv(255);             // Set the divider for the ADC clock. Default is 1, Range is 1 - 255
   //adcAttachPin(analogDigitalPin);     // Attach a pin to ADC (also clears any other analog mode that could be on), returns TRUE/FALSE result
@@ -1749,15 +1769,15 @@ uint16_t sensorRead(uint8_t enablePin) {
   for (uint8_t i = 0; i < sensitivity; i++) {
     result += analogRead(analogDigitalPin);
   }
-  result /= sensitivity;  //Average
+  result /= sensitivity;         //Average
 #endif
   /*
   if (WiFi.getMode() == WIFI_OFF) {
     result -= ADC_ERROR_OFFSET;
   }
   */
-  digitalWrite(enablePin, LOW);          //OFF
-  pinMode(enablePin, INPUT);             //Prevent from leaving floating to GND
+  digitalWrite(enablePin, LOW);  //OFF
+  pinMode(enablePin, INPUT);     //Prevent from leaving floating to GND
 
 #if DEBUG
   Serial.printf("Sensor Pin: %u\n", enablePin);
@@ -1874,13 +1894,13 @@ void blinky(uint16_t timer, uint16_t duration, uint8_t threaded) {
 #if ESP32
       digitalWrite(ledPin, HIGH);  //ON
 #else
-    digitalWrite(ledPin, LOW);          //ON
+    digitalWrite(ledPin, LOW);   //ON
 #endif
       delay(timer);
 #if ESP32
       digitalWrite(ledPin, LOW);  //OFF
 #else
-    digitalWrite(ledPin, HIGH);         //OFF
+    digitalWrite(ledPin, HIGH);  //OFF
 #endif
       delay(timer);
       blinkDuration--;  //after restart will be uninitialized 65536
