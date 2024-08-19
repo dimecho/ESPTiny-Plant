@@ -49,7 +49,7 @@ This is the next evolution from the original [ATtiny13 Plant](https://github.com
 Sketch (Firmware)
 
 1. Install [Arduino IDE](https://www.arduino.cc/en/main/software)
-2. Arduino/File -> Preferences -> Additional Boards Manager URLs: https://espressif.github.io/arduino-esp32/package_esp32_index.json, https://arduino.esp8266.com/stable/package_esp8266com_index.json
+2. Arduino/File -> Preferences -> Additional Boards Manager URLs: ```https://espressif.github.io/arduino-esp32/package_esp32_index.json, https://arduino.esp8266.com/stable/package_esp8266com_index.json```
 3. Tools -> Boards -> Board Manager -> esp8266/esp32 -> Install
 4. Tools -> Boards -> NodeMCU -> Flash Size -> 4M (2M SPIFFS)
 5. Sketch -> Export compiled Binary

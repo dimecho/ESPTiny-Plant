@@ -375,7 +375,7 @@ String DEMO_PASSWORD = "";  //public demo
 //String TIMEZONE_OFFSET = "-28800";       //UTC offset in seconds
 char DEMO_AVAILABILITY[] = "00000000618";  //M, T, W, T, F, S, S + Time Range
 //=============================
-uint32_t WEB_SLEEP = 300000;  //5 minutes = 5 x 60x 1000
+uint32_t WEB_SLEEP = 360000;  //6 minutes = 6 x 60x 1000
 //=============================
 uint16_t delayBetweenAlertEmails = 0;     //2 hours = 2 x 60 = 120 minutes = x4 30 min loops
 uint16_t delayBetweenRefillReset = 0;     //2 hours = 2 x 60 = 120 minutes = x4 30 min loops
@@ -1209,7 +1209,6 @@ void setupWebServer() {
 
   server.onNotFound([](AsyncWebServerRequest *request) {
     //Serial.println((request->method() == HTTP_GET) ? "GET" : "POST");
-
     webTimer = millis();
 
     String file = request->url();
@@ -1311,7 +1310,7 @@ void loop() {
     smtpSend("Test", String(EEPROM_ID, HEX));
   }
 
-  if (millis() - loopTimer <= LOG_INTERVAL) return;
+  if (millis() - loopTimer < LOG_INTERVAL) return;
   rtcData.runTime += LOG_INTERVAL_S;  //track time since NTP sync (as seconds)
 
 #ifdef ESP8266
@@ -1392,8 +1391,8 @@ void loop() {
   byte WiFiClientCount = 0;
   if (millis() - webTimer < WEB_SLEEP) {  //track web activity for 5 minutes
     WiFiClientCount = 1;
-  } else if (WiFi.getMode() == WIFI_AP) {
-    WiFiClientCount = WiFi.softAPgetStationNum();  //counts all wifi clients (refresh may take 5 min to register station leave)
+  //} else if (WiFi.getMode() == WIFI_AP) {
+  //  WiFiClientCount = WiFi.softAPgetStationNum();  //counts all wifi clients (refresh may take 5 min to register station leave)
   }
 
 #if DEBUG
@@ -1512,10 +1511,10 @@ void readySleep() {
     WiFi.disconnect();                //disassociate properly (easier to reconnect)
                                       //delay(100);
 #ifdef ESP32
-    WiFi.setSleep(true);  //Will wake up without radio
+    esp_sleep_disable_wifi_wakeup();
     esp_sleep_enable_timer_wakeup(DEEP_SLEEP);
     //Special Hibernate Mode
-    if (DEEP_SLEEP_S == PLANT_POT_SIZE) {
+    if (DEEP_SLEEP_S == LOG_INTERVAL_S) {
       esp_sleep_pd_config(ESP_PD_DOMAIN_RTC_SLOW_MEM, ESP_PD_OPTION_OFF);
       esp_sleep_pd_config(ESP_PD_DOMAIN_RTC_FAST_MEM, ESP_PD_OPTION_OFF);
       esp_sleep_pd_config(ESP_PD_DOMAIN_RTC_PERIPH, ESP_PD_OPTION_OFF);

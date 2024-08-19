@@ -271,7 +271,7 @@ function loadSVG(svgfile) {
 					            ts.send();
 					            ts.onloadend = function() {
 								    if(adc.status == 200) {
-								    	var t = parseInt(ts.responseText);
+								    	var t = parseInt(ts.responseText) - 16;
 								    	if(t > 0) {
 					                    	document.getElementById('moisture-adc').textContent = document.getElementById('moisture-adc').textContent + ' (' + t + '°C)';
 					                    }else if(t < 4) {
@@ -399,13 +399,12 @@ function loadSVG(svgfile) {
 				        	var modal = new bootstrap.Modal(document.getElementById('moisture-Settings'));
 				            modal.show();
 				            
-				            var moistureMin = 200;
+				            var moistureMin = 100;
 				            var moistureMax = 1000;
 				            var moistureStep = 10;
 				            if(ESP32) {
-				            	moistureMin = 500;
-				            	moistureMax = 3000;
-				            	moistureStep = 50;
+				            	moistureMin = 100;
+				            	moistureMax = 2500;
 				            }
 
 				            $("#moisture-Slider").roundSlider({
@@ -476,7 +475,7 @@ function loadSVG(svgfile) {
 
 				            var sleepMax = 30;
 				            if(ESP32) {
-				            	sleepMax = 240;
+				            	sleepMax = 1440;
 				            }
 				            $("#power-Slider").roundSlider({
 				                value: document.getElementById('power-text').textContent,
