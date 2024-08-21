@@ -1478,7 +1478,11 @@ void loop() {
     }
     //----------------------------------------
     if (PLANT_MANUAL_TIMER == 0) {
-      if (moisture <= 20) {  //Sensor Not in Soil
+#ifdef ESP8266
+      if (moisture < 20) {  //Sensor Not in Soil
+#else
+      if (moisture < 80) {  //Sensor Not in Soil
+#endif
         blinky(200, 4, 0);
         if (ALERTS[2] == '1')
           smtpSend("Low Sensor", String(moisture));

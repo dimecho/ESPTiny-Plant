@@ -399,11 +399,11 @@ function loadSVG(svgfile) {
 				        	var modal = new bootstrap.Modal(document.getElementById('moisture-Settings'));
 				            modal.show();
 				            
-				            var moistureMin = 100;
+				            var moistureMin = 20;
 				            var moistureMax = 1000;
 				            var moistureStep = 10;
 				            if(ESP32) {
-				            	moistureMin = 50;
+				            	moistureMin = 80;
 				            	moistureMax = 2500;
 				            }
 
