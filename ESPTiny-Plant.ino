@@ -382,7 +382,7 @@ uint8_t ON_TIME = 0;                      //from 6am
 uint8_t OFF_TIME = 0;                     //to 6pm
 uint16_t LOG_INTERVAL_S = 0; //seconds
 uint16_t DEEP_SLEEP_S = 0;   //seconds
-uint16_t DEEP_SLEEP_MS = 0;  //milliseconds
+uint32_t DEEP_SLEEP_MS = 0;  //milliseconds
 char PNP_ADC[] = "010";  //0=NPN|1=PNP, ADC sensitivity, Water Level Sensor 0=Disable|1=Enable
 //uint8_t ADC_ERROR_OFFSET = 64;           //WAKE_RF_DISABLED offset
 #if TIMECLIENT_NTP
@@ -1404,7 +1404,7 @@ void loop() {
   }
 
   byte WiFiClientCount = 0;
-  if (LOG_INTERVAL > 0 && (millis() - webTimer) < DEEP_SLEEP_MS) {  //track web activity for 5 minutes
+  if ((millis() - webTimer) < DEEP_SLEEP_MS) {  //track web activity for 5 minutes
     WiFiClientCount = 1;
   //} else if (WiFi.getMode() == WIFI_AP) {
   //  WiFiClientCount = WiFi.softAPgetStationNum();  //counts all wifi clients (refresh may take 5 min to register station leave)
