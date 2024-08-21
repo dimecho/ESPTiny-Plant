@@ -403,7 +403,7 @@ function loadSVG(svgfile) {
 				            var moistureMax = 1000;
 				            var moistureStep = 10;
 				            if(ESP32) {
-				            	moistureMin = 100;
+				            	moistureMin = 50;
 				            	moistureMax = 2500;
 				            }
 

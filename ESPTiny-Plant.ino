@@ -362,7 +362,7 @@ uint16_t PLANT_SOIL_MOISTURE = 480;  //ADC value
 uint32_t PLANT_MANUAL_TIMER = 0;     //manual sleep timer - hours
 uint16_t PLANT_SOIL_TYPE = 2;        //['Sand', 'Clay', 'Dirt', 'Loam', 'Moss'];
 uint16_t PLANT_TYPE = 0;             //['Bonsai', 'Monstera', 'Palm'];
-int DEEP_SLEEP = 4;                  //auto sleep timer - minutes
+int DEEP_SLEEP = 5;                  //auto sleep timer - minutes
 //=============================
 //String EMAIL_ALERT = "";
 //String SMTP_SERVER = "";
@@ -375,15 +375,14 @@ String DEMO_PASSWORD = "";  //public demo
 //String TIMEZONE_OFFSET = "-28800";       //UTC offset in seconds
 char DEMO_AVAILABILITY[] = "00000000618";  //M, T, W, T, F, S, S + Time Range
 //=============================
-uint32_t WEB_SLEEP = 360000;  //6 minutes = 6 x 60x 1000
-//=============================
 uint16_t delayBetweenAlertEmails = 0;     //2 hours = 2 x 60 = 120 minutes = x4 30 min loops
 uint16_t delayBetweenRefillReset = 0;     //2 hours = 2 x 60 = 120 minutes = x4 30 min loops
 uint16_t delayBetweenOverfloodReset = 0;  //8 hours = 8 x 60 = 480 minutes = x16 30 min loops
 uint8_t ON_TIME = 0;                      //from 6am
 uint8_t OFF_TIME = 0;                     //to 6pm
-uint16_t LOG_INTERVAL_S = 0;
-uint16_t DEEP_SLEEP_S = 0;
+uint16_t LOG_INTERVAL_S = 0; //seconds
+uint16_t DEEP_SLEEP_S = 0;   //seconds
+uint16_t DEEP_SLEEP_MS = 0;  //milliseconds
 char PNP_ADC[] = "010";  //0=NPN|1=PNP, ADC sensitivity, Water Level Sensor 0=Disable|1=Enable
 //uint8_t ADC_ERROR_OFFSET = 64;           //WAKE_RF_DISABLED offset
 #if TIMECLIENT_NTP
@@ -555,15 +554,21 @@ void setup() {
 #if DEBUG
   Serial.printf("Wakeup Reason:%u\n", wakeupReason);
 #endif
-
-  if (wakeupReason == 5) {  // && WiFi.getMode() == WIFI_OFF) {
-    LOG_INTERVAL = 0;       //going into sleep mode anyway, do not delay in loop()
-    WEB_SLEEP = 0;
+#ifdef ESP32
+  if (wakeupReason == 8) { //ESP_RST_DEEPSLEEP (8)
+#else
+  if (wakeupReason == 5) { //REASON_DEEP_SLEEP_AWAKE (5)
+#endif
+    LOG_INTERVAL = 0;  //going into sleep mode anyway, do not delay in loop()
     if (DATA_LOG > 0)  //writing logs during sleep
       LittleFS.begin();
   } else {
     //Emergency Recover (RST to GND)
-    if (wakeupReason == 6) {
+#ifdef ESP32
+    if (wakeupReason == 2) { //ESP_RST_EXT (2)
+#else
+    if (wakeupReason == 6) { //REASON_EXT_SYS_RST (6)
+#endif
       LOG_INTERVAL = 300;                    //prevent WiFi from sleeping 5 minutes
       ALERTS[0] = '1';                       //email DHCP IP
       ALERTS[1] = '0';                       //low voltage
@@ -614,7 +619,6 @@ void setupWiFi(uint8_t timeout) {
   WiFi.setOutputPower(WIRELESS_PHY_POWER);
 #else
   WiFi.setTxPower((wifi_power_t)WIRELESS_PHY_POWER);
-  //btStop();
 #endif
 
   const String WIRELESS_SSID = NVRAM_Read(_WIRELESS_SSID);
@@ -891,6 +895,7 @@ void setupWebServer() {
   //Async Web Server HTTP_GET, HTTP_POST, HTTP_ANY
   //==============================================
   server.on("/api", HTTP_GET, [](AsyncWebServerRequest *request) {
+    webTimer = millis();
     if (request->hasParam("adc")) {
       uint8_t adc = request->getParam("adc")->value().toInt();
       uint16_t moisture = 0;
@@ -1114,8 +1119,11 @@ void setupWebServer() {
       if (!request->authenticate("", DEMO_PASSWORD.c_str()))
         return request->requestAuthentication();
 #endif
-    String updateURL = "http://" + NETWORK_IP + "/update";
-    String updateHTML = "<!DOCTYPE html><html><body><form method=POST action='" + updateURL + "' enctype='multipart/form-data'><input type=file accept='.bin,.signed' name=firmware><input type=submit value='Update Firmware'></form><br><form method=POST action='" + updateURL + "' enctype='multipart/form-data'><input type=file accept='.bin,.signed' name=filesystem><input type=submit value='Update Filesystem'></form></body></html>";
+    char updateHTML[512];
+    snprintf(updateHTML, sizeof(updateHTML), "<!DOCTYPE html><html><body>");
+    strncat(updateHTML, buildFormPostButton("Firmware"), sizeof(updateHTML) - strlen(updateHTML) - 1);
+    strncat(updateHTML, buildFormPostButton("Filesystem"), sizeof(updateHTML) - strlen(updateHTML) - 1);
+    strncat(updateHTML, "</body></html>", sizeof(updateHTML) - strlen(updateHTML) - 1);
     AsyncWebServerResponse *response = request->beginResponse(200, text_html, updateHTML);
     request->send(response);
   });
@@ -1209,7 +1217,6 @@ void setupWebServer() {
 
   server.onNotFound([](AsyncWebServerRequest *request) {
     //Serial.println((request->method() == HTTP_GET) ? "GET" : "POST");
-    webTimer = millis();
 
     String file = request->url();
 #if DEBUG
@@ -1294,6 +1301,14 @@ void setupWebServer() {
 
   //server.serveStatic("/", LittleFS, "/");
   //server.onRequestBody(serverCompression);
+}
+
+char* buildFormPostButton(char name[]) {
+  static char buffer[256];
+  snprintf(buffer, sizeof(buffer),
+           "<form method=POST action='http://%s/update' enctype='multipart/form-data'><input type=file accept='.bin,.signed' name=%s><input type=submit value='Update %s'></form><br>",
+           NETWORK_IP, name, name);
+  return buffer;
 }
 
 void loop() {
@@ -1389,7 +1404,7 @@ void loop() {
   }
 
   byte WiFiClientCount = 0;
-  if (millis() - webTimer < WEB_SLEEP) {  //track web activity for 5 minutes
+  if (LOG_INTERVAL > 0 && (millis() - webTimer) < DEEP_SLEEP_MS) {  //track web activity for 5 minutes
     WiFiClientCount = 1;
   //} else if (WiFi.getMode() == WIFI_AP) {
   //  WiFiClientCount = WiFi.softAPgetStationNum();  //counts all wifi clients (refresh may take 5 min to register station leave)
@@ -1508,8 +1523,9 @@ void readySleep() {
   //GPIO16 (D0) needs to be tied to RST to wake from deepSleep
   if (DEEP_SLEEP_S > 1) {
     rtcData.runTime += DEEP_SLEEP_S;  //add sleep time, when we wake up will be accurate.
-    WiFi.disconnect();                //disassociate properly (easier to reconnect)
-                                      //delay(100);
+    WiFi.disconnect(true);            //disassociate properly (easier to reconnect)
+    WiFi.mode(WIFI_OFF);
+
 #ifdef ESP32
     esp_sleep_disable_wifi_wakeup();
     esp_sleep_enable_timer_wakeup(DEEP_SLEEP);
@@ -2110,8 +2126,8 @@ void offsetTiming() {
   DEEP_SLEEP_S = DEEP_SLEEP;      //store in seconds - no need to convert in loop()
   LOG_INTERVAL_S = LOG_INTERVAL;  //store in seconds - no need to convert in loop()
 
-  DEEP_SLEEP = DEEP_SLEEP * 1000;      //milliseconds millis()
-  DEEP_SLEEP = DEEP_SLEEP * 1000;      //microseconds micros()
+  DEEP_SLEEP_MS = DEEP_SLEEP * 1000;   //milliseconds millis()
+  DEEP_SLEEP = DEEP_SLEEP_MS * 1000;   //microseconds micros()
   LOG_INTERVAL = LOG_INTERVAL * 1000;  //milliseconds millis()
 }
 
@@ -2155,7 +2171,6 @@ String getContentType(String filename) {
 //===============
 void WebUpload(AsyncWebServerRequest *request, String filename, size_t index, uint8_t *data, size_t len, bool final) {
   if (!index) {
-
     //WARNING: Do not save RTC memory after Update.begin(). "chksum" will be different after reboot, firmware will not flash
     /*
     memset(&rtcData, 0, sizeof(rtcData));  //reset RTC memory (set all zero)

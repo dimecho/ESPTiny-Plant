@@ -78,5 +78,5 @@ if($littlefsSelect -eq 1) {
     Start-Process $mklittlefs -ArgumentList "-c .\data -b 8192 -p 256 -s 2072576 .\build\flash-littlefs.bin" -NoNewWindow -PassThru -Wait
 }else{
     $mklittlefs = "$env:LOCALAPPDATA\Arduino15\packages\esp32\tools\mklittlefs\3.0.0-gnu12-dc7f933\mklittlefs.exe"
-    Start-Process $mklittlefs -ArgumentList "-c .\data -b 8192 -p 256 -s 1036288 .\build\flash-littlefs.bin" -NoNewWindow -PassThru -Wait
+    Start-Process $mklittlefs -ArgumentList "-c .\data -b 4096 -p 256 -s 518144 .\build\flash-littlefs.bin" -NoNewWindow -PassThru -Wait
 }
