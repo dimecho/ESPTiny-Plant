@@ -477,7 +477,11 @@ void setup() {
       }
     }
     WiFi.scanDelete();
+#ifdef ESP32
     LittleFS.begin(true);
+#else
+    LittleFS.begin();
+#endif
     LittleFS.format();
 
     NVRAM_Erase();
@@ -569,7 +573,7 @@ void setup() {
 #else
     if (wakeupReason == 6) { //REASON_EXT_SYS_RST (6)
 #endif
-      LOG_INTERVAL = 300;                    //prevent WiFi from sleeping 5 minutes
+      LOG_INTERVAL = 600;                    //prevent WiFi from sleeping 5 minutes
       ALERTS[0] = '1';                       //email DHCP IP
       ALERTS[1] = '0';                       //low voltage
       memset(&rtcData, 0, sizeof(rtcData));  //reset RTC memory (set all zero)
@@ -676,6 +680,8 @@ void setupWiFi(uint8_t timeout) {
 #else
     MDNS.begin(WIRELESS_SSID);
 #endif
+
+    delay(100); //Wait 100 ms for AP_START
     NETWORK_IP = WiFi.softAPIP().toString();
 
   } else {
@@ -873,7 +879,11 @@ void setupWiFi(uint8_t timeout) {
 void setupWebServer() {
   //LittleFSConfig config;
   //LittleFS.setConfig(config);
+#ifdef ESP32
   if (!LittleFS.begin(true)) {
+#else
+  if (!LittleFS.begin()) {
+#endif
 #if DEBUG
     Serial.println("LittleFS Mount Failed");
 #endif
@@ -903,7 +913,7 @@ void setupWebServer() {
 #ifdef ESP8266
         moisture = sensorRead_ESP8266(sensorPin);
 #else
-          moisture = sensorRead(sensorPin);
+        moisture = sensorRead(sensorPin);
 #endif
       } else {
         moisture = waterLevelRead(adc);
@@ -1121,8 +1131,8 @@ void setupWebServer() {
 #endif
     char updateHTML[512];
     snprintf(updateHTML, sizeof(updateHTML), "<!DOCTYPE html><html><body>");
-    strncat(updateHTML, buildFormPostButton("Firmware"), sizeof(updateHTML) - strlen(updateHTML) - 1);
-    strncat(updateHTML, buildFormPostButton("Filesystem"), sizeof(updateHTML) - strlen(updateHTML) - 1);
+    strncat(updateHTML, buildFormPostButton(NETWORK_IP.c_str(), "Firmware"), sizeof(updateHTML) - strlen(updateHTML) - 1);
+    strncat(updateHTML, buildFormPostButton(NETWORK_IP.c_str(),"Filesystem"), sizeof(updateHTML) - strlen(updateHTML) - 1);
     strncat(updateHTML, "</body></html>", sizeof(updateHTML) - strlen(updateHTML) - 1);
     AsyncWebServerResponse *response = request->beginResponse(200, text_html, updateHTML);
     request->send(response);
@@ -1303,11 +1313,11 @@ void setupWebServer() {
   //server.onRequestBody(serverCompression);
 }
 
-char* buildFormPostButton(char name[]) {
+char* buildFormPostButton(const char ip[], const char name[]) {
   static char buffer[256];
   snprintf(buffer, sizeof(buffer),
            "<form method=POST action='http://%s/update' enctype='multipart/form-data'><input type=file accept='.bin,.signed' name=%s><input type=submit value='Update %s'></form><br>",
-           NETWORK_IP, name, name);
+           ip, name, name);
   return buffer;
 }
 

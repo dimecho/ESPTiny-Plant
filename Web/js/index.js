@@ -453,9 +453,9 @@ function loadSVG(svgfile) {
 						                    }else{
 						                        $('#timer-disabled').hide();
 						                        $('#timer-enabled').show();
-						                        document.getElementById('power-text').textContent = 30;
-						                        if($('#EnableLogCheckbox').prop('checked') == false)
-						                        	saveSetting(DEEP_SLEEP, 30);
+						                        //document.getElementById('power-text').textContent = 30;
+						                        //if($('#EnableLogCheckbox').prop('checked') == false)
+						                        //	saveSetting(DEEP_SLEEP, 30);
 						                        notify('', 'Timer disables Soil Sensor', 'danger');
 						                        if(args.value < 8) //less than 8 hours
 						                        	notify('', 'Timer is Low! No Overwater protection', 'warning');
