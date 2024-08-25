@@ -194,10 +194,11 @@ function loadSVG(svgfile) {
 	    		
 	    		if(nvram.response['nvram'][0].indexOf('esp32') != -1) {
 	    			ESP32 = true;
+	    			document.getElementById('WiFiModeClientEnt').closest('div').style.display = 'none';
 	    		}
 
  				//var index = new XMLHttpRequest();
-				index.open('GET', 'svg', true);
+				index.open('GET', 'svg/', true);
 				index.send();
 				index.onload = function(e) {
 					svgfile = 'bonsai.svg';
@@ -274,9 +275,10 @@ function loadSVG(svgfile) {
 								    	var t = parseInt(ts.responseText) - 16;
 								    	if(t > 0) {
 					                    	document.getElementById('moisture-adc').textContent = document.getElementById('moisture-adc').textContent + ' (' + t + '°C)';
-					                    }else if(t < 4) {
-					                        notify('', 'Water Freeze Warning', 'danger');
-					                    }
+						                    if(t < 4) {
+						                        notify('', 'Water Freeze Warning', 'danger');
+						                    }
+					                	}
 									}
 								}
 							}
@@ -290,7 +292,7 @@ function loadSVG(svgfile) {
 						    svgPlant.innerHTML = '';
 						    
 				            var xhr = new XMLHttpRequest();
-						    xhr.open('GET', 'svg', true);
+						    xhr.open('GET', 'svg/', true);
 						    xhr.send();
 						    xhr.onload = function(e) {
 					        	var s = xhr.responseText.split('\n');
@@ -1087,55 +1089,60 @@ function testPump(arg)
 	var modal = new bootstrap.Modal(document.getElementById('test-Pump'));
 	modal.show();
 	document.getElementById('test-pump-start').onclick = function() {
-    	testPumpLoopback(false, function(log) {
-			var xhr = new XMLHttpRequest();
-			xhr.clearlog = log.responseText;
-			xhr.open('GET', 'api?pump=' + arg, true);
-		    xhr.send();
-		    xhr.onload = function() {
-		        if (xhr.status == 200) {
-		        	if(xhr.responseText == "Locked") {
-		        		PlantLogin();
-		        	}else{
-		        		if(document.getElementById('WaterLevel').value == 1) {
-					    	var adc = new XMLHttpRequest();
-						    adc.open('GET', 'api?adc=2', true);
-						    adc.send();
-						    adc.onloadend = function() {
-							    if(adc.status == 200) {
-							    	if(adc.responseText > 0) {
-							    		testPumpRun();
-							    	}else{
-							    		notify('', 'Check Water Level Connection', 'danger');
-							    	}
+		var t = document.getElementById('test-pump-delay').value * 2;
+    	var x = setInterval(function() {
+			if (t == 0) {
+			    clearInterval(x);
+			    document.getElementById('test-pump-delay-timer').innerHTML = '';
+		    	testPumpLoopback(false, function(log) {
+					var xhr = new XMLHttpRequest();
+					xhr.open('GET', 'api?pump=' + arg, true);
+				    xhr.send();
+				    xhr.onload = function() {
+				        if (xhr.status == 200) {
+				        	var p = parseInt(document.getElementById('pot-size-text').textContent) + 1;
+				        	if(xhr.responseText == "Locked") {
+				        		PlantLogin();
+				        	}else if(document.getElementById('WaterLevel').value == 1) {
+				        		notify('', 'Water Level Sensor is On', 'warning');
+						    	var adc = new XMLHttpRequest();
+							    adc.open('GET', 'api?adc=2', true);
+							    adc.send();
+							    adc.onloadend = function() {
+								    if(adc.status == 200) {
+								    	if(adc.responseText > 0) {
+								    		testPumpRun(p, log.responseText);
+								    	}else{
+								    		notify('', 'Check Water Level', 'danger');
+								    	}
+									}
 								}
-							}
-					    }else{
-					    	var t = document.getElementById('test-pump-delay').value;
-					    	var x = setInterval(function() {
-							  document.getElementById('test-pump-delay-timer').innerHTML = '(' + t + ')';
-							  if (t < 0) {
-							    clearInterval(x);
-							    document.getElementById('test-pump-delay-timer').innerHTML = '';
-							    testPumpRun();
-							  }
-							  t--;
-							}, 1000);
-			        	}
-		        	}
-		        }else{
-		        	notify('', 'Pump Test Failed', 'danger');
-		        }
-		    };
-		});
+						    }else{
+						    	testPumpRun(p, log.responseText);
+						    }
+				        }else{
+				        	notify('', 'Pump Test Failed', 'danger');
+				        }
+				    };
+				});
+			}else if ((t/2) % 1 == 0) {
+			  	document.getElementById('test-pump-delay-timer').innerHTML = '(' + (t/2) + ')';
+			}
+			t--;
+		}, 500);
 	}
 };
 
-function testPumpRun()
+function testPumpRun(tm, clearlog)
 {
 	notify('', 'Running Pump ...', 'warning');
-	progressTimer(62,0,function() {
-		if(xhr.clearlog == "...") {
+	var timer = setInterval(function() {
+		tm -= 10;
+	    notify('', '... ' + tm + ' Seconds Remaining', 'warning');
+	}, 10000);
+	progressTimer((tm * 10), 3, function() {
+		clearInterval(timer);
+		if(clearlog == "...") {
 			testPumpLoopback(true);
 		}else{
 			testPumpLoopback(false);
@@ -1146,7 +1153,7 @@ function testPumpRun()
 function testPumpLoopback(clearlog, callback)
 {
 	var log = new XMLHttpRequest();
-	log.open('GET', 'data.log', true);
+	log.open('GET', 'log', true);
     log.send();
     log.onload = function() {
         if (log.status == 200) {
@@ -1157,13 +1164,15 @@ function testPumpLoopback(clearlog, callback)
 	        	//console.log(s[s.length-2]);
 	        	if (log.responseText.indexOf('M:') != -1) {
 	        		notify('', 'Pump OK', 'success');
+	        	}else if (log.responseText.indexOf('e:') != -1) {
+	        		notify('', 'Empty Water Protection', 'warning');
 	        	}else{
 	        		notify('', 'Pump Status Uknown', 'warning');
 	        	}
 			}
 			if(clearlog) {
 				var clog = new XMLHttpRequest();
-				clog.open('GET', 'data.log?clear=1', true);
+				clog.open('GET', 'log?clear=1', true);
 				clog.send();
 			}
         }

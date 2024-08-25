@@ -141,7 +141,7 @@ function buildGraphMenu() {
 
     btn_clean.click(function() {
         var log = new XMLHttpRequest();
-        log.open('GET', '/data.log?clear=1', true);
+        log.open('GET', '/log?clear=1', true);
         log.send();
         log.onload = function() {
             if (log.status == 200) {
@@ -411,7 +411,7 @@ function initChart() {
             resizeChart();
         }
     }
-    xhr.open('GET', 'data.log', true);
+    xhr.open('GET', 'log', true);
     xhr.send();
     
     $('.chartAreaWrapper2').width($('.chartAreaWrapper').width());
@@ -460,7 +460,7 @@ function startChart() {
             updateChart();
         }
     }
-    xhr.open('GET', 'data.log?clear=1', true);
+    xhr.open('GET', 'log?clear=1', true);
     xhr.send();
 };
 
