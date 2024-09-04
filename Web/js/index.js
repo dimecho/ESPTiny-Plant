@@ -32,7 +32,7 @@ var WIFI_CHANNEL = 5;
 var WIFI_SSID = 6;
 var WIFI_USERNAME = 7;
 var WIFI_PASSWORD = 8;
-var DATA_LOG = 9;
+var LOG_ENABLE = 9;
 var LOG_INTERVAL = 10;
 //==========
 var NETWORK_DHCP = 11
@@ -166,14 +166,14 @@ function svgwaterLevelAdjust(v) {
 			}
 		}
 	}
-};
+}
 
 function updateNTP() {
 	var d = new Date();
 	var ntp = new XMLHttpRequest();
 	ntp.open('GET', 'api?week=' + d.getDay() + '&hour=' + d.getHours() + '&minute=' + d.getMinutes() + '&ntp=1', true);
 	ntp.send();
-};
+}
 
 function loadSVG(svgfile) {
 
@@ -229,7 +229,6 @@ function loadSVG(svgfile) {
 						}catch{}
 					}
 					document.getElementById('cssSVG').href = 'svg/' + svgfile.replace('.svg', '.css');
-					var pnp_adc = nvram.response['nvram'][PNP_ADC] + '000';
 
 				    // Request the SVG file
 				    var xhr = new XMLHttpRequest();
@@ -264,15 +263,13 @@ function loadSVG(svgfile) {
 			                    	//notify('', 'Current Moisture: ' + a, 'info');
 			                    }
 			                    document.getElementById('moisture-adc').textContent = a;
-			                    
-			                    svgwaterLevelAdjust(pnp_adc.charAt(2));
 
 			                    var ts = new XMLHttpRequest();
 					            ts.open('GET', 'api?temp=1', true);
 					            ts.send();
 					            ts.onloadend = function() {
 								    if(adc.status == 200) {
-								    	var t = parseInt(ts.responseText) - 16;
+								    	var t = parseInt(ts.responseText) - 18;
 								    	if(t > 0) {
 					                    	document.getElementById('moisture-adc').textContent = document.getElementById('moisture-adc').textContent + ' (' + t + '°C)';
 						                    if(t < 4) {
@@ -281,6 +278,9 @@ function loadSVG(svgfile) {
 					                	}
 									}
 								}
+			                    var pnp_adc = nvram.response['nvram'][PNP_ADC] + '000';
+			                    document.getElementById('WaterLevel').value = pnp_adc.charAt(2);
+			                    svgwaterLevelAdjust(pnp_adc.charAt(2));
 							}
 						}
 	                    
@@ -387,7 +387,7 @@ function loadSVG(svgfile) {
 				                min: 0,
 				                max: 1,
 				                change: function (args) {
-				                	$('#WaterLevel').val(args.value);
+				                	document.getElementById('WaterLevel').value = args.value;
 				                    saveSetting(PNP_ADC, pnp_adc.charAt(0) + pnp_adc.charAt(1) + args.value, function(lock) {
 				                    	if (lock != 'Locked') {
 				                    		svgwaterLevelAdjust(args.value);
@@ -587,7 +587,7 @@ function loadSVG(svgfile) {
 				            nvram.onload = function(e) {
 				                try {
 				                	var data = nvram.response; //nvram.responseText;
-				                    var v = data["nvram"][0].split('|');
+				                    var v = data['nvram'][0].split('|');
 				                    document.getElementById('coreVersion').textContent = 'Core Version: ' + v[0];
 				                    document.getElementById('sdkVersion').textContent = 'SDK Version: ' + v[1];
 				                    document.getElementById('fsVersion').textContent = 'LittleFS Version: ' + (0xffff & (v[2] >> 16)) + "." + (0xffff & (v[2] >> 0)) + "." + (0xffff & (v[2] >> 20));
@@ -610,8 +610,8 @@ function loadSVG(svgfile) {
 				                    $('#WiFiChannel').val(data['nvram'][WIFI_CHANNEL]);
 				                    $('#WiFiSSID').val(data['nvram'][WIFI_SSID]);
 				                    $('#WiFiUsername').val(data['nvram'][WIFI_USERNAME]);
-				                    bool_value = data['nvram'][DATA_LOG] == '1' ? true : false;
-				                    $('#EnableLog').val(data['nvram'][DATA_LOG]);
+				                    bool_value = data['nvram'][LOG_ENABLE] == '1' ? true : false;
+				                    $('#EnableLog').val(data['nvram'][LOG_ENABLE]);
 				                    $('#EnableLogCheckbox').prop('checked', bool_value);
 				                    $('#EnableLogInterval').val(data['nvram'][LOG_INTERVAL]);
 
@@ -756,7 +756,7 @@ function loadSVG(svgfile) {
 												document.cookie = 'WIFI_SSID=' + data['nvram'][WIFI_SSID];
 												document.cookie = 'WIFI_USERNAME=' + data['nvram'][WIFI_USERNAME];
 												//document.cookie = 'WIFI_PASSWORD=' + data['nvram'][WIFI_PASSWORD];
-												document.cookie = 'DATA_LOG=' + data['nvram'][DATA_LOG];
+												document.cookie = 'LOG_ENABLE=' + data['nvram'][LOG_ENABLE];
 												document.cookie = 'LOG_INTERVAL=' + data['nvram'][LOG_INTERVAL];
 												document.cookie = 'NETWORK_DHCP=' + data['nvram'][NETWORK_DHCP];
 												document.cookie = 'NETWORK_IP=' + data['nvram'][NETWORK_IP];
@@ -852,7 +852,7 @@ function loadSVG(svgfile) {
 	            	DEMOLOCK = true;
 	            }
 
-				if(nvram.response['nvram'][DATA_LOG] == 1) {
+				if(nvram.response['nvram'][LOG_ENABLE] == 1) {
 					notify('', 'Data collection is enabled.', 'info');
 				}
 			}
@@ -861,7 +861,7 @@ function loadSVG(svgfile) {
 	    	notify('','The browser does not support SVG graphics', 'danger');
 	    }
     }
-};
+}
 
 function saveSetting(offset, value, callback) {
 
@@ -881,13 +881,13 @@ function saveSetting(offset, value, callback) {
 	   	xhr.open('GET', 'nvram.json?offset=' + offset + '&value=' + value, true);
 	    xhr.send();
 	}
-};
+}
 
 function PlantLogin() {
 	$('.modal').modal('hide');
 	var modal = new bootstrap.Modal(document.getElementById('demo-Lock'));
 	modal.show();
-};
+}
 
 function HiddenInput(id, value) {
     if(value == true) {
@@ -895,7 +895,7 @@ function HiddenInput(id, value) {
     }else{
        document.getElementById(id).setAttribute('disabled', '');
     }
-};
+}
 
 function RequireInput(id, value) {
     if(value == true) {
@@ -903,7 +903,7 @@ function RequireInput(id, value) {
     }else{
         document.getElementById(id).removeAttribute('required');
     }
-};
+}
 
 function AvailabilityWeek(availability) {
 
@@ -928,7 +928,7 @@ function AvailabilityWeek(availability) {
     	availabilityText += slider[1];
     }
 	$('#DemoAvailability').val(availabilityText);
-};
+}
 
 function AlertSet(alerts) {
 
@@ -948,7 +948,7 @@ function AlertSet(alerts) {
 		}
 	}
 	$('#Alerts').val(alerts.join("") + l);
-};
+}
 
 function SetWiFiMode() {
 	document.getElementById('AlertInfo').classList.add('d-none');
@@ -970,7 +970,7 @@ function SetWiFiMode() {
         $('#WiFiModeClientWEP').prop('checked', true);
         WarningWiFiMode();
     }
-};
+}
 
 function WarningWiFiMode() {
 	document.getElementById('AlertWiFiPower').classList.add('d-none');
@@ -982,7 +982,7 @@ function WarningWiFiMode() {
 	if(document.getElementById("WiFiDHCP").value == 0) {
 		document.getElementById('AlertWiFiDHCP').classList.remove('d-none');
 	}
-};
+}
 
 function HiddenCheck(id, element) {
     //console.log(id);
@@ -997,15 +997,20 @@ function HiddenCheck(id, element) {
     	if(element.checked) {
     		saveSetting(WIFI_HIDE, 1, function(lock) {if (lock != 'Locked') {notify('','WiFi SSID is now Hidden', 'danger')}});
     	}else{
-    		
     		saveSetting(WIFI_HIDE, 0, function(lock) {if (lock != 'Locked') {notify('','WiFi SSID is now Broadcasting', 'success')}});
     	}
 	}else if(id == 'EnableLog') {
     	if(element.checked) {
-    		saveSetting(DATA_LOG, 1, function(lock) {if (lock != 'Locked') {notify('','Graph & Log Collection is ON', 'info')}});
+    		saveSetting(LOG_ENABLE, 1, function(lock) {if (lock != 'Locked') {notify('','Graph & Log Collection is ON', 'info')}});
     	}else{
-    		saveSetting(DATA_LOG, 0, function(lock) {if (lock != 'Locked') {notify('','Graph & Log Collection is OFF', 'success')}});
+    		saveSetting(LOG_ENABLE, 0, function(lock) {if (lock != 'Locked') {notify('','Graph & Log Collection is OFF', 'success')}});
     	}
+    }else if(id == 'WaterLevel') {
+    	var pnp = 0;
+        if(document.getElementById('EnablePNP').value == 'PNP')
+        	pnp = 1;
+        saveSetting(PNP_ADC, pnp + document.getElementById('ADCSensitivity').value + document.getElementById('WaterLevel').value, function(lock) {if (lock != 'Locked') {notify('','Make sure Water Sensor is OK and Water Full', 'info')}});
+        svgwaterLevelAdjust(document.getElementById('WaterLevel').value);
     }else if(id == 'WiFiDHCP') {
         var b = false;
 
@@ -1023,12 +1028,12 @@ function HiddenCheck(id, element) {
         document.getElementById('WiFiGateway').setAttribute('disabled', b);
         document.getElementById('WiFiDNS').setAttribute('disabled', b);
     }
-};
+}
 
 function NVRAMtoSVG(data)
 {
     /*
-    if(data['nvram'][DATA_LOG] == '1') {
+    if(data['nvram'][LOG_ENABLE] == '1') {
         document.getElementById('graph-enabled').style.display = 'block';
     }else{
         document.getElementById('graph-enabled').style.display = 'none';
@@ -1058,7 +1063,7 @@ function NVRAMtoSVG(data)
     document.getElementById('soil-type-text').textContent = soil_type_labels[data['nvram'][PLANT_SOIL_TYPE]];
     if(document.getElementById('soil-text'))
     	document.getElementById('soil-text').style.fill = soil_type_color[data['nvram'][PLANT_SOIL_TYPE]];
-};
+}
 
 function formValidate() {
 	if(WiFiPassword.value != null) {
@@ -1066,12 +1071,12 @@ function formValidate() {
 	}else if(DemoPassword.value != null) {
 		DemoPasswordConfirm.setCustomValidity(DemoPasswordConfirm.value != DemoPassword.value ? 'Passwords do not match.' : '');
 	}
-};
+}
 
 function resetFlash()
 {
 	window.open('api?reset=1');
-};
+}
 
 function testPump(arg)
 {
@@ -1094,46 +1099,51 @@ function testPump(arg)
 			if (t == 0) {
 			    clearInterval(x);
 			    document.getElementById('test-pump-delay-timer').innerHTML = '';
-		    	testPumpLoopback(false, function(log) {
-					var xhr = new XMLHttpRequest();
-					xhr.open('GET', 'api?pump=' + arg, true);
-				    xhr.send();
-				    xhr.onload = function() {
-				        if (xhr.status == 200) {
-				        	var p = parseInt(document.getElementById('pot-size-text').textContent) + 1;
-				        	if(xhr.responseText == "Locked") {
-				        		PlantLogin();
-				        	}else if(document.getElementById('WaterLevel').value == 1) {
-				        		notify('', 'Water Level Sensor is On', 'warning');
-						    	var adc = new XMLHttpRequest();
-							    adc.open('GET', 'api?adc=2', true);
-							    adc.send();
-							    adc.onloadend = function() {
-								    if(adc.status == 200) {
-								    	if(adc.responseText > 0) {
-								    		testPumpRun(p, log.responseText);
-								    	}else{
-								    		notify('', 'Check Water Level', 'danger');
-								    	}
+			    var log = new XMLHttpRequest();
+				log.open('GET', 'log?start=1', true);
+			    log.send();
+			    log.onload = function() {
+			        if (log.status == 200) {
+						var xhr = new XMLHttpRequest();
+						xhr.open('GET', 'api?pump=' + arg, true);
+					    xhr.send();
+					    xhr.onload = function() {
+					        if (xhr.status == 200) {
+					        	var tm = parseInt(document.getElementById('pot-size-text').textContent) + 1;
+					        	if(xhr.responseText == "Locked") {
+					        		PlantLogin();
+					        	}else if(document.getElementById('WaterLevel').value == 1) {
+					        		notify('', 'Water Level Sensor is On', 'warning');
+							    	var adc = new XMLHttpRequest();
+								    adc.open('GET', 'api?adc=2', true);
+								    adc.send();
+								    adc.onloadend = function() {
+									    if(adc.status == 200) {
+									    	if(adc.responseText > 0) {
+									    		testPumpRun(tm);
+									    	}else{
+									    		notify('', 'Check Water Level', 'danger');
+									    	}
+										}
 									}
-								}
-						    }else{
-						    	testPumpRun(p, log.responseText);
-						    }
-				        }else{
-				        	notify('', 'Pump Test Failed', 'danger');
-				        }
-				    };
-				});
+							    }else{
+							    	testPumpRun(tm);
+							    }
+					        }else{
+					        	notify('', 'Pump Test Failed', 'danger');
+					        }
+					    };
+			        }
+			    };
 			}else if ((t/2) % 1 == 0) {
 			  	document.getElementById('test-pump-delay-timer').innerHTML = '(' + (t/2) + ')';
 			}
 			t--;
 		}, 500);
 	}
-};
+}
 
-function testPumpRun(tm, clearlog)
+function testPumpRun(tm)
 {
 	notify('', 'Running Pump ...', 'warning');
 	var timer = setInterval(function() {
@@ -1142,24 +1152,11 @@ function testPumpRun(tm, clearlog)
 	}, 10000);
 	progressTimer((tm * 10), 3, function() {
 		clearInterval(timer);
-		if(clearlog == "...") {
-			testPumpLoopback(true);
-		}else{
-			testPumpLoopback(false);
-		}
-	});
-};
-
-function testPumpLoopback(clearlog, callback)
-{
-	var log = new XMLHttpRequest();
-	log.open('GET', 'log', true);
-    log.send();
-    log.onload = function() {
-        if (log.status == 200) {
-			if(callback) {
-				callback(log);
-			}else{
+		var log = new XMLHttpRequest();
+		log.open('GET', 'log', true);
+	    log.send();
+	    log.onload = function() {
+	        if (log.status == 200) {
 				//var s = log.responseText.split('\n');
 	        	//console.log(s[s.length-2]);
 	        	if (log.responseText.indexOf('M:') != -1) {
@@ -1169,15 +1166,15 @@ function testPumpLoopback(clearlog, callback)
 	        	}else{
 	        		notify('', 'Pump Status Uknown', 'warning');
 	        	}
-			}
-			if(clearlog) {
-				var clog = new XMLHttpRequest();
-				clog.open('GET', 'log?clear=1', true);
-				clog.send();
-			}
-        }
-    };
-};
+				if(document.getElementById('EnableLog').value == 0) {
+					var elog = new XMLHttpRequest();
+					elog.open('GET', 'log?end=1', true);
+					elog.send();
+				}
+	        }
+	    };
+	});
+}
 
 function emailValidate(email)
 {
@@ -1185,7 +1182,7 @@ function emailValidate(email)
 		return false;
 	}
 	return true;
-};
+}
 
 function inputValidate(item)
 {
@@ -1226,7 +1223,7 @@ function inputValidate(item)
 			document.getElementById('AlertOAuthInfo').classList.add('d-none');
 		}
     }, 3000);
-};
+}
 
 function testFlood(water)
 {
@@ -1242,7 +1239,7 @@ function testFlood(water)
         }
     };
     xhr.send();
-};
+}
 
 function testEmpty(loop, flood)
 {	
@@ -1302,7 +1299,7 @@ function testEmpty(loop, flood)
         }
     };
     xhr.send();
-};
+}
 
 function autoWiFiPower()
 {
@@ -1312,7 +1309,51 @@ function autoWiFiPower()
     }else{
     	document.getElementById('WiFiPower').value = 1;
     }
-};
+}
+
+function generateRandomNumbers(count, min, max) {
+    const numbers = [];
+    for (let i = 0; i < count; i++) {
+        const randomNumber = Math.floor(Math.random() * (max - min + 1)) + min;
+		numbers.push(randomNumber);
+		var MANUAL_TIMER = parseInt(document.getElementById('moisture-text').textContent);
+		if(randomNumber <= MANUAL_TIMER) {
+        	numbers.push("T:" + MANUAL_TIMER + ",M:" + randomNumber);
+		}
+    }
+    return numbers;
+}
+
+function testGraph()
+{
+	var xhr = new XMLHttpRequest();
+	xhr.open('GET', 'log?clear=1', true);
+    xhr.onload = function() {
+        if (xhr.status == 200) {
+        	if(xhr.responseText == "Locked") {
+        		PlantLogin();
+        	}else{ //if(xhr.responseText == "...") {
+    			notify('', 'Generating Random Graph ...', 'success');
+
+    			const randomNumbers = generateRandomNumbers(100, 500, 1024);
+				const fileContent = randomNumbers.join('\n');
+				const blob = new Blob([fileContent], { type: 'text/plain' });
+				console.log(blob);
+				const file = new File([blob], "log", { type: 'text/plain' });
+				const formData = new FormData();
+				formData.append('file', file);
+				fetch('/upload', {
+				    method: 'POST',
+				    body: formData
+				})
+				.then(response => response.json())
+				.then(data => console.log('Success:', data))
+				.catch(error => console.error('Error:', error));
+        	}
+        }
+    };
+    xhr.send();
+}
 
 function testSoil()
 {
@@ -1325,7 +1366,7 @@ function testSoil()
 	    	notify('', 'Soil Moisture = ' + a, 'success');
 		}
 	}
-};
+}
 
 function testWater()
 {
@@ -1347,7 +1388,7 @@ function testWater()
 			}
 		}
     }
-};
+}
 
 function flushWater()
 {
@@ -1360,17 +1401,17 @@ function flushWater()
 	document.getElementById('flush-water-stop').onclick = function() {
     	testPump(0);
 	}
-};
+}
 
 function testBattery()
 {
 
-};
+}
 
 function testLED()
 {
 
-};
+}
 
 function testEmail()
 {
@@ -1400,7 +1441,7 @@ function testEmail()
 	        }
 	    };
 	}
-};
+}
 
 function infoOAuthToken()
 {
@@ -1413,7 +1454,7 @@ function infoOAuthToken()
 		//https://oauth2.googleapis.com/tokeninfo?access_token=ACCESS_TOKEN
 	}else if(smtp.indexOf('office365.com') != -1) {
 	}
-};
+}
 
 function getOAuthToken()
 {
@@ -1443,7 +1484,7 @@ function getOAuthToken()
 			//https://login.microsoftonline.com/common/v2.0/oauth2/token
 		}
 	}
-};
+}
 
 function calcNextWaterCycle(start, stop, size)
 {
@@ -1478,7 +1519,7 @@ function calcNextWaterCycle(start, stop, size)
 		console.log('Hours: ' + hours);
 	}
 	return days;
-};
+}
 
 function checkFirmwareUpdates(v)
 {
@@ -1522,7 +1563,7 @@ function checkFirmwareUpdates(v)
         xhr.send();
     }
     */
-};
+}
 
 function progressTimer(speed, bar, callback)
 {
@@ -1536,7 +1577,7 @@ function progressTimer(speed, bar, callback)
 	    }
 	    document.getElementsByClassName('progress-bar')[bar].style.width = timerUploadCounter + '%';
     }, speed);
-};
+}
 
 function deleteCookies()
 {
@@ -1583,10 +1624,10 @@ function generateWiFiQR()
 		a.href = qrcode.toDataURL('image/png');
 		a.download = ssid+'-qrcode.png';
 	}
-};
+}
 
 /*
 function sleep(ms) {
   return new Promise(resolve => setTimeout(resolve, ms));
-};
+}
 */

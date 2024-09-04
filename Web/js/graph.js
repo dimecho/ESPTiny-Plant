@@ -7,6 +7,7 @@ var pageLimit = 4;
 
 var LOG_INTERVAL = 10;
 var DEEP_SLEEP = 21;
+var ESP32 = false;
 
 var chart_datasets = [{
 	type: 'line',
@@ -48,6 +49,16 @@ document.addEventListener("DOMContentLoaded", function(event)
 	graphTheme();
 
     graphSettings();
+
+    var nvram = new XMLHttpRequest();
+    nvram.responseType = 'json';
+    nvram.open('GET', 'nvram.json', true);
+    nvram.send();
+    nvram.onload = function(e) {
+        if(nvram.response['nvram'][0].indexOf('esp32') != -1) {
+            ESP32 = true;
+        }
+    }
 
     var canvas = $('#chartCanvas');
     ctx = canvas.get(0).getContext('2d');
@@ -141,7 +152,7 @@ function buildGraphMenu() {
 
     btn_clean.click(function() {
         var log = new XMLHttpRequest();
-        log.open('GET', '/log?clear=1', true);
+        log.open('GET', 'log?end=1', true);
         log.send();
         log.onload = function() {
             if (log.status == 200) {
@@ -395,6 +406,8 @@ function initChart() {
     //chart.update();
 
     var xhr = new XMLHttpRequest();
+    xhr.open('GET', 'log', true);
+    xhr.send();
     xhr.onload = function() {
         if (xhr.status == 200) {
             var s = nTrim(xhr.responseText).split('\n');
@@ -402,17 +415,15 @@ function initChart() {
 
             chart.data.datasets[0].data = [];
             for (var i = 0; i < s.length; i++) {
-            	if(s[i].indexOf(':') == -1) {
-            		chart.data.datasets[0].data.push(s[i]);
-            	}
+                if(s[i].indexOf(':') == -1) { //TODO filter only T: and M:
+                    chart.data.datasets[0].data.push(s[i]);
+                }
             }
             chart.update();
 
             resizeChart();
         }
     }
-    xhr.open('GET', 'log', true);
-    xhr.send();
     
     $('.chartAreaWrapper2').width($('.chartAreaWrapper').width());
 };
@@ -449,6 +460,8 @@ function stopChart() {
 function startChart() {
 
     var xhr = new XMLHttpRequest();
+    xhr.open('GET', 'log?start=1', true);
+    xhr.send();
     xhr.onload = function() {
         if (xhr.status == 200) {
             console.log(xhr.responseText);
@@ -460,8 +473,6 @@ function startChart() {
             updateChart();
         }
     }
-    xhr.open('GET', 'log?clear=1', true);
-    xhr.send();
 };
 
 function initTimeAxis(seconds, labels, stamp) {
@@ -508,7 +519,12 @@ function updateChart() {
     xhr.onload = function() {
         if (xhr.status == 200) {
             var adc = parseInt(xhr.responseText);
-            var ref = adc / 1023;
+            var ref;
+            if (ESP32){
+                ref = adc / 4096;
+            }else{
+                ref = adc / 1023;
+            }
             var v = 5 * (ref * 1.1); // Calculate Vcc from 5V
             var h2o = Math.round(ref * 100 / 2.0); //scientific value (actual H2O inside soil)
             console.log(adc + ' ' + h2o);

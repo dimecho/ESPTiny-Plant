@@ -263,6 +263,7 @@ RTC_DATA_ATTR struct {
   volatile uint8_t ntpWeek;       //NTP day of week
   volatile uint8_t ntpHour;       //NTP hour
   volatile uint8_t emptyBottle;   //empty tracking
+  volatile uint8_t drySoil;       //dry soil tracking
   volatile uint16_t waterTime;    //pump tracking
   volatile uint16_t moistureLog;  //moisture average tracking
   volatile uint16_t alertTime;    //prevent email spam
@@ -273,6 +274,7 @@ struct {
   uint8_t ntpWeek;       //NTP day of week
   uint8_t ntpHour;       //NTP hour
   uint8_t emptyBottle;   //empty tracking
+  uint8_t drySoil;       //dry soil tracking
   uint16_t waterTime;    //pump tracking
   uint16_t moistureLog;  //moisture average tracking
   uint16_t alertTime;    //prevent email spam
@@ -294,7 +296,7 @@ bool testSMTP = false;
 #define _WIRELESS_SSID 6
 #define _WIRELESS_USERNAME 7
 #define _WIRELESS_PASSWORD 8
-#define _DATA_LOG 9
+#define _LOG_ENABLE 9
 #define _LOG_INTERVAL 10
 #define _NETWORK_DHCP 11
 #define _NETWORK_IP 12
@@ -328,7 +330,7 @@ const int NVRAM_Map[] = {
   16,  //_WIRELESS_SSID
   32,  //_WIRELESS_USERNAME
   32,  //_WIRELESS_PASSWORD
-  8,   //_DATA_LOG
+  8,   //_LOG_ENABLE
   32,  //_LOG_INTERVAL
   8,   //_NETWORK_DHCP
   16,  //_NETWORK_IP
@@ -361,7 +363,7 @@ uint8_t WIRELESS_CHANNEL = 7;
 //String WIRELESS_SSID = "Plant";
 //char WIRELESS_USERNAME[] = "";
 //char WIRELESS_PASSWORD[] = "";
-uint8_t DATA_LOG = 0;        //data logger (enable/disable)
+uint8_t LOG_ENABLE = 0;        //data logger (enable/disable)
 uint32_t LOG_INTERVAL = 30;  //loop() delay - seconds
 //uint8_t NETWORK_DHCP = 0;
 String NETWORK_IP = "192.168.8.8";
@@ -388,6 +390,7 @@ char DEMO_AVAILABILITY[] = "00000000618";  //M, T, W, T, F, S, S + Time Range
 //=============================
 uint16_t delayBetweenAlertEmails = 0;     //2 hours = 2 x 60 = 120 minutes = x4 30 min loops
 uint16_t delayBetweenRefillReset = 0;     //2 hours = 2 x 60 = 120 minutes = x4 30 min loops
+uint16_t delayBetweenDrySoilReset = 0;    //12 hours = 12 x 60 = 720 minutes = x24 30 min loops
 uint16_t delayBetweenOverfloodReset = 0;  //8 hours = 8 x 60 = 480 minutes = x16 30 min loops
 uint8_t ON_TIME = 0;                      //from 6am
 uint8_t OFF_TIME = 0;                     //to 6pm
@@ -507,7 +510,7 @@ void setup() {
     NVRAM_Write(_WIRELESS_SSID, WIRELESS_SSID);
     NVRAM_Write(_WIRELESS_USERNAME, "");
     NVRAM_Write(_WIRELESS_PASSWORD, "");
-    NVRAM_Write(_DATA_LOG, String(DATA_LOG));
+    NVRAM_Write(_LOG_ENABLE, String(LOG_ENABLE));
     NVRAM_Write(_LOG_INTERVAL, String(LOG_INTERVAL));
     //==========
     NVRAM_Write(_NETWORK_DHCP, "0");
@@ -579,7 +582,7 @@ void setup() {
   if (wakeupReason == 5) {    //REASON_DEEP_SLEEP_AWAKE (5)
 #endif
     LOG_INTERVAL = 0;  //going into sleep mode anyway, do not delay in loop()
-    if (DATA_LOG > 0)  //writing logs during sleep
+    if (LOG_ENABLE > 0)  //writing logs during sleep
       LittleFS.begin();
   } else {
     //Emergency Recover (RST to GND)
@@ -1043,13 +1046,14 @@ void setupWebServer() {
   });
   */
   server.on("/log", HTTP_GET, [](AsyncWebServerRequest *request) {
-    if (request->hasParam("clear")) {
-      DATA_LOG = 0;
+    if (request->hasParam("end")) {
+      LOG_ENABLE = 0;
       LittleFS.remove("/l");
-      //NVRAM_Write(_DATA_LOG, "0");
-    } else if (!LittleFS.exists("/l")) {
-      DATA_LOG = 1;
-      //NVRAM_Write(_DATA_LOG, "1");
+      //NVRAM_Write(_LOG_ENABLE, "0");
+      } else if (request->hasParam("start")) {
+      LOG_ENABLE = 1;
+      dataLog("l");
+      //NVRAM_Write(_LOG_ENABLE, "1");
     } else {
       AsyncWebServerResponse *response = request->beginResponse(LittleFS, "/l", text_plain);
       request->send(response);
@@ -1352,9 +1356,11 @@ void loop() {
   //ArduinoOTA.handle();
   //delay(LOG_INTERVAL);
 
-  if (testPump > 0) {
-    if (testPump == 1)
+  if (testPump > 0) { //0 = stop, 1= run (timed), 2 = run (continues)
+    if (testPump == 1) {
       testPump = 0;
+      dataLog("P:" + String(rtcData.runTime));
+    }
     runPump();
 #if EMAILCLIENT_SMTP
   } else if (testSMTP) {
@@ -1515,9 +1521,17 @@ void loop() {
 #ifdef ESP8266
       if (moisture < 20) {  //Sensor Not in Soil
 #else
-      if (moisture < 80) {     //Sensor Not in Soil
+      if (moisture < 80) {  //Sensor Not in Soil
 #endif
-        blinky(200, 4, 0);
+        // Soil dryed out too fast or missed oportunity to water (empty)
+        if (rtcData.drySoil > delayBetweenDrySoilReset) {
+          rtcData.drySoil = 0;
+          PLANT_POT_SIZE /= 2; //Try to go out of dry loop but do not overwater
+          runPump();
+        }else{
+          rtcData.drySoil++;
+          blinky(200, 4, 0);
+        }
 #if EMAILCLIENT_SMTP
         if (ALERTS[2] == '1')
           smtpSend("Low Sensor", String(moisture));
@@ -1551,7 +1565,7 @@ void loop() {
 #if DEBUG
       Serial.printf("Water Timer: %u\n", rtcData.waterTime);
 #endif
-      //We need to split deep sleep as 32-bit unsigned integer is 4294967295 or 0xffffffff max ~71 minutes
+      //ESP8266 - We need to split deep sleep as 32-bit unsigned integer is 4294967295 or 0xffffffff max ~71 minutes
       if (rtcData.waterTime >= PLANT_MANUAL_TIMER) {
         rtcData.emptyBottle = 0;  //assume no sensor with manual timer
         rtcData.waterTime = 0;
@@ -1660,7 +1674,7 @@ String indexSVG(String dir) {
 }
 
 void dataLog(String text) {
-  if (DATA_LOG == 1) {
+  if (LOG_ENABLE == 1) {
 #if ESP8266
     FSInfo fs_info;
     LittleFS.info(fs_info);
@@ -2125,7 +2139,7 @@ void NVRAM_Read_Config() {
   DEEP_SLEEP = NVRAM_Read(_DEEP_SLEEP).toInt() * 60;
   LOG_INTERVAL = NVRAM_Read(_LOG_INTERVAL).toInt();
 
-  DATA_LOG = NVRAM_Read(_DATA_LOG).toInt();
+  LOG_ENABLE = NVRAM_Read(_LOG_ENABLE).toInt();
   PLANT_POT_SIZE = NVRAM_Read(_PLANT_POT_SIZE).toInt();
   PLANT_SOIL_MOISTURE = NVRAM_Read(_PLANT_SOIL_MOISTURE).toInt();
   PLANT_SOIL_TYPE = NVRAM_Read(_PLANT_SOIL_TYPE).toInt();
@@ -2166,7 +2180,7 @@ void offsetTiming() {
 
   //Sleep set and Logging is OFF
   /*
-  if (DEEP_SLEEP > 1 && DATA_LOG < 1 && PLANT_MANUAL_TIMER > 0) {
+  if (DEEP_SLEEP > 1 && LOG_ENABLE < 1 && PLANT_MANUAL_TIMER > 0) {
     PLANT_MANUAL_TIMER = PLANT_MANUAL_TIMER * 2;  //calculate loop for ESP.deepSleep()
     delayBetweenAlertEmails = 1 * 60 / 30;        //2 hours as 30 min loops
     delayBetweenRefillReset = 2 * 60 / 30;        //2 hours as 30 min loops
@@ -2180,6 +2194,7 @@ void offsetTiming() {
   PLANT_MANUAL_TIMER = (PLANT_MANUAL_TIMER * 3600) / loopTime;  //wait hours (minus pump on time) to loops
   delayBetweenAlertEmails = 1 * 3600 / loopTime;                //1 hours as loops of seconds
   delayBetweenRefillReset = 2 * 3600 / loopTime;                //2 hours as loops of seconds
+  delayBetweenDrySoilReset = 12 * 3600 / loopTime;              //12 hours as loops of seconds
   delayBetweenOverfloodReset = 8 * 3600 / loopTime;             //8 hours as loops of seconds
   //}
 
