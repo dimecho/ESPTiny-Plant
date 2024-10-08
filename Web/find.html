@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html>
+<header>
+    <meta http-equiv="Content-Security-Policy" content="upgrade-insecure-requests">
+</header>
+    <body>
+        <script>
+        async function scanRange(startIP, endIP) {
+            const startIPInt = ipToInt(startIP);
+            const endIPInt = ipToInt(endIP);
+            for (let currentIPInt = startIPInt; currentIPInt <= endIPInt; currentIPInt++) {
+                const currentIP = intToIp(currentIPInt);
+                fetch('http://' + currentIP + '/update', { method: 'GET' })
+                .then(response => {
+                    if (response.ok) {
+                        window.location.href = 'http://' + currentIP;
+                    }
+                });
+            }
+        }
+        function ipToInt(ip) {
+            return ip.split('.').reduce((int, octet) => (int << 8) + parseInt(octet), 0);
+        }
+        function intToIp(int) {
+            return [
+                (int >> 24) & 255,
+                (int >> 16) & 255,
+                (int >> 8) & 255,
+                int & 255
+            ].join('.');
+        }
+        scanRange('192.168.8.8', '192.168.8.8');
+        scanRange('10.0.0.2', '10.0.0.254');
+        scanRange('192.168.0.2', '192.168.0.254');
+        scanRange('192.168.1.2', '192.168.1.254');
+        </script>
+    </body>
+</html>

@@ -5,675 +5,594 @@
         <meta charset="UTF-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <link rel="stylesheet" type="text/css" id="cssSVG">
-        <link rel="stylesheet" type="text/css" id="cssBootstrap">
-        <link rel="stylesheet" type="text/css" href="css/preloader.css" />
-        <link rel="stylesheet" type="text/css" href="css/roundslider.css" />
-        <link rel="icon" type="image/x-icon" href="favicon.ico" />
+        <link rel="stylesheet" type="text/css" href="css/preloader.css">
+        <link rel="stylesheet" type="text/css" href="css/tailwind.css">
+        <link rel="stylesheet" type="text/css" href="css/roundslider.css">
+        <link rel="icon" type="image/x-icon" href="favicon.ico">
         <script src="js/preloader.js"></script>
         <script src="js/jquery.core.js"></script>
-        <script src="js/bootstrap.js"></script>
         <script src="js/roundslider.js"></script>
-        <script src="js/index.js"></script>
+        <script defer src="js/index.js"></script>
     </head>
-    <body class="preloader">
+    <body class="preloader bg-gray-100 dark:bg-gray-700">
         <div id="preloader"></div>
-        <div class="toast-container position-absolute top-0 end-0 p-3" id="notify" style="z-index:2000"></div>
-        <div class="container">
-            <div class="row main">
-            	<center><div id="svgInteractive" class="col bg-light svglayer"></div></center>
-            </div>
-        </div>
-        <div class="modal zindex-modal" id="water-Settings">
-	        <div class="modal-dialog modal-dialog-centered">
-	            <div class="modal-content bg-transparent border-0">
-	            	<button type="button" class="btn-close btn-close-dark" data-bs-dismiss="modal" aria-label="Close"></button>
-	                <div id="water-Slider"></div>
+		<div class="fixed top-0 right-0 p-3 z-[2000]" id="notify"></div>
+		<div class="fixed inset-0 bg-black opacity-50 hidden" id="modal-backdrop"></div>
+	    <div class="flex justify-center px-20">
+	        <div id="svgInteractive" class="bg-gray-100 dark:bg-gray-600 svglayer w-full"></div>
+	    </div>
+		<div class="fixed inset-0 flex items-center justify-center hidden modal" id="water-Settings">
+		    <div class="w-full max-w-md mx-auto">
+  				<div id="water-Slider"></div>
+		    </div>
+		</div>
+		<div class="fixed inset-0 flex items-center justify-center hidden modal" id="moisture-Settings">
+  			<div id="moisture-Slider"></div>
+		</div>
+		<div class="fixed inset-0 flex items-center justify-center hidden modal" id="pot-size-Settings">
+  			<div id="pot-size-Slider"></div>
+		</div>
+		<div class="fixed inset-0 flex items-center justify-center hidden modal" id="power-Settings">
+  			<div id="power-Slider"></div>
+		</div>
+		<div class="fixed inset-0 flex items-center justify-center hidden modal" id="soil-Settings">
+			<div class="bg-white dark:bg-gray-800 w-[50%] rounded-lg border border-gray-300 dark:border-gray-600">
+		        <div class="flex justify-between items-center p-2 border-b">
+		            <h5 class="text-lg font-semibold text-gray-800 dark:text-white">Soil Type</h5>
+		            <button id="close-modal" class="text-gray-500 hover:text-gray-800 dark:text-gray-400 dark:hover:text-gray-300 focus:outline-none text-2xl p-1" onclick="hideModal(this)">&times;</button>
+		        </div>
+			    <div class="p-4 h-[90vh] max-h-[90vh] overflow-y-auto">
+	  				<div id="svgSoil"></div>
+	  			</div>
+  			</div>
+		</div>
+		<div class="fixed inset-0 flex items-center justify-center hidden modal" id="plant-Type">
+			<div class="bg-white dark:bg-gray-800 w-[50%] rounded-lg border border-gray-300 dark:border-gray-600">
+		        <div class="flex justify-between items-center p-2 border-b">
+		            <h5 class="text-lg font-semibold text-gray-800 dark:text-white">Plant Type</h5>
+		            <button id="close-modal" class="text-gray-500 hover:text-gray-800 dark:text-gray-400 dark:hover:text-gray-300 focus:outline-none text-2xl p-1" onclick="hideModal(this)">&times;</button>
+		        </div>
+			    <div class="p-4 h-[90vh] max-h-[90vh] overflow-y-auto">
+	  				<div id="svgPlant"></div>
+	  			</div>
+  			</div>
+		</div>
+		<div class="fixed inset-0 flex items-center justify-center hidden modal" id="wireless-Settings" tabindex="-1" aria-hidden="true">
+			<div class="bg-white dark:bg-gray-800 w-[50%] rounded-lg border border-gray-300 dark:border-gray-600">
+		        <div class="flex justify-between items-center p-2 border-b">
+		            <h5 class="text-lg font-semibold text-gray-800 dark:text-white">WiFi Settings</h5>
+		            <button id="close-modal" class="text-gray-500 hover:text-gray-800 dark:text-gray-400 dark:hover:text-gray-300 focus:outline-none text-2xl p-1" onclick="hideModal(this)">&times;</button>
+		        </div>
+				<div class="p-4 h-[90vh] max-h-[90vh] overflow-y-auto">
+		            <ul class="flex border-b dark:border-gray-700">
+	                    <li class="mr-4">
+	                        <button class="tab-link text-blue-500 dark:text-blue-300 hover:text-blue-500 border-blue-500 border-b-2" onclick="changeTab(event, 'tabWireless')">Wireless</button>
+	                    </li>
+	                    <li class="mr-4">
+	                        <button class="tab-link text-gray-600 dark:text-gray-400 hover:text-blue-500 border-blue-500" onclick="changeTab(event, 'tabAlerts')">Alerts</button>
+	                    </li>
+	                    <li class="mr-4">
+	                        <button class="tab-link text-gray-600 dark:text-gray-400 hover:text-blue-500 border-blue-500" onclick="changeTab(event, 'tabDemo')">Settings</button>
+	                    </li>
+	                    <li class="mr-4">
+	                        <button class="tab-link text-gray-600 dark:text-gray-400 hover:text-blue-500 border-blue-500" onclick="changeTab(event, 'tabLayout')">Layout</button>
+	                    </li>
+	                    <li class="mr-4">
+	                        <button class="tab-link text-gray-600 dark:text-gray-400 hover:text-blue-500 border-blue-500" onclick="changeTab(event, 'tabTest')">Test</button>
+	                    </li>
+	                    <li class="mr-4">
+	                        <button class="tab-link text-gray-600 dark:text-gray-400 hover:text-blue-500 border-blue-500" onclick="changeTab(event, 'tabFirmware')">Firmware</button>
+	                    </li>
+	                </ul>
+	                <div class="tab-content mt-4">
+	                    <div class="tab-pane" id="tabWireless">
+							<form method="POST" action="/nvram?wireless" id="wireless-SettingsForm" class="p-4">
+							    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+							        <div>
+							            <fieldset class="mb-4">
+							                <legend class="text-gray-800 dark:text-gray-300">WiFi Mode</legend>
+							                <div class="flex items-center mb-2">
+							                    <input type="radio" class="form-radio text-blue-500" id="WiFiModeAP" name="WiFiMode" value="0" onclick="RequireInput('WiFiUsername',false); SetWiFiMode()">
+							                    <label for="WiFiModeAP" class="ml-2 text-gray-800 dark:text-gray-300">WiFi Access Point</label>
+							                </div>
+							                <div class="flex items-center mb-2">
+							                    <input type="radio" class="form-radio text-blue-500" id="WiFiModeClient" name="WiFiMode" value="1" onclick="RequireInput('WiFiUsername',false); SetWiFiMode()">
+							                    <label for="WiFiModeClient" class="ml-2 text-gray-800 dark:text-gray-300">WiFi Client (WPA2 Personal)</label>
+							                </div>
+							                <div class="flex items-center mb-2">
+							                    <input type="radio" class="form-radio text-blue-500" id="WiFiModeClientEnt" name="WiFiMode" value="2" onclick="RequireInput('WiFiUsername',true); SetWiFiMode()">
+							                    <label for="WiFiModeClientEnt" class="ml-2 text-gray-800 dark:text-gray-300">WiFi Client (WPA2 Enterprise)</label>
+							                </div>
+							                <div class="flex items-center mb-2">
+							                    <input type="radio" class="form-radio text-blue-500" id="WiFiModeClientWEP" name="WiFiMode" value="3" onclick="RequireInput('WiFiUsername',false); SetWiFiMode()">
+							                    <label for="WiFiModeClientWEP" class="ml-2 text-gray-800 dark:text-gray-300">WiFi Client (WEP Key)</label>
+							                </div>
+							                <div class="flex items-center mb-2">
+							                    <input type="hidden" id="WiFiHidden" name="WiFiHidden" value="0">
+							                    <input type="checkbox" id="WiFiHiddenCheckbox" class="form-checkbox text-blue-500" onclick="HiddenCheck('WiFiHidden',this)">
+							                    <label for="WiFiHiddenCheckbox" class="ml-2 text-gray-800 dark:text-gray-300">Hidden SSID</label>
+							                </div>
+							            </fieldset>
+							        </div>
+							        <div class="flex justify-center">
+							            <a href="" id="qrcode-dl">
+							                <img id="qrcode" class="dark:invert">
+							            </a>
+							        </div>
+							    </div>
+							    <div class="mb-2">
+							        <div class="bg-yellow-500 text-white mb-4 hidden" id="AlertWiFiPower">WiFi power may not reach AP</div>
+							        <div class="bg-yellow-500 text-white mb-4 hidden" id="AlertWiFiDHCP">Don't forget to enable DHCP</div>
+							    </div>
+							    <div class="mb-4">
+							        <label class="text-gray-800 dark:text-gray-300">Antenna</label>
+							        <select id="WiFiPhyMode" class="form-select px-2 py-1 w-full dark:bg-gray-700 dark:text-gray-300 rounded-sm" name="WiFiPhyMode">
+							            <option value="1">802.11 b</option>
+							            <option value="2">802.11 g</option>
+							            <option value="3">802.11 n</option>
+							        </select>
+							    </div>
+							    <div class="mb-4">
+							        <label class="text-gray-800 dark:text-gray-300">Power</label>
+							        <div class="flex justify-center">
+							            <select id="WiFiPower" class="form-select px-2 w-[80%] dark:bg-gray-700 dark:text-gray-300 rounded-sm" name="WiFiPower" onchange="SetWiFiMode()">
+							                <option value="1">1 dBm (1mW)</option>
+							                <option value="2">2 dBm (1mW)</option>
+							                <option value="3">3 dBm (1mW)</option>
+							                <option value="4">4 dBm (2mW)</option>
+							                <option value="5">5 dBm (3mW)</option>
+							                <option value="6">6 dBm (3mW)</option>
+							                <option value="7">7 dBm (5mW)</option>
+							                <option value="8">8 dBm (6mW)</option>
+							                <option value="9">9 dBm (7mW)</option>
+							                <option value="10">10 dBm (10mW)</option>
+							                <option value="11">11 dBm (12mW)</option>
+							                <option value="12">12 dBm (15mW)</option>
+							                <option value="13">13 dBm (19mW)</option>
+							                <option value="14">14 dBm (25mW)</option>
+							                <option value="15">15 dBm (31mW)</option>
+							                <option value="16">16 dBm (39mW)</option>
+							                <option value="17">17 dBm (50mW)</option>
+							                <option value="18">18 dBm (63mW)</option>
+							                <option value="19">19 dBm (79mW)</option>
+							                <option value="20">20 dBm (100mW)</option>
+							                <option value="21">20.5 dBm (112mW)</option>
+							            </select>
+							            <button type="button" class="ml-2 px-2 py-1 w-[20%] bg-gray-300 hover:bg-gray-500 text-gray-800 rounded" onclick="autoWiFiPower()">Auto Tune</button>
+							        </div>
+							    </div>
+							    <div class="mb-4">
+							        <label class="block text-gray-800 dark:text-gray-300">Channel</label>
+							        <select id="WiFiChannel" class="form-select px-2 py-1 w-full dark:bg-gray-700 dark:text-gray-300 rounded-sm" name="WiFiChannel">
+							            <option>1</option>
+							            <option>2</option>
+							            <option>3</option>
+							            <option>4</option>
+							            <option>5</option>
+							            <option>6</option>
+							            <option>7</option>
+							            <option>8</option>
+							            <option>9</option>
+							            <option>10</option>
+							            <option>11</option>
+							        </select>
+							    </div>
+							    <div class="mb-4">
+							        <label class="block text-gray-800 dark:text-gray-300">Network</label>
+							        <input type="text" id="WiFiSSID" name="WiFiSSID" class="px-2 w-full dark:bg-gray-700 dark:text-gray-300 rounded-sm" placeholder="SSID" required />
+							    </div>
+							    <div class="mb-4">
+							        <label class="block text-gray-800 dark:text-gray-300">Username (WPA2 Enterprise)</label>
+							        <input type="text" id="WiFiUsername" name="WiFiUsername" class="px-2 w-full dark:bg-gray-700 dark:text-gray-300 rounded-sm" placeholder="Username" oninput="inputValidate(this)" />
+							    </div>
+							    <div class="mb-4">
+							        <label class="block text-gray-800 dark:text-gray-300">Password</label>
+							        <div class="flex items-center">
+							            <input type="password" id="WiFiPassword" name="WiFiPassword" class="px-2 w-full dark:bg-gray-700 dark:text-gray-300 rounded-sm" placeholder="Password" oninput="generateWiFiQR()" />
+							            <img class="mx-2 dark:invert cursor-pointer" data-target="WiFiPassword" src="img/eye-slash.svg" />
+							        </div>
+							    </div>
+							    <div class="mb-4">
+							        <fieldset class="mb-4">
+							            <div class="flex items-center">
+							                <input type="hidden" id="EnableLog" name="EnableLog" value="0">
+							                <input type="checkbox" id="EnableLogCheckbox" class="form-checkbox text-blue-500" onclick="HiddenCheck('EnableLog',this)">
+							                <label for="EnableLogCheckbox" class="ml-2 text-gray-800 dark:text-gray-300">Enable Data Log</label>
+							            </div>
+							        </fieldset>
+							        <input type="text" id="EnableLogInterval" name="EnableLogInterval" data-provider="slider" />
+							    </div>
+							    <div class="mb-4">
+							        <fieldset class="mb-4">
+							            <div class="flex items-center">
+							                <input type="hidden" id="WiFiDHCP" name="WiFiDHCP" value="0">
+							                <input type="checkbox" id="WiFiDHCPCheckbox" class="form-checkbox text-blue-500" onclick="HiddenCheck('WiFiDHCP',this)">
+							                <label for="WiFiDHCPCheckbox" class="ml-2 text-gray-800 dark:text-gray-300">Enable DHCP</label>
+							            </div>
+							        </fieldset>
+							    </div>
+							    <div class="mb-4">
+							        <label class="block text-gray-800 dark:text-gray-300">IPv4 Address</label>
+							        <input type="text" id="WiFiIP" name="WiFiIP" class="px-2 w-full dark:bg-gray-700 dark:text-gray-300 rounded-sm" placeholder="IPv4 Address (192.168.0.2)" required />
+							    </div>
+							    <div class="mb-4">
+							        <label class="block text-gray-800 dark:text-gray-300">Subnet Mask</label>
+							        <input type="text" id="WiFiSubnet" name="WiFiSubnet" class="px-2 w-full dark:bg-gray-700 dark:text-gray-300 rounded-sm" placeholder="Subnet Mask (255.255.255.0)" required />
+							    </div>
+							    <div class="mb-4">
+							        <label class="block text-gray-800 dark:text-gray-300">Gateway Address</label>
+							        <input type="text" id="WiFiGateway" name="WiFiGateway" class="px-2 w-full dark:bg-gray-700 dark:text-gray-300 rounded-sm" placeholder="Gateway Address (192.168.0.1)" required />
+							    </div>
+							    <div class="mb-4">
+							        <label class="block text-gray-800 dark:text-gray-300">DNS Address</label>
+							        <input type="text" id="WiFiDNS" name="WiFiDNS" class="px-2 w-full dark:bg-gray-700 dark:text-gray-300 rounded-sm" placeholder="DNS Address (8.8.8.8)" required />
+							    </div>
+							    <div class="flex justify-between mt-4">
+							        <button type="button" class="px-4 py-2 bg-red-500 hover:bg-red-600 text-white rounded" onclick="hideModal(this)">Cancel</button>
+							        <button type="button" class="px-4 py-2 bg-green-500 hover:bg-green-600 text-white rounded" id="wireless-settings-ok">Save</button>
+							    </div>
+							</form>
+	                    </div>
+	                    <div class="tab-pane hidden" id="tabAlerts">
+							<form method="POST" action="/nvram?alerts" id="alert-SettingsForm" class="space-y-4">
+							    <div class="m-2 space-y-4">
+							        <div class="bg-red-500 text-white p-2 rounded mb-4 hidden" id="AlertInfo">Wireless Client must be enabled!</div>
+							        <div class="bg-red-500 text-white p-2 rounded mb-4 hidden" id="AlertEncryptionInfo">No TLS Encryption, Add port (Example: smtp.server.com:587)</div>
+							        <div class="bg-yellow-500 text-white p-2 rounded mb-4 hidden" id="AlertGmailInfo">Do not use Gmail password, create an <a href="https://support.google.com/accounts/answer/185833" target="_blank" class="underline">App Password</a>.</div>
+							        <div class="bg-green-500 text-white p-2 rounded mb-4 hidden" id="AlertOAuthInfo">Try modern OAuth2.0 Token instead of a password.</div>
+							    </div>
+							    <div class="space-y-4 text-gray-800 dark:text-gray-300">
+							        <div>
+							            <label class="block">Email Server</label>
+							            <input type="text" id="AlertEmail" name="AlertEmail" class="mt-2 w-full p-2 border rounded dark:bg-gray-700 dark:text-white" placeholder="Recipient Email" oninput="inputValidate(this)" required />
+							            <input type="text" id="AlertSMTPServer" name="AlertSMTPServer" class="mt-2 w-full p-2 border rounded dark:bg-gray-700 dark:text-white" placeholder="SMTP Server" oninput="inputValidate(this)" required />
+							            <input type="text" id="AlertSMTPUsername" name="AlertSMTPUsername" class="mt-2 w-full p-2 border rounded dark:bg-gray-700 dark:text-white" placeholder="SMTP Username" oninput="inputValidate(this)" />
+							            <div class="relative mt-2">
+							                <input type="password" id="AlertSMTPPassword" name="AlertSMTPPassword" class="w-full p-2 border rounded dark:bg-gray-700 dark:text-white" placeholder="SMTP Password" />
+							                <img class="absolute right-3 top-3 cursor-pointer dark:invert" data-target="AlertSMTPPassword" src="img/eye-slash.svg" />
+							            </div>
+							            <div class="flex justify-center mt-2">
+							                <input type="password" id="AlertSMTPToken" name="AlertSMTPToken" class="p-2 w-[80%] border rounded dark:bg-gray-700 dark:text-white" placeholder="OAuth2.0 Access Token" />
+							                <button type="button" class="ml-2 px-2 py-1 w-[20%] bg-gray-300 hover:bg-gray-500 text-gray-800 rounded" onclick="getOAuthToken()">Generate Token</button>
+							            </div>
+							        </div>
+							        <div>
+							            <label class="block">Identity</label>
+							            <input type="text" id="AlertPlantName" name="AlertPlantName" class="mt-2 w-full p-2 border rounded dark:bg-gray-700 dark:text-white" placeholder="Plant Name" />
+							        </div>
+							        <div class="m-4">
+							            <input type="hidden" id="Alerts" name="Alerts" value="" />
+							            <label class="block">Send Email Alerts:</label>
+							        </div>
+							        <div class="m-4 grid grid-cols-1 md:grid-cols-2 gap-4" id="AlertSet">
+							            <div class="space-y-2">
+							                <div class="flex items-center">
+							                    <input type="checkbox" class="form-check-input" />
+							                    <label class="ml-2">DHCP IP</label>
+							                </div>
+							                <div class="flex items-center">
+							                    <input type="checkbox" class="form-check-input" />
+							                    <label class="ml-2">Low Battery</label>
+							                </div>
+							                <div class="flex items-center">
+							                    <input type="checkbox" class="form-check-input" />
+							                    <label class="ml-2">Low Moisture</label>
+							                </div>
+							                <div class="flex items-center">
+							                    <input type="checkbox" class="form-check-input" />
+							                    <label class="ml-2">Pump Run</label>
+							                </div>
+							            </div>
+							            <div class="space-y-2">
+							                <div class="flex items-center">
+							                    <input type="checkbox" class="form-check-input" />
+							                    <label class="ml-2">Over Water</label>
+							                </div>
+							                <div class="flex items-center">
+							                    <input type="checkbox" class="form-check-input" />
+							                    <label class="ml-2">Empty Water</label>
+							                </div>
+							                <div class="flex items-center">
+							                    <input type="checkbox" class="form-check-input" />
+							                    <label class="ml-2">Internal Errors</label>
+							                </div>
+							                <div class="flex items-center">
+							                    <input type="checkbox" class="form-check-input" />
+							                    <label class="ml-2">High Priority</label>
+							                </div>
+							            </div>
+							        </div>
+							        <div class="flex justify-between mt-4">
+							        	<button type="button" class="px-4 py-2 bg-red-500 hover:bg-red-600 text-white rounded" onclick="hideModal(this)">Cancel</button>
+							        	<button type="button" class="px-4 py-2 bg-green-500 hover:bg-green-600 text-white rounded" id="alert-settings-ok">Save</button>
+							    	</div>
+							    </div>
+							</form>
+	                    </div>
+						<div class="tab-pane hidden" id="tabDemo">
+							<form method="POST" action="/nvram?demo" id="demo-SettingsForm" class="space-y-4 text-gray-800 dark:text-gray-300">
+							    <div class="space-y-4">
+							        <div>
+							            <label class="block">Security</label>
+							            <div class="relative mt-1">
+							                <input type="password" id="DemoPassword" name="DemoPassword" class="w-full p-2 border rounded dark:bg-gray-700" placeholder="Settings Password" />
+							                <img class="absolute right-3 top-2.5 cursor-pointer dark:invert" data-target="DemoPassword" src="img/eye-slash.svg" />
+							            </div>
+							        </div>
+							        <div>
+							            <label class="block">Timezone</label>
+							            <select id="Timezone" name="Timezone" class="mt-1 block w-full p-2 border rounded dark:bg-gray-700">
+							                <option value="-28800" selected="selected">(GMT -8:00) Pacific Time (US & Canada)</option>
+							                <option value="-25200">(GMT -7:00) Mountain Time (US & Canada)</option>
+							                <option value="-21600">(GMT -6:00) Central Time (US & Canada)</option>
+							                <option value="-18000">(GMT -5:00) Eastern Time (US & Canada)</option>
+							                <option value="-14400">(GMT -4:00) Atlantic Time (Canada)</option>
+							                <option value="-12600">(GMT -3:30) Newfoundland</option>
+							            </select>
+							        </div>
+							    </div>
+							    <input type="hidden" id="DemoAvailability" name="DemoAvailability" value="" />
+							    <label class="block">WiFi Availability:</label>
+							    <div class="flex">
+							        <div class="flex-1">
+							            <div id="DemoAvailabilityWeek" class="space-y-1">
+							                <div class="flex items-center">
+							                    <input type="checkbox" class="form-check-input" />
+							                    <label class="ml-2">Sunday</label>
+							                </div>
+							                <div class="flex items-center">
+							                    <input type="checkbox" class="form-check-input" />
+							                    <label class="ml-2">Monday</label>
+							                </div>
+							                <div class="flex items-center">
+							                    <input type="checkbox" class="form-check-input" />
+							                    <label class="ml-2">Tuesday</label>
+							                </div>
+							                <div class="flex items-center">
+							                    <input type="checkbox" class="form-check-input" />
+							                    <label class="ml-2">Wednesday</label>
+							                </div>
+							                <div class="flex items-center">
+							                    <input type="checkbox" class="form-check-input" />
+							                    <label class="ml-2">Thursday</label>
+							                </div>
+							                <div class="flex items-center">
+							                    <input type="checkbox" class="form-check-input" />
+							                    <label class="ml-2">Friday</label>
+							                </div>
+							                <div class="flex items-center">
+							                    <input type="checkbox" class="form-check-input" />
+							                    <label class="ml-2">Saturday</label>
+							                </div>
+							            </div>
+							        </div>
+							        <div class="flex-1">
+							            <div id="Availability-Slider"></div>
+							        </div>
+							    </div>
+							    <div class="flex justify-between mt-4">
+							    	<button type="button" class="px-4 py-2 bg-red-500 hover:bg-red-600 text-white rounded" onclick="hideModal(this)">Cancel</button>
+							    	<button type="button" class="px-4 py-2 bg-green-500 hover:bg-green-600 text-white rounded" id="demo-settings-ok">Save</button>
+								</div>
+							</form>
+	                    </div>
+	                    <div class="tab-pane hidden" id="tabLayout">
+							<div class="space-y-4 text-white">
+							    <div class="grid grid-cols-1 sm:grid-cols-3 gap-2">
+							        <div class="col-span-1">
+							            <form method="POST" action="/upload" enctype="multipart/form-data" id="formLayout">
+							                <input type="file" accept=".svg,.css" name="filesystem" id="fileLayout" class="hidden" />
+							                <input type="submit" class="hidden" />
+							            </form>
+							            <button class="bg-blue-500 hover:bg-blue-600 w-full py-2 rounded" type="button" id="browseLayout">Upload Layout</button>
+							        </div>
+							        <div class="col-span-1">
+							            <button class="bg-green-500 hover:bg-green-600 w-full py-2 rounded" type="button" id="defaultLayout">Set Default</button>
+							        </div>
+							        <div class="col-span-1">
+							            <button class="bg-red-500 hover:bg-red-600 w-full py-2 rounded" type="button" id="removeLayout">Remove Layout</button>
+							        </div>
+							    </div>
+							    <div class="row mb-2 mt-2">
+							        <div class="col-span-10 offset-sm-2" id="listLayout"></div>
+							    </div>
+							</div>
+	                    </div>
+	                    <div class="tab-pane hidden" id="tabTest">
+							<div class="mt-8 text-white">
+							    <div class="grid grid-cols-1 sm:grid-cols-4 gap-2 mb-2">
+							        <div class="col-span-1">
+							            <button class="bg-green-500 hover:bg-green-600 w-full py-2 rounded" type="button" id="testPump" onclick="testPump()">Test Pump</button>
+							        </div>
+							        <div class="col-span-1">
+							            <button class="bg-green-500 hover:bg-green-600 w-full py-2 rounded" type="button" id="testGraph" onclick="testGraph()">Test Graph</button>
+							        </div>
+							        <div class="col-span-1">
+							            <button class="bg-green-500 hover:bg-green-600 w-full py-2 rounded" type="button" id="testBattery" onclick="testBattery()">Test Battery</button>
+							        </div>
+							        <div class="col-span-1">
+							            <button class="bg-green-500 hover:bg-green-600 w-full py-2 rounded" type="button" id="testSleep">Test Sleep</button>
+							        </div>
+							    </div>
+							    <div class="grid grid-cols-1 sm:grid-cols-4 gap-2 mb-2">
+							        <div class="col-span-1">
+							            <button class="bg-green-500 hover:bg-green-600 w-full py-2 rounded" type="button" id="testFlood" onclick="testEmpty(0, true)">Test Flood</button>
+							        </div>
+							        <div class="col-span-1">
+							            <button class="bg-green-500 hover:bg-green-600 w-full py-2 rounded" type="button" id="testEmpty" onclick="testEmpty(0, false)">Test Empty</button>
+							        </div>
+							        <div class="col-span-1">
+							            <button class="bg-green-500 hover:bg-green-600 w-full py-2 rounded" type="button" id="testRefill" onclick="testRefill()">Test Refill</button>
+							        </div>
+							        <div class="col-span-1">
+							            <button class="bg-green-500 hover:bg-green-600 w-full py-2 rounded" type="button" id="testSMTP" onclick="testEmail()">Test Email</button>
+							        </div>
+							    </div>
+							    <div class="grid grid-cols-1 sm:grid-cols-4 gap-2 mb-2">
+							        <div class="col-span-1">
+							            <button class="bg-green-500 hover:bg-green-600 w-full py-2 rounded" type="button" id="testLED" onclick="testLED()">Test LED</button>
+							        </div>
+							        <div class="col-span-1">
+							            <button class="bg-green-500 hover:bg-green-600 w-full py-2 rounded" type="button" id="testSoil" onclick="testSoil()">Test Soil Sensor</button>
+							        </div>
+							        <div class="col-span-1">
+							            <button class="bg-green-500 hover:bg-green-600 w-full py-2 rounded" type="button" id="testWater" onclick="testWater()">Test Water Sensor</button>
+							        </div>
+							        <div class="col-span-1">
+							            <button class="bg-yellow-500 hover:bg-yellow-600 w-full py-2 rounded" type="button" id="flushWater" onclick="flushWater()">Flush Water</button>
+							        </div>
+							    </div>
+							    <div class="mt-4">
+						            <div class="progress bg-gray-200 dark:bg-gray-700 rounded-sm mt-4">
+						                <div class="progress-bar bg-blue-500 h-2 rounded-sm" style="width:0%"></div>
+						            </div>
+							    </div>
+							</div>
+	                    </div>
+	                    <div class="tab-pane hidden" id="tabFirmware">
+							<div class="mx-auto p-4">
+							    <div class="flex items-center mb-4">
+							        <div class="w-1/2 text-gray-800 dark:text-gray-300 mb-2">
+							            <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-2">
+							                <div>
+							                    <form method="POST" action="/update" enctype="multipart/form-data" id="formLittleFS">
+							                        <input type="file" accept=".bin,.signed" name="filesystem" id="fileLittleFS" class="hidden" />
+							                        <input type="submit" class="hidden" />
+							                    </form>
+							                    <button class="py-2 bg-gray-500 hover:bg-gray-600 w-full rounded" type="button" id="browseLittleFS">Flash LittleFS</button>
+							                </div>
+							                <div>
+							                    <form method="POST" action="/update" enctype="multipart/form-data" id="formFirmware">
+							                        <input type="file" accept=".bin,.signed" name="firmware" id="fileFirmware" class="hidden" />
+							                        <input type="submit" class="hidden" />
+							                    </form>
+							                    <button class="py-2 bg-gray-500 hover:bg-gray-600 w-full rounded" type="button" id="browseFirmware">Flash Firmware</button>
+							                </div>
+							            </div>
+							            <input type="text" id="EnablePNP" name="EnablePNP" class="border border-gray-300 rounded-md p-2 w-full" data-provider="slider" />
+							            <label for="ADCSensitivity" class="mt-4 text-gray-800 dark:text-gray-300">Moisture Sensor Sensitivity</label>
+							            <input type="text" id="ADCSensitivity" name="ADCSensitivity" class="border border-gray-300 rounded-md p-2 w-full" data-provider="slider" />
+							        </div>
+							        <div class="w-1/2 text-gray-800 dark:text-gray-300 p-4">
+							            <small class="block">GUI Version: 1.0.6</small>
+							            <small class="block" id="coreVersion">Core Version: 3.0.2</small>
+							            <small class="block" id="sdkVersion">SDK Version: 2.2.2</small>
+							            <small class="block" id="fsVersion">LittleFS Version: 1.3.0</small>
+							            <small class="block" id="firmwareVersion">Firmware Version: 1.0</small>
+							            <small class="block" id="iram">IRAM: 0</small>
+							            <small class="block" id="dram">DRAM: 0</small>
+							            <div class="flex items-center mt-2">
+							                <input type="hidden" id="WaterLevel" name="WaterLevel" value="0">
+							                <input type="checkbox" id="WaterLevelCheckbox" class="mr-2" onclick="HiddenCheck('WaterLevel', this)">
+							                <label for="WaterLevelCheckbox" class="text-gray-800 dark:text-gray-300"><small>Water Level Sensor</small></label>
+							            </div>
+							        </div>
+							    </div>
+							    <div class="mt-2">
+							        <button class="bg-red-500 text-white w-full py-2 rounded hover:bg-red-600" type="button" onclick="resetFlash()">Default Reset</button>
+							    </div>
+							    <div class="mt-4 grid grid-cols-1 lg:grid-cols-3 gap-4">
+							        <div>
+							            <form method="POST" action="/upload" enctype="multipart/form-data" id="formCertificate">
+							                <input type="file" accept=".der,.cer" name="cert" id="fileCertificate" class="hidden" />
+							                <input type="submit" class="hidden" />
+							            </form>
+							            <button class="bg-blue-500 text-white w-full py-2 rounded hover:bg-blue-600" type="button" id="browseCertificate">Certificate</button>
+							        </div>
+							        <div>
+							            <form method="POST" action="/upload" enctype="multipart/form-data" id="formPrivateKey">
+							                <input type="file" accept=".der,.key" name="key" id="filePrivateKey" class="hidden" />
+							                <input type="submit" class="hidden" />
+							            </form>
+							            <button class="bg-blue-500 text-white w-full py-2 rounded hover:bg-blue-600" type="button" id="browsePrivateKey">Private Key</button>
+							        </div>
+							        <div class="flex justify-center items-center">
+							            <img src="img/cert.svg" loading="lazy" alt="Certificate Icon" width="64" height="64" />
+							        </div>
+							    </div>
+							    <div class="progress bg-gray-200 dark:bg-gray-700 rounded-sm mt-4">
+					                <div class="progress-bar bg-blue-500 h-2 rounded-sm" style="width:0%"></div>
+					            </div>
+							</div>
+	                    </div>
+		            </div>
+		    	</div>
+			</div>
+		</div>
+        <div class="fixed inset-0 flex items-center justify-center hidden modal" id="keep-EEPROM">
+		    <div class="bg-white dark:bg-gray-800 p-4 rounded-lg w-full max-w-md mx-auto border border-gray-300 dark:border-gray-600">
+		        <div class="flex modal-header justify-between items-center border-b mb-4">
+		            <h5 class="text-lg font-semibold text-gray-800 dark:text-white">EEPROM</h5>
+		            <button id="close-modal" class="text-gray-500 hover:text-gray-800 dark:text-gray-400 dark:hover:text-gray-300 focus:outline-none text-2xl" onclick="hideModal(this)">&times;</button>
+		        </div>
+	            <span id="keep-eeprom-text"></span>
+	            <div class="progress bg-gray-200 dark:bg-gray-700 rounded-sm mt-4">
+	                <div class="progress-bar bg-blue-500 h-2 rounded-sm" style="width:0%"></div>
 	            </div>
-	        </div>
-        </div>
-        <div class="modal zindex-modal" id="moisture-Settings">
-	        <div class="modal-dialog modal-dialog-centered">
-	            <div class="modal-content bg-transparent border-0">
-	            	<button type="button" class="btn-close btn-close-dark" data-bs-dismiss="modal" aria-label="Close"></button>
-	                <div id="moisture-Slider"></div>
+		        <div id="keep-eeprom-footer" class="flex justify-between">
+		            <button type="button" class="bg-red-500 hover:bg-red-600 text-white rounded w-full py-2 mt-4 mr-2" id="keep-eeprom-no">No (Default)</button>
+		            <button type="button" class="bg-green-500 hover:bg-green-600 text-white rounded w-full py-2 mt-4 mr-2" id="keep-eeprom-yes">Yes</button>
+		        </div>
+		    </div>
+		</div>
+        <div class="fixed inset-0 flex items-center justify-center hidden modal" id="oauth-ClientID">
+		    <div class="bg-white dark:bg-gray-800 p-4 w-[50%] rounded-lg border border-gray-300 dark:border-gray-600">
+		        <div class="flex modal-header justify-between items-center border-b mb-4">
+		            <h5 class="text-lg font-semibold text-gray-800 dark:text-white">OAuth 2.0 (Client ID + Secret)</h5>
+		            <button id="close-modal" class="text-gray-500 hover:text-gray-800 dark:text-gray-400 dark:hover:text-gray-300 focus:outline-none text-2xl" onclick="hideModal(this)">&times;</button>
+		        </div>
+                <div class="badge bg-danger text-white mb-4 d-none" id="AlertTokenError"></div>
+            	<div class="badge bg-danger text-white mb-4 d-none" id="AlertGmailToken"><a href="https://console.cloud.google.com/apis/library/gmail.googleapis.com?project=clever-acolyte-161503" target="_blank">Enable Gmail API</a> and <a href="https://console.cloud.google.com/apis/credentials/oauthclient?project=clever-acolyte-161503" target="_blank">Create OAuth client ID</a> (Review: <a href="https://console.cloud.google.com/apis/credentials/consent?project=clever-acolyte-161503" target="_blank">OAuth consent screen</a>)</div>
+				<div class="badge bg-warning text-white mb-4 d-none" id="AlertGmailTokenURL">Add Authorized redirect URIs <b class="bg-dark" id="gmail-redirect-uri">http://localhost</b></div>
+                <input type="text" id="oauth-clientid" name="oauth-clientid" class="mt-2 w-full p-1 border rounded dark:bg-gray-700 dark:text-white" placeholder="Client ID: 6841945-5er1v2bt1.apps.googleusercontent.com" required />
+                <input type="password" id="oauth-secret" name="oauth-secret" class="mt-2 w-full p-1 border rounded dark:bg-gray-700 dark:text-white" placeholder="Secret: GOVSNX-7P0JIfhcehhpkkLZd5Nyn-EI023q" required />
+		        <div class="flex justify-between">
+		        	<input type="file" accept=".json" name="token" id="oauth-file" hidden>
+		            <button type="button" class="bg-yellow-500 hover:bg-yellow-600 text-white rounded w-full py-2 mt-4 mr-2" id="oauth-json">Browse OAuth Client JSON</button>
+		            <button type="button" class="bg-green-500 hover:bg-green-600 text-white rounded w-full py-2 mt-4 mr-2" id="oauth-get">Get Authorization</button>
+		        </div>
+		    </div>
+		</div>
+		<div class="fixed inset-0 flex items-center justify-center hidden modal" id="demo-Lock">
+		    <div class="bg-white dark:bg-gray-800 p-4 rounded-lg w-full max-w-md mx-auto border border-gray-300 dark:border-gray-600">
+		        <div class="flex modal-header justify-between items-center border-b mb-4">
+		        	<h5 class="text-lg font-semibold text-gray-800 dark:text-white">Login</h5>
+		            <button id="close-modal" class="text-gray-500 hover:text-gray-800 dark:text-gray-400 dark:hover:text-gray-300 focus:outline-none text-2xl" onclick="hideModal(this)">&times;</button>
+		        </div>
+		        <form method="POST" action="login" id="demo-LockForm">
+		            <input type="password" id="DemoPassword" name="password" class="border border-gray-300 dark:border-gray-600 focus:ring focus:ring-green-500 rounded-md p-2 w-full" placeholder="Password" required />
+		        	<button type="submit" class="bg-green-500 hover:bg-green-600 text-white rounded w-full px-4 py-2 mt-4" id="demo-lock-ok">Login</button>
+		        </form>
+		    </div>
+		</div>
+        <div class="fixed inset-0 flex items-center justify-center hidden modal" id="test-Pump">
+		    <div class="bg-white dark:bg-gray-800 p-4 rounded-lg w-full max-w-md mx-auto border border-gray-300 dark:border-gray-600">
+		        <div class="flex modal-header justify-between items-center border-b mb-4">
+		            <h5 class="text-lg font-semibold text-gray-800 dark:text-white">Test Pump</h5>
+		            <button id="close-modal" class="text-gray-500 hover:text-gray-800 dark:text-gray-400 dark:hover:text-gray-300 focus:outline-none text-2xl" onclick="hideModal(this)">&times;</button>
+		        </div>
+	            <input type="text" id="test-pump-delay" name="test-pump-delay" data-provider="slider" />
+	            <div class="mt-2 text-sm text-gray-600 dark:text-gray-300">
+	                Delay Test in Seconds <span id="test-pump-delay-timer"></span>
 	            </div>
-	        </div>
-        </div>
-        <div class="modal zindex-modal" id="pot-size-Settings">
-	        <div class="modal-dialog modal-dialog-centered">
-	            <div class="modal-content bg-transparent border-0">
-	            	<button type="button" class="btn-close btn-close-dark" data-bs-dismiss="modal" aria-label="Close"></button>
-	                <div id="pot-size-Slider"></div>
+	            <div class="progress bg-gray-200 dark:bg-gray-700 rounded-sm mt-4">
+	                <div class="progress-bar bg-blue-500 h-2 rounded-sm" style="width:0%"></div>
 	            </div>
-	        </div>
-        </div>
-        <div class="modal zindex-modal" id="power-Settings">
-            <div class="modal-dialog modal-sm modal-dialog-centered">
-                <div class="modal-content bg-transparent border-0">
-                	<button type="button" class="btn-close btn-close-dark" data-bs-dismiss="modal" aria-label="Close"></button>
-                    <div id="power-Slider"></div>
-                </div>
-            </div>
-        </div>
-        <div class="modal zindex-modal" id="plant-Type" tabindex="-1" role="dialog" aria-hidden="true">
-            <div class="modal-dialog modal-lg modal-dialog-centered">
-                <div class="modal-content">
-                	<div class="modal-header">
-                		<button type="button" class="btn-close btn-close-dark" data-bs-dismiss="modal" aria-label="Close"></button>
-                	</div>
-                	<div class="modal-body">
-                        <div class="container" id="svgPlant"></div>
-                    </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-        <div class="modal zindex-modal" id="soil-Settings" tabindex="-1" role="dialog" aria-hidden="true">
-            <div class="modal-dialog modal-xl modal-dialog-centered">
-                <div class="modal-content">
-                	<div class="modal-header">
-                		<button type="button" class="btn-close btn-close-dark" data-bs-dismiss="modal" aria-label="Close"></button>
-                	</div>
-                	<div class="modal-body">
-                        <div class="container" id="svgSoil"></div>
-                    </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-        <div class="modal zindex-modal" id="wireless-Settings" tabindex="-1" role="dialog" aria-hidden="true">
-            <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable" role="document" >
-                <div class="modal-content">
-                    <div class="modal-header">
-                        <h5 class="modal-title">WiFi Settings</h5>
-                        <button type="button" class="btn-close btn-close-dark" data-bs-dismiss="modal" aria-label="Close"></button>
-                    </div>
-                    <div class="modal-body">
-                		<ul class="nav nav-tabs" role="tablist">
-							<li class="nav-item" role="presentation">
-							    <button class="nav-link active" data-bs-toggle="tab" data-bs-target="#tabWireless" type="button" role="tab" aria-selected="true">Wireless</button>
-							</li>
-							<li class="nav-item" role="presentation">
-							    <button class="nav-link" data-bs-toggle="tab" data-bs-target="#tabAlerts" type="button" role="tab" aria-selected="false">Alerts</button>
-							</li>
-							<li class="nav-item" role="presentation">
-							    <button class="nav-link" data-bs-toggle="tab" data-bs-target="#tabDemo" type="button" role="tab" aria-selected="false">Settings</button>
-							</li>
-							<li class="nav-item" role="presentation">
-							    <button class="nav-link" data-bs-toggle="tab" data-bs-target="#tabLayout" type="button" role="tab" aria-selected="false">Layout</button>
-							</li>
-							<li class="nav-item" role="presentation">
-							    <button class="nav-link" data-bs-toggle="tab" data-bs-target="#tabTest" type="button" role="tab" aria-selected="false">Test</button>
-							</li>
-							<li class="nav-item" role="presentation">
-							    <button class="nav-link" data-bs-toggle="tab" data-bs-target="#tabFirmware" type="button" role="tab" aria-selected="false">Firmware</button>
-							</li>
-						</ul>
-						<div class="tab-content mt-4">
-							<div class="tab-pane fade show active" id="tabWireless" role="tabpanel">
-								<form method="POST" action="/nvram?wireless" id="wireless-SettingsForm" oninput="formValidate()">
-									<div class="row">
-										<div class="col">
-											<fieldset class="form-group">
-				                                <div class="form-check">
-				                                    <label class="form-check-label">
-				                                    <input type="radio" class="form-check-input" id="WiFiModeAP" name="WiFiMode" value="0" onclick="RequireInput('WiFiUsername',false); SetWiFiMode()">
-				                                        WiFi Access Point
-				                                    </label>
-				                                </div>
-				                                <div class="form-check">
-				                                    <label class="form-check-label">
-				                                    <input type="radio" class="form-check-input" id="WiFiModeClient" name="WiFiMode" value="1" onclick="RequireInput('WiFiUsername',false); SetWiFiMode()">
-				                                        WiFi Client (WPA2 Personal)
-				                                    </label>
-				                                </div>
-				                                <div class="form-check">
-				                                    <label class="form-check-label">
-				                                    <input type="radio" class="form-check-input" id="WiFiModeClientEnt" name="WiFiMode" value="2" onclick="RequireInput('WiFiUsername',true); SetWiFiMode()">
-				                                        WiFi Client (WPA2 Enterprise)
-				                                    </label>
-				                                </div>
-		   										<div class="form-check">
-				                                    <label class="form-check-label">
-				                                    <input type="radio" class="form-check-input" id="WiFiModeClientWEP" name="WiFiMode" value="3" onclick="RequireInput('WiFiUsername',false); SetWiFiMode()">
-				                                        WiFi Client (WEP Key)
-				                                    </label>
-				                                </div>
-				                                <div class="form-check">
-				                                  <label class="form-check-label">
-				                                    <input type="hidden" id="WiFiHidden" name="WiFiHidden" value="0">
-				                                    <input type="checkbox" id="WiFiHiddenCheckbox" class="form-check-input" onclick="HiddenCheck('WiFiHidden',this)">
-				                                        Hidden SSID
-				                                  </label>
-				                                </div>
-				                            </fieldset>
-										</div>
-										<div class="col">
-											<a href="" id="qrcode-dl"><img id="qrcode"></a>
-										</div>
-									</div>
-									<div class="row m-2">
-				                        <div class="badge bg-warning text-white mb-4 d-none" id="AlertWiFiPower">WiFi power maybe not reach AP</div>
-				                        <div class="badge bg-warning text-white mb-4 d-none" id="AlertWiFiDHCP">Don't forget to enable DHCP</div>
-				                    </div>
-		                            <div class="form-group">
-		                                <label>Antenna</label>
-		                                <div class="input-group">
-		                                    <div class="input-group-addon"><i class="p-3"></i></div>
-		                                    <select id="WiFiPhyMode" class="form-control" name="WiFiPhyMode">
-		                                        <option value="1">802.11 b</option>
-		                                        <option value="2">802.11 g</option>
-		                                        <option value="3">802.11 n</option>
-		                                    </select>
-		                                </div>
-		                            </div>
-		                            <div class="form-group">
-		                            	<label>Power</label>
-		                                <div class="input-group">
-		                                    <div class="input-group-addon"><i class="p-3"></i></div>
-		                                    <select id="WiFiPower" class="form-control" name="WiFiPower" onchange="SetWiFiMode()">
-		                                        <option value="1">1 dBm (1mW)</option>
-		                                        <option value="2">2 dBm (1mW)</option>
-		                                        <option value="3">3 dBm (1mW)</option>
-		                                        <option value="4">4 dBm (2mW)</option>
-		                                        <option value="5">5 dBm (3mW)</option>
-		                                        <option value="6">6 dBm (3mW)</option>
-		                                        <option value="7">7 dBm (5mW)</option>
-		                                        <option value="8">8 dBm (6mW)</option>
-		                                        <option value="9">9 dBm (7mW)</option>
-		                                        <option value="10">10 dBm (10mW)</option>
-		                                        <option value="11">11 dBm (12mW)</option>
-		                                        <option value="12">12 dBm (15mW)</option>
-		                                        <option value="13">13 dBm (19mW)</option>
-		                                        <option value="14">14 dBm (25mW)</option>
-		                                        <option value="15">15 dBm (31mW)</option>
-		                                        <option value="16">16 dBm (39mW)</option>
-		                                        <option value="17">17 dBm (50mW)</option>
-		                                        <option value="18">18 dBm (63mW)</option>
-		                                        <option value="19">19 dBm (79mW)</option>
-		                                        <option value="20">20 dBm (100mW)</option>
-		                                        <option value="21">20.5 dBm (112mW)</option>
-		                                    </select>
-		                                    <button type="button" class="btn btn-secondary" onclick="autoWiFiPower()">Auto Tune</button>
-		                                </div>
-		                            </div>
-		                            <div class="form-group">
-		                            	<label>Channel</label>
-		                                <div class="input-group">
-		                                    <div class="input-group-addon"><i class="p-3"></i></div>
-		                                    <select id="WiFiChannel" class="form-control" name="WiFiChannel">
-		                                        <option>1</option>
-		                                        <option>2</option>
-		                                        <option>3</option>
-		                                        <option>4</option>
-		                                        <option>5</option>
-		                                        <option>6</option>
-		                                        <option>7</option>
-		                                        <option>8</option>
-		                                        <option>9</option>
-		                                        <option>10</option>
-		                                        <option>11</option>
-		                                    </select>
-		                                </div>
-		                            </div>
-		                            <div class="row mb-2"></div>
-		                            <div class="form-group">
-		                            	<label>Network</label>
-		                                <div class="input-group">
-		                                    <div class="input-group-addon"><i class="p-3"></i></div>
-		                                    <input type="text" id="WiFiSSID" name="WiFiSSID" class="form-control" placeholder="SSID" required />
-		                                </div>
-		                            </div>
-		                            <div class="form-group">
-		                                <div class="input-group">
-		                                    <div class="input-group-addon"><i class="p-3"></i></div>
-		                                    <input type="text" id="WiFiUsername" name="WiFiUsername" class="form-control" placeholder="Username (WPA2 Enterprise)" oninput="inputValidate(this)" />
-		                                </div>
-		                            </div>
-		                            <div class="form-group">
-		                                <div class="input-group">
-		                                    <div class="input-group-addon"><i class="p-3"></i></div>
-		                                    <input type="password" id="WiFiPassword" name="WiFiPassword" class="form-control" placeholder="Password" />
-		                                </div>
-		                            </div>
-		                            <div class="form-group">
-		                                <div class="input-group">
-		                                    <div class="input-group-addon"><i class="p-3"></i></div>
-		                                    <input type="password" id="WiFiPasswordConfirm" name="WiFiPasswordConfirm" class="form-control" placeholder="Password Confirm" oninput="generateWiFiQR()" />
-		                                </div>
-		                            </div>
-		                            <div class="row mb-2"></div>
-		                            <fieldset class="form-group">
-		                            	 <div class="form-check">
-		                                  <label class="form-check-label">
-		                                        <input type="hidden" id="EnableLog" name="EnableLog" value="0">
-		                                        <input type="checkbox" id="EnableLogCheckbox" class="form-check-input" onclick="HiddenCheck('EnableLog',this)"> Enable Data Log
-		                                  </label>
-		                                </div>
-		                            </fieldset>
-		                            <div class="row m-4"><input type="text" id="EnableLogInterval" name="EnableLogInterval" data-provider="slider"></div>
-		                            <fieldset class="form-group">
-		                                <div class="form-check">
-		                                  <label class="form-check-label">
-		                                    <input type="hidden" id="WiFiDHCP" name="WiFiDHCP" value="0">
-		                                    <input type="checkbox" id="WiFiDHCPCheckbox" class="form-check-input" onclick="HiddenCheck('WiFiDHCP',this)" />
-		                                        Enable DHCP
-		                                  </label>
-		                                </div>
-		                            </fieldset>
-		                            <div class="form-group">
-		                                <div class="input-group">
-		                                    <div class="input-group-addon"><i class="p-3"></i></div>
-		                                    <input type="text" id="WiFiIP" name="WiFiIP" class="form-control" placeholder="IPv4 Address (192.168.0.2)" required />
-		                                </div>
-		                            </div>
-		                            <div class="form-group">
-		                                <div class="input-group">
-		                                    <div class="input-group-addon"><i class="p-3"></i></div>
-		                                    <input type="text" id="WiFiSubnet" name="WiFiSubnet" class="form-control" placeholder="Subnet Mask (255.255.255.0)" required />
-		                                </div>
-		                            </div>
-		                            <div class="form-group">
-		                                <div class="input-group">
-		                                    <div class="input-group-addon"><i class="p-3"></i></div>
-		                                    <input type="text" id="WiFiGateway" name="WiFiGateway" class="form-control" placeholder="Gateway Address (192.168.0.1)" required />
-		                                </div>
-		                            </div>
-		                            <div class="form-group">
-		                                <div class="input-group">
-		                                    <div class="input-group-addon"><i class="p-3"></i></div>
-		                                    <input type="text" id="WiFiDNS" name="WiFiDNS" class="form-control" placeholder="DNS Address (8.8.8.8)" required />
-		                                </div>
-		                            </div>
-		                            <div class="row mb-4"></div>
-		                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal" onclick="$('.modalDialog').click()">Cancel</button>
-		                        	<button type="button" class="btn btn-success" id="wireless-settings-ok">Save</button>
-		                        </form>
-							</div>
-							<div class="tab-pane fade" id="tabAlerts" role="tabpanel">
-								<form method="POST" action="/nvram?alerts" id="alert-SettingsForm" oninput="formValidate()">
-									<div class="row m-2">
-					                    <div class="badge bg-danger text-white mb-4 d-none" id="AlertInfo">Wireless Client must be enabled!</div>
-					                    <div class="badge bg-danger text-white mb-4 d-none" id="AlertEncryptionInfo">No TLS Encryption, Add port (Example: smtp.server.com:587)</div>
-										<div class="badge bg-warning text-white mb-4 d-none" id="AlertGmailInfo">Do not use Gmail password, create an <a href="https://support.google.com/accounts/answer/185833" target="_blank">App Password</a>.</div>
-										<div class="badge bg-warning text-white mb-4 d-none" id="AlertGmailToken"><a href="https://console.cloud.google.com/apis/library/gmail.googleapis.com?project=clever-acolyte-161503" target="_blank">Enable Gmail API</a> and create <a href="https://console.cloud.google.com/apis/api/gmail.googleapis.com/credentials?project=clever-acolyte-161503" target="_blank">Web App Credentials</a> with OAuth 2.0 Client IDs.</div>
-										<div class="badge bg-warning text-white mb-4 d-none" id="AlertGmailTokenURL">Make sure Client ID has Authorized redirect URIs <b class="bg-dark" id="gmail-redirect-uri">http://localhost</b></div>
-										<div class="badge bg-success text-white mb-4 d-none" id="AlertOAuthInfo">Try modern OAuth2.0 Token instead of a password.</a></div>
-					                </div>
-		                            <div class="form-group">
-		                            	<label>Email Server</label>
-		                                <div class="input-group">
-		                                    <div class="input-group-addon"><i class="p-3"></i></div>
-		                                    <input type="text" id="AlertEmail" name="AlertEmail" class="form-control" placeholder="Recipient Email" oninput="inputValidate(this)" required />
-		                                </div>
-		                                <div class="input-group">
-		                                    <div class="input-group-addon"><i class="p-3"></i></div>
-		                                    <input type="text" id="AlertSMTPServer" name="AlertSMTPServer" class="form-control" placeholder="SMTP Server" oninput="inputValidate(this)" required />
-		                                </div>
-		                                <div class="input-group">
-		                                    <div class="input-group-addon"><i class="p-3"></i></div>
-		                                    <input type="text" id="AlertSMTPUsername" name="AlertSMTPUsername" class="form-control" placeholder="SMTP Username" oninput="inputValidate(this)" />
-		                                </div>
-		                                <div class="input-group">
-		                                    <div class="input-group-addon"><i class="p-3"></i></div>
-		                                    <input type="password" id="AlertSMTPPassword" name="AlertSMTPPassword" class="form-control" placeholder="SMTP Password" oninput="inputValidate(this)" />
-		                                </div>
-		                                <div class="input-group">
-		                                    <div class="input-group-addon"><i class="p-3"></i></div>
-		                                    <input type="password" id="AlertSMTPToken" name="AlertSMTPToken" class="form-control" placeholder="SMTP OAuth2.0 Token" oninput="inputValidate(this)" />
-		                                    <button type="button" class="btn btn-secondary" onclick="getOAuthToken()">Generate Token</button>
-		                                </div>
-		                            </div>
-		                            <div class="form-group">
-		                            	<label>Identity</label>
-		                                <div class="input-group">
-		                                    <div class="input-group-addon"><i class="p-3"></i></div>
-		                                    <input type="text" id="AlertPlantName" name="AlertPlantName" class="form-control" placeholder="Plant Name" />
-		                                </div>
-		                            </div>
-		                            <div class="row m-4"><input type="hidden" id="Alerts" name="Alerts" value="" />Send Email Alerts:</div>
-		                            <div class="row m-4 form-group" id="AlertSet">
-		                            	<div class="col-lg-6 col-12">
-		                            		<div class="form-check">
-			                                    <input type="checkbox" class="form-check-input" />
-			                                    <label class="form-check-label">DHCP IP</label>
-			                                </div>
-			                                <div class="form-check">
-			                                    <input type="checkbox" class="form-check-input" />
-			                                    <label class="form-check-label">Low Battery</label>
-			                                </div>
-			                                <div class="form-check">
-			                                    <input type="checkbox" class="form-check-input" />
-			                                    <label class="form-check-label">Low Moisture</label>
-			                                </div>
-			                                <div class="form-check">
-			                                    <input type="checkbox" class="form-check-input" />
-			                                    <label class="form-check-label">Pump Run</label>
-			                                </div>
-		                            	</div>
-										<div class="col-lg-6 col-12">
-			                                <div class="form-check">
-			                                    <input type="checkbox" class="form-check-input" />
-			                                    <label class="form-check-label">Over Water</label>
-			                                </div>
-			                                <div class="form-check">
-			                                    <input type="checkbox" class="form-check-input" />
-			                                    <label class="form-check-label">Empty Water</label>
-			                                </div>
-			                                <div class="form-check">
-			                                    <input type="checkbox" class="form-check-input" />
-			                                    <label class="form-check-label">Internal Errors</label>
-			                                </div>
-			                                <div class="form-check">
-			                                    <input type="checkbox" class="form-check-input" />
-			                                    <label class="form-check-label">High Priority</label>
-			                                </div>
-										</div>
-		                            </div>
-		                            <div class="row mb-4"></div>
-		                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-		                        	<button type="button" class="btn btn-success" id="alert-settings-ok">Save</button>
-		                        </form>
-							</div>
-							<div class="tab-pane fade" id="tabDemo" role="tabpanel">
-								<form method="POST" action="/nvram?demo" id="demo-SettingsForm" oninput="formValidate()">
-								    <div class="form-group">
-								    	<label>Security</label>
-								        <div class="input-group">
-								            <div class="input-group-addon"><i class="p-3"></i></div>
-								            <input type="password" id="DemoPassword" name="DemoPassword" class="form-control" placeholder="Settings Password" />
-								        </div>
-								    </div>
-								    <div class="form-group">
-								        <div class="input-group">
-								            <div class="input-group-addon"><i class="p-3"></i></div>
-								            <input type="password" id="DemoPasswordConfirm" name="DemoPasswordConfirm" class="form-control" placeholder="Settings Password Confirm" />
-								        </div>
-								    </div>
-								    <div class="form-group">
-		                            	<label>Timezone</label>
-		                                <div class="input-group">
-		                                    <div class="input-group-addon"><i class="p-3"></i></div>
-		                                    <select id="Timezone" class="form-control" name="Timezone">
-												<option value="-28800" selected="selected">(GMT -8:00) Pacific Time (US &amp; Canada)</option>
-												<option value="-25200">(GMT -7:00) Mountain Time (US &amp; Canada)</option>
-												<option value="-21600">(GMT -6:00) Central Time (US &amp; Canada)</option>
-												<option value="-18000">(GMT -5:00) Eastern Time (US &amp; Canada)</option>
-												<option value="-14400">(GMT -4:00) Atlantic Time (Canada)</option>
-												<option value="-12600">(GMT -3:30) Newfoundland</option>
-		                                    </select>
-		                                </div>
-		                            </div>
-								    <div class="row m-4"><input type="hidden" id="DemoAvailability" name="DemoAvailability" value="" />WiFi Availability:</div>
-								    <div class="row m-4 form-group">
-								    	<div class="col">
-								    		<div class="form-group" id="DemoAvailabilityWeek">
-								    			<div class="form-check">
-				                                    <input type="checkbox" class="form-check-input" />
-				                                    <label class="form-check-label">Sunday</label>
-				                                </div>
-				                                <div class="form-check">
-				                                    <input type="checkbox" class="form-check-input" />
-				                                    <label class="form-check-label" >Monday</label>
-				                                </div>
-				                                <div class="form-check">
-				                                    <input type="checkbox" class="form-check-input" />
-				                                    <label class="form-check-label">Tuesday</label>
-				                                </div>
-				                                <div class="form-check">
-				                                    <input type="checkbox" class="form-check-input" />
-				                                    <label class="form-check-label">Wednesday</label>
-				                                </div>
-				                                <div class="form-check">
-				                                    <input type="checkbox" class="form-check-input" />
-				                                    <label class="form-check-label">Thursday</label>
-				                                </div>
-				                                <div class="form-check">
-				                                    <input type="checkbox" class="form-check-input" />
-				                                    <label class="form-check-label">Friday</label>
-				                                </div>
-				                                <div class="form-check">
-				                                    <input type="checkbox" class="form-check-input" />
-				                                    <label class="form-check-label">Saturday</label>
-				                                </div>
-				                            </div>
-								    	</div>
-								    	<div class="col">
-				                            <div id="Availability-Slider"></div>
-								    	</div>
-								    </div>
-								    <div class="row mb-4"></div>
-								    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-									<button type="button" class="btn btn-success" id="demo-settings-ok">Save</button>
-								</form>
-							</div>
-							<div class="tab-pane fade" id="tabLayout" role="tabpanel">
-							  	<div class="container">
-		                            <div class="row m-2">
-		                            	<div class="col-lg-4 col-12">
-			                                <form method="POST" action="/upload" enctype="multipart/form-data" id="formLayout">
-					                            <input type="file" accept=".svg,.css" name="filesystem" id="fileLayout" hidden />
-					                            <input type="submit" hidden />
-					                        </form>
-					                        <button class="btn btn-primary w-100" type="button" id="browseLayout">Upload Layout</button>
-					                    </div>
-					                    <div class="col-lg-4 col-12">
-		                                    <button class="btn btn-success w-100" type="button" id="defaultLayout">Set Default</button>
-		                                </div>
-					                    <div class="col-lg-4 col-12">
-		                                    <button class="btn btn-danger w-100" type="button" id="removeLayout">Remove Layout</button>
-		                                </div>
-		                            </div>
-		                            <div class="row mb-2">
-		                            	<div class="col-sm-10 offset-sm-2" id="listLayout"></div>
-				                    </div>
-	                            </div>
-							</div>
-							<div class="tab-pane fade" id="tabTest" role="tabpanel">
-							  	<div class="container">
-		                            <div class="row">
-		                                <div class="col">
-		                                    <button class="btn btn-success w-100" type="button" id="testPump" onclick="testPump(1)">Test Pump</button>
-		                                </div>
-		                                <div class="col">
-		                                    <button class="btn btn-success w-100" type="button" id="testGraph" onclick="testGraph()">Test Graph</button>
-		                                </div>
-		                                <div class="col">
-		                                    <button class="btn btn-success w-100" type="button" id="testBattery" onclick="testBattery()">Test Battery</button>
-		                                </div>
-		                                <div class="col">
-		                                    <button class="btn btn-success w-100" type="button" id="testSleep">Test Sleep</button>
-		                                </div>
-		                            </div>
-		                            <div class="row m-2"></div>
-		                            <div class="row">
-		                            	<div class="col">
-		                                    <button class="btn btn-block btn-success w-100" type="button" id="testFlood" onclick="testEmpty(0, true)">Test Flood</button>
-		                                </div>
-		                                <div class="col">
-		                                	<button class="btn btn-block btn-success w-100" type="button" id="testEmpty" onclick="testEmpty(0, false)">Test Empty</button>
-		                                </div>
-		                                <div class="col">
-		                                	<button class="btn btn-block btn-success w-100" type="button" id="testEmpty" onclick="testRefill()">Test Refill</button>
-		                                </div>
-		                                <div class="col">
-		                                    <button class="btn btn-block btn-success w-100" type="button" id="testSMTP" onclick="testEmail()">Test Email</button>
-		                                </div>
-		                            </div>
-		                            <div class="row m-2"></div>
-		                            <div class="row">
-		                            	<div class="col">
-		                                    <button class="btn btn-success w-100" type="button" id="testLED" onclick="testLED()">Test LED</button>
-		                                </div>
-		                            	<div class="col">
-		                                    <button class="btn btn-success w-100" type="button" id="testSoil" onclick="testSoil()">Test Soil Sensor</button>
-		                                </div>
-		                                <div class="col">
-		                                    <button class="btn btn-success w-100" type="button" id="testWater" onclick="testWater()">Test Water Sensor</button>
-		                                </div>
-		                                <div class="col">
-		                                	 <button class="btn btn-warning w-100" type="button" id="flushWater" onclick="flushWater()">Flush Water</button>
-		                                </div>
-		                            </div>
-		                            <div class="row mt-4">
-		                            	<div class="col">
-		                            		<div class="progress progress-striped active">
-		    									<div class="progress-bar" style="width:0%"></div>
-		    								</div>
-		                            	</div>
-		                            </div>
-	                            </div>
-							</div>
-							<div class="tab-pane fade" id="tabFirmware" role="tabpanel">
-							  	<div class="container">
-		                            <div class="row">
-		                            	<div class="col-lg-6 col-12">
-				                            <div class="row mb-2">
-				                            	<div class="col-lg-6 col-12">
-					                                <form method="POST" action="/update" enctype="multipart/form-data" id="formLittleFS">
-							                            <input type="file" accept=".bin,.signed" name="filesystem" id="fileLittleFS" hidden />
-							                            <input type="submit" hidden />
-							                        </form>
-							                        <button class="btn btn-primary w-100" type="button" id="browseLittleFS">Flash LittleFS</button>
-							                    </div>
-							                    <div class="col-lg-6 col-12">
-							                        <form method="POST" action="/update" enctype="multipart/form-data" id="formFirmware">
-							                            <input type="file" accept=".bin,.signed" name="firmware" id="fileFirmware" hidden />
-							                            <input type="submit" hidden />
-							                        </form>
-				                                    <button class="btn btn-primary w-100" type="button" id="browseFirmware">Flash Firmware</button>
-				                                </div>
-				                            </div>
-				                            <input type="text" id="EnablePNP" name="EnablePNP" data-provider="slider">
-				                            Moisture Sensor Sensitivity (1-8)
-					                        <input type="text" id="ADCSensitivity" name="ADCSensitivity" data-provider="slider">
-			                        	</div>
-		                                <div class="col-lg-6 col-12">
-		                                	<small>GUI Version: 1.0.6</small><br/>
-		                                    <small id="coreVersion">Core Version: 3.0.2</small><br/>
-		                                    <small id="sdkVersion">SDK Version: 2.2.2</small><br/>
-		                                    <small id="fsVersion">LittleFS Version: 1.3.0</small><br/>
-		                                    <small id="firmwareVersion">Firmware Version: 1.0</small><br/>
-		                                    <small id="iram">IRAM: 0</small><br/>
-		                                    <small id="dram">DRAM: 0</small>
-		                                    <div class="form-check">
-			                                  <label class="form-check-label">
-			                                    <input type="hidden" id="WaterLevel" name="WaterLevel" value="0">
-			                                    <input type="checkbox" id="WaterLevelCheckbox" class="form-check-input" onclick="HiddenCheck('WaterLevel',this)">
-			                                        <small>Water Level Sensor</small>
-			                                  </label>
-			                                </div>
-		                                </div>
-		                            </div>
-		                            <div class="row mt-2">
-		                            	<div class="col-lg-6 col-12">
-		                                    <button class="btn btn-danger w-100" type="button" onclick="resetFlash()">Default Reset</button>
-		                                </div>
-		                            </div>
-		                            <div class="row mt-4">
-		                            	<div class="col-lg-3 col-12">
-			                                <form method="POST" action="/upload" enctype="multipart/form-data" id="formCertificate">
-					                            <input type="file" accept=".der,.cer" name="cert" id="fileCertificate" hidden />
-					                            <input type="submit" hidden />
-					                        </form>
-		                                    <button class="btn btn-primary w-100" type="button" id="browseCertificate">Certificate</button>
-		                                </div>
-		                                <div class="col-lg-3 col-12">
-					                        <form method="POST" action="/upload" enctype="multipart/form-data" id="formPrivateKey">
-					                            <input type="file" accept=".der,.key" name="key" id="filePrivateKey" hidden />
-					                            <input type="submit" hidden />
-					                        </form>
-		                                    <button class="btn btn-primary w-100" type="button" id="browsePrivateKey">Private Key</button>
-		                                </div>
-		                                <div class="col-lg-6 col-12">
-		                                	<img src="img/cert.svg" loading="lazy" width="64" height="64" />
-		                                </div>
-		                            </div>
-		                            <div class="row mt-4">
-		                            	<div class="col">
-		                            		<div class="progress progress-striped active">
-		    									<div class="progress-bar" style="width:0%"></div>
-		    								</div>
-		                            	</div>
-		                            </div>
-	                            </div>
-							</div>
-						</div>
-                    </div>
-                </div>
-            </div>
-        </div>
-        <div class="modal zindex-modal" id="keep-EEPROM">
-            <div class="modal-dialog modal-dialog-centered">
-                <div class="modal-content">
-                    <div class="modal-header">
-                        <h5 class="modal-title">EEPROM</h5>
-                        <button type="button" class="btn-close btn-close-dark" data-bs-dismiss="modal" aria-label="Close"></button>
-                    </div>
-                    <div class="modal-body">
-                    	<span id="keep-eeprom-text"></span>
-                    	<div class="progress progress-striped active">
-		    				<div class="progress-bar" style="width:0%"></div>
-		    			</div>
-		    		</div>
-                    <div class="modal-footer">
-                    	<button type="button" class="btn btn-danger" data-bs-dismiss="modal" id="keep-eeprom-no">No (Default)</button>
-                        <button type="button" class="btn btn-success" data-bs-dismiss="modal" id="keep-eeprom-yes">Yes</button>
-                    </div>
-                </div>
-            </div>
-        </div>
-        <div class="modal zindex-modal" id="demo-Lock">
-            <div class="modal-dialog modal-sm modal-dialog-centered">
-                <div class="modal-content bg-transparent border-0">
-                	<form method="POST" action="/login" id="demo-LockForm">
-                		<div class="form-group">
-                            <div class="input-group">
-                                <div class="input-group-addon"><i class="p-3"></i></div>
-                                <input type="password" id="DemoPassword" name="password" class="form-control" placeholder="Password" required />
-                            </div>
-                        </div>
-		            </form>
-		            <button type="submit" class="btn btn-success" id="demo-lock-ok">Login</button>
-                </div>
-            </div>
-        </div>
-        <div class="modal zindex-modal" id="test-Pump">
-            <div class="modal-dialog modal-dialog-centered">
-                <div class="modal-content">
-                    <div class="modal-header">
-                        <h5 class="modal-title">Test Pump</h5>
-                        <button type="button" class="btn-close btn-close-dark" data-bs-dismiss="modal" aria-label="Close"></button>
-                    </div>
-                    <div class="modal-body">
-                    	<input type="text" id="test-pump-delay" name="test-pump-delay" data-provider="slider">
-				        Delay Test in Seconds <span id="test-pump-delay-timer"></span>
-				        <div class="progress progress-striped active">
-		    				<div class="progress-bar" style="width:0%"></div>
-		    			</div>
-		    		</div>
-                    <div class="modal-footer">
-                        <button type="button" class="btn btn-success" id="test-pump-start">Run Pump Test</button>
-                    </div>
-                </div>
-            </div>
-        </div>
-        <div class="modal zindex-modal" id="flush-Water">
-            <div class="modal-dialog modal-dialog-centered">
-                <div class="modal-content">
-                    <div class="modal-header">
-                        <h5 class="modal-title">Flush Water</h5>
-                        <button type="button" class="btn-close btn-close-dark" data-bs-dismiss="modal" aria-label="Close"></button>
-                    </div>
-                    <div class="modal-body">
-                    	<p>Empty large water containers.</p><span class="badge bg-warning">Warning:</span> Pump will run until stopped!
-		    		</div>
-                    <div class="modal-footer">
-                    	<button type="button" class="btn btn-danger" id="flush-water-stop">Stop Pump</button>
-                        <button type="button" class="btn btn-success" id="flush-water-start">Start Pump</button>
-                    </div>
-                </div>
-            </div>
-        </div>
+		        <button type="button" class="bg-green-500 hover:bg-green-600 text-white rounded w-full py-2 mt-4" id="test-pump-start">Run Pump Test</button>
+		    </div>
+		</div>
+		<div class="fixed inset-0 flex items-center justify-center hidden modal" id="flush-Water">
+		    <div class="bg-white dark:bg-gray-800 p-4 rounded-lg w-full max-w-md mx-auto border border-gray-300 dark:border-gray-600">
+		        <div class="flex modal-header justify-between items-center border-b mb-4">
+		            <h5 class="text-lg font-semibold text-gray-800 dark:text-white">Flush Water</h5>
+		            <button id="close-modal" class="text-gray-500 hover:text-gray-800 dark:text-gray-400 dark:hover:text-gray-300 focus:outline-none text-2xl" onclick="hideModal(this)">&times;</button>
+		        </div>
+	            <p class="text-gray-800 dark:text-white">Empty large water containers.<br/><span class="bg-yellow-500 font-semibold px-1 rounded-sm">Warning:</span> Pump will run until stopped!</p>
+		        <div class="flex justify-between">
+		            <button type="button" class="bg-red-500 hover:bg-red-600 text-white rounded w-full py-2 mt-4 mr-2" id="flush-water-stop">Stop Pump</button>
+		            <button type="button" class="bg-green-500 hover:bg-green-600 text-white rounded w-full py-2 mt-4 ml-2" id="flush-water-start">Start Pump</button>
+		        </div>
+		    </div>
+		</div>
     </body>
 </html>

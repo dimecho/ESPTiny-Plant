@@ -61,47 +61,65 @@ var PNP_ADC = 31;
 var DEMOLOCK = false;
 var ESP32 = false;
 
+var redirectURL = location.protocol + '//' + location.host + '.nip.io' + location.pathname;
+
 document.addEventListener('DOMContentLoaded', function(event)
 {
-	loadTheme();
-
-	if(document.cookie != "")
-	{
-		var ArrayCookies = {};
-		try {
-			ArrayCookies = document.cookie.split(";");
-			for (i = 0; i < ArrayCookies.length; i++) {
-		        var c_name = ArrayCookies[i].substr(0, ArrayCookies[i].indexOf("="));
-		        var c_value = ArrayCookies[i].substr(ArrayCookies[i].indexOf("=") + 1);
-		        c_name = c_name.replace(/^\s+|\s+$/g, "");
-
-		        //console.log(c_name + '(' + eval(c_name) + ') = ' + unescape(c_value));
-		        saveSetting(eval(c_name), unescape(c_value));
+	if(document.cookie != "") {
+		const params = new URLSearchParams(window.location.search);
+		let oauthCode = params.get('code');
+        let oauthScope = params.get('scope');
+        if (oauthCode && oauthScope) {
+			if (typeof  getOAuthToken !== 'function') {
+		        var script = document.createElement('script');
+		        script.src = 'js/oauth2.js';
+		        script.onload = function(){ getOAuthToken(oauthCode, oauthScope) };
+		        document.head.appendChild(script);
 		    }
-	   	}catch(error){
-	    	notify('',error, 'danger');
-	    }finally{
-	    	if(ArrayCookies.length > 1)
-	    	{
-	    		document.getElementById('keep-eeprom-text').textContent="Restoring settings ...";
-				document.querySelectorAll("#keep-EEPROM .modal-footer")[0].style.display = "none";
-				var modal = new bootstrap.Modal(document.getElementById('keep-EEPROM'));
-				modal.show();
-			  	progressTimer(62,2,function() {
-		        	$('.modal').modal('hide');
-		        	notify('','EEPROM restored', 'success');
-		        	setTimeout(function() {
-				   		notify('','Passwords must be set again', 'warning');
-				    }, 4000);
-				});
+        }else{
+        	var ArrayCookies = {};
+			try {
+				ArrayCookies = document.cookie.split(";");
+				for (i = 0; i < ArrayCookies.length; i++) {
+			        var c_name = ArrayCookies[i].substr(0, ArrayCookies[i].indexOf("="));
+			        var c_value = ArrayCookies[i].substr(ArrayCookies[i].indexOf("=") + 1);
+			        c_name = c_name.replace(/^\s+|\s+$/g, "");
+			        saveSetting(c_name, unescape(c_value));
+			    }
+		   	}catch(error){
+		    	notify('',error, 'danger');
+		    }finally{
+		    	if(ArrayCookies.length > 1) {
+		    		document.getElementById('keep-eeprom-text').textContent="Restoring Settings ...";
+					document.getElementById('keep-eeprom-footer').classList.add('hidden');
+					document.getElementById('keep-EEPROM').classList.remove('hidden');
+
+				  	progressTimer(62,2,function() {
+			        	document.getElementById('keep-EEPROM').classList.add('hidden');
+			        	document.getElementById('keep-eeprom-footer').classList.remove('hidden');
+			        	notify('','EEPROM restored', 'success');
+			        	setTimeout(function() {
+					   		notify('','Passwords must be set again', 'warning');
+					    }, 4000);
+					});
+				}
 			}
 		}
-	    deleteCookies();
+		deleteCookies();
 	}
 
     loadSVG();
 	
 	updateNTP();
+
+	const modals = document.querySelectorAll('.modal');
+    modals.forEach(modal => {
+        modal.addEventListener('click', function (event) {
+            if (event.target === modal) {
+                hideModal(modal);
+            }
+        });
+    });
 
     document.getElementById('wireless-settings-ok').onclick = function() {
 		if(DEMOLOCK) {
@@ -194,7 +212,6 @@ function loadSVG(svgfile) {
 	    		
 	    		if(nvram.response['nvram'][0].indexOf('esp32') != -1) {
 	    			ESP32 = true;
-	    			document.getElementById('WiFiModeClientEnt').closest('div').style.display = 'none';
 	    		}
 
  				//var index = new XMLHttpRequest();
@@ -285,8 +302,7 @@ function loadSVG(svgfile) {
 						}
 	                    
 				        document.getElementById('background').onclick = function() {
-					    	var modal = new bootstrap.Modal(document.getElementById('plant-Type'));
-				            modal.show();
+				            document.getElementById('plant-Type').classList.remove('hidden');
 
 				            var svgPlant = document.getElementById('svgPlant');
 						    svgPlant.innerHTML = '';
@@ -316,7 +332,7 @@ function loadSVG(svgfile) {
 												div.onclick = function() {
 													var id = this.id;
 													console.log(i);
-													saveSetting(PLANT_TYPE, i, function() { loadSVG(id); modal.hide(); });
+													saveSetting(PLANT_TYPE, i, function() { loadSVG(id); hideAllModals(); });
 									            }
 							                	svgPlant.appendChild(div);
 							                }
@@ -350,9 +366,6 @@ function loadSVG(svgfile) {
 				        }
 
 				        document.getElementById('pot-size').onclick = function() {
-				        	var modal = new bootstrap.Modal(document.getElementById('pot-size-Settings'));
-				            modal.show();
-
 				            $("#pot-size-Slider").roundSlider({
 				                value: document.getElementById('pot-size-text').textContent,
 				                //svgMode: true,
@@ -367,13 +380,12 @@ function loadSVG(svgfile) {
 				                    document.getElementById('pot-size-text').textContent = args.value;
 				                    saveSetting(PLANT_POT_SIZE, args.value);
 				                }
-				            })
+				            });
+				            document.getElementById('pot-size-Settings').classList.remove('hidden');
+				        	document.getElementById('modal-backdrop').classList.remove('hidden');
 				        }
 
 				        document.getElementById('water').onclick = function() {
-				        	var modal = new bootstrap.Modal(document.getElementById('water-Settings'));
-				            modal.show();
-				            
 				            $("#water-Slider").roundSlider({
 				                value: document.getElementById('WaterLevel').value,
 				                //svgMode: true,
@@ -395,20 +407,18 @@ function loadSVG(svgfile) {
 					                });
 				                }
 				            });
+				            document.getElementById('water-Settings').classList.remove('hidden');
+				        	document.getElementById('modal-backdrop').classList.remove('hidden');
 				        }
 
 				        document.getElementById('moisture').onclick = function() {
-				        	var modal = new bootstrap.Modal(document.getElementById('moisture-Settings'));
-				            modal.show();
-				            
 				            var moistureMin = 20;
 				            var moistureMax = 1000;
 				            var moistureStep = 10;
 				            if(ESP32) {
-				            	moistureMin = 80;
-				            	moistureMax = 2500;
+				            	moistureMin = 100;
+				            	moistureMax = 2000;
 				            }
-
 				            $("#moisture-Slider").roundSlider({
 				                value: document.getElementById('moisture-text').textContent,
 				                //svgMode: true,
@@ -425,12 +435,12 @@ function loadSVG(svgfile) {
 				                    saveSetting(PLANT_SOIL_MOISTURE, args.value);
 				                }
 				            });
+				            document.getElementById('moisture-Settings').classList.remove('hidden');
+				        	document.getElementById('modal-backdrop').classList.remove('hidden');
 				        }
 
 				        document.getElementById('timer').onclick = function() {
-				            var modal = new bootstrap.Modal(document.getElementById('moisture-Settings'));
-				            modal.show();
-
+				            var timerStep = 1;
 				            $("#moisture-Slider").roundSlider({
 				                value: document.getElementById('timer-text').textContent,
 				                //svgMode: true,
@@ -441,6 +451,7 @@ function loadSVG(svgfile) {
 				                sliderType: "min-range",
 				                min: 0,
 				                max: 96,
+				                step: timerStep,
 				                change: function (args) {
 				                    document.getElementById('timer-text').textContent = args.value;
 
@@ -467,14 +478,13 @@ function loadSVG(svgfile) {
 					                });
 				                }
 				            });
+				            document.getElementById('moisture-Settings').classList.remove('hidden');
+				        	document.getElementById('modal-backdrop').classList.remove('hidden');
 				            //$('#timer-enabled').toggle('slow');
 				            //$('#timer-disabled').toggle('slow');
 				        }
 
 						document.getElementById('power').onclick = function() {
-				        	var modal = new bootstrap.Modal(document.getElementById('power-Settings'));
-				            modal.show();
-
 				            var sleepMax = 30;
 				            if(ESP32) {
 				            	sleepMax = 1440;
@@ -506,15 +516,13 @@ function loadSVG(svgfile) {
 				                    	saveSetting(DEEP_SLEEP, args.value);
 				                    }
 				                }
-				            })
+				            });
+				            document.getElementById('power-Settings').classList.remove('hidden');
+				        	document.getElementById('modal-backdrop').classList.remove('hidden');
 				        }
 
 				        document.getElementById('soil').onclick = function() {
-				        	var modal = new bootstrap.Modal(document.getElementById('soil-Settings'));
-				            modal.show();
-				            
 				            var svgSoil = document.getElementById('svgSoil');
-
 				            if (typeof SVGRect != undefined) {
 				                var xhr = new XMLHttpRequest();
 				                xhr.open('GET', 'svg/soil.svg', true);
@@ -529,7 +537,7 @@ function loadSVG(svgfile) {
 								        document.getElementById('soil-type-text').textContent = soil_type_labels[0];
 								        if(document.getElementById('soil-text'))
 								        	document.getElementById('soil-text').style.fill = moss_color;
-								        saveSetting(PLANT_SOIL_TYPE, 0, function() { modal.hide(); });
+								        saveSetting(PLANT_SOIL_TYPE, 0, function() { hideAllModals(); });
 								    }
 								    document.getElementById('soil-loam').onclick = function() {
 								    	var loam_color = $('#soil-loam-badge')[0].firstElementChild.attributes.fill.value;
@@ -537,7 +545,7 @@ function loadSVG(svgfile) {
 								        document.getElementById('soil-type-text').textContent = soil_type_labels[1];
 								        if(document.getElementById('soil-text'))
 								        	document.getElementById('soil-text').style.fill = loam_color;
-								        saveSetting(PLANT_SOIL_TYPE, 1, function() { modal.hide(); });
+								        saveSetting(PLANT_SOIL_TYPE, 1, function() { hideAllModals(); });
 								    }
 								    document.getElementById('soil-dirt').onclick = function() {
 										var dirt_color = $('#soil-dirt-badge')[0].firstElementChild.attributes.fill.value;
@@ -545,7 +553,7 @@ function loadSVG(svgfile) {
 								        document.getElementById('soil-type-text').textContent = soil_type_labels[2];
 								        if(document.getElementById('soil-text'))
 								        	document.getElementById('soil-text').style.fill = dirt_color;
-								        saveSetting(PLANT_SOIL_TYPE, 2, function() { modal.hide(); });
+								        saveSetting(PLANT_SOIL_TYPE, 2, function() { hideAllModals(); });
 								    }
 								    document.getElementById('soil-clay').onclick = function() {
 								    	var clay_color = $('#soil-clay-badge')[0].firstElementChild.attributes.fill.value;
@@ -553,7 +561,7 @@ function loadSVG(svgfile) {
 								        document.getElementById('soil-type-text').textContent = soil_type_labels[3];
 								        if(document.getElementById('soil-text'))
 								        	document.getElementById('soil-text').style.fill = clay_color;
-								        saveSetting(PLANT_SOIL_TYPE, 3, function() { modal.hide(); });
+								        saveSetting(PLANT_SOIL_TYPE, 3, function() { hideAllModals(); });
 								    }
 								    document.getElementById('soil-sand').onclick = function() {
 								    	var sand_color = $('#soil-sand-badge')[0].firstElementChild.attributes.fill.value;
@@ -561,7 +569,7 @@ function loadSVG(svgfile) {
 								        document.getElementById('soil-type-text').textContent = soil_type_labels[4];
 								        if(document.getElementById('soil-text'))
 								        	document.getElementById('soil-text').style.fill = sand_color;
-								        saveSetting(PLANT_SOIL_TYPE, 4, function() { modal.hide(); });
+								        saveSetting(PLANT_SOIL_TYPE, 4, function() { hideAllModals(); });
 								    }
 								    document.getElementById('soil-rock').onclick = function() {
 								    	var rock_color = $('#soil-rock-badge')[0].firstElementChild.attributes.fill.value;
@@ -569,15 +577,18 @@ function loadSVG(svgfile) {
 								        document.getElementById('soil-type-text').textContent = soil_type_labels[5];
 								        if(document.getElementById('soil-text'))
 								        	document.getElementById('soil-text').style.fill = rock_color;
-								        saveSetting(PLANT_SOIL_TYPE, 5, function() { modal.hide(); });
+								        saveSetting(PLANT_SOIL_TYPE, 5, function() { hideAllModals(); });
 								    }
 				                }
+				                document.getElementById('soil-Settings').classList.remove('hidden');
+				        		document.getElementById('modal-backdrop').classList.remove('hidden');
 				            }
 				        }
 				        
 				        document.getElementById('wireless').onclick = function() {
-				        	var modal = new bootstrap.Modal(document.getElementById('wireless-Settings'));
-				            modal.show();
+
+				        	document.getElementById('wireless-Settings').classList.remove('hidden');
+				        	document.getElementById('modal-backdrop').classList.remove('hidden');
 
 				            var nvram = new XMLHttpRequest();
 				            nvram.responseType = 'json';
@@ -742,10 +753,10 @@ function loadSVG(svgfile) {
 										}else{
 											$('#formFirmware').attr('action', 'http://' + window.location.hostname + "/update"); //force HTTP
 											document.getElementById('keep-eeprom-text').textContent="After firmware upgrade, keep current settings?";
-											document.querySelectorAll("#keep-EEPROM .modal-footer")[0].style.display = "";
-											$('.modal').modal('hide');
-											var modal = new bootstrap.Modal(document.getElementById('keep-EEPROM'));
-											modal.show();
+											//document.querySelectorAll("#keep-EEPROM .modal-footer")[0].style.display = "";
+
+											document.getElementById('wireless-Settings').classList.add('hidden');
+											document.getElementById('keep-EEPROM').classList.remove('hidden');
 											document.getElementById('keep-eeprom-yes').onclick = function() {
 												deleteCookies();
 												//document.cookie = 'WIFI_MODE=' + data['nvram'][WIFI_MODE];
@@ -784,7 +795,8 @@ function loadSVG(svgfile) {
 					            				if(data['nvram'][PNP_ADC] != 0) {
 					            					document.cookie = 'PNP_ADC=' + data['nvram'][PNP_ADC];
 					            				}
-					            				new bootstrap.Modal(document.getElementById('wireless-Settings')).show();
+					            				document.getElementById('keep-EEPROM').classList.add('hidden');
+					            				document.getElementById('wireless-Settings').classList.remove('hidden');
 					                			progressTimer(20, 1);
 							                	document.getElementById('formFirmware').submit();
 					            			}
@@ -814,6 +826,18 @@ function loadSVG(svgfile) {
 
 				                } catch (error) {}
 				            }
+				            
+							const togglePasswordIcons = document.querySelectorAll('.toggle-password');
+							togglePasswordIcons.forEach(icon => {
+							    icon.addEventListener('click', () => {
+							        const passwordField = document.querySelector(`#${icon.getAttribute('data-target')}`);
+							        const type = passwordField.getAttribute('type') === 'password' ? 'text' : 'password';
+							        passwordField.setAttribute('type', type);
+							        const currentSrc = icon.getAttribute('src');
+							        const newSrc = currentSrc === 'img/eye-slash.svg' ? 'img/eye-slash-fill.svg' : 'img/eye-slash.svg';
+							        icon.setAttribute('src', newSrc);
+							    });
+							});
 
 				            $('#browseLittleFS').click(function() {
 				            	if(DEMOLOCK) {
@@ -883,17 +907,56 @@ function saveSetting(offset, value, callback) {
 	}
 }
 
+function hideModal(button) {
+    let modal = button.closest('.flex');
+    while (modal && !modal.classList.contains('modal')) {
+        modal = modal.parentElement;
+    }
+    if (modal) {
+    	const backdrop = document.getElementById('modal-backdrop');
+    	backdrop.classList.add('hidden');
+        modal.classList.add('hidden');
+    }
+}
+
+function hideAllModals() {
+	const backdrop = document.getElementById('modal-backdrop');
+    const modals = document.querySelectorAll('.modal');
+    modals.forEach(modal => {
+        modal.classList.add('hidden');
+    });
+    backdrop.classList.add('hidden');
+}
+
 function PlantLogin() {
-	$('.modal').modal('hide');
-	var modal = new bootstrap.Modal(document.getElementById('demo-Lock'));
-	modal.show();
+	hideAllModals();
+	document.getElementById('demo-Lock').classList.remove('hidden');
+}
+
+ function changeTab(event, tabId) {
+
+    const tabLinks = document.querySelectorAll('.tab-link');
+    tabLinks.forEach(link => {
+        link.classList.remove('border-b-2', 'text-blue-500', 'dark:text-blue-300');
+        link.classList.add('text-gray-600', 'dark:text-gray-400');
+    });
+
+    const tabPanes = document.querySelectorAll('.tab-pane');
+    tabPanes.forEach(pane => {
+        pane.classList.add('hidden');
+    });
+
+    event.currentTarget.classList.add('border-b-2', 'text-blue-500', 'dark:text-blue-300');
+    
+    const activeTab = document.getElementById(tabId);
+    activeTab.classList.remove('hidden');
 }
 
 function HiddenInput(id, value) {
     if(value == true) {
         document.getElementById(id).removeAttribute('disabled');
     }else{
-       document.getElementById(id).setAttribute('disabled', '');
+       	document.getElementById(id).setAttribute('disabled', '');
     }
 }
 
@@ -1065,20 +1128,12 @@ function NVRAMtoSVG(data)
     	document.getElementById('soil-text').style.fill = soil_type_color[data['nvram'][PLANT_SOIL_TYPE]];
 }
 
-function formValidate() {
-	if(WiFiPassword.value != null) {
-    	WiFiPasswordConfirm.setCustomValidity(WiFiPasswordConfirm.value != WiFiPassword.value ? 'Passwords do not match.' : '');
-	}else if(DemoPassword.value != null) {
-		DemoPasswordConfirm.setCustomValidity(DemoPasswordConfirm.value != DemoPassword.value ? 'Passwords do not match.' : '');
-	}
-}
-
 function resetFlash()
 {
 	window.open('api?reset=1');
 }
 
-function testPump(arg)
+function testPump()
 {
 	var delayslider_parameters = {
         skin: 'big',
@@ -1090,9 +1145,10 @@ function testPump(arg)
     };
 	$('#test-pump-delay').ionRangeSlider(delayslider_parameters);
 
-	$('.modal').modal('hide');
-	var modal = new bootstrap.Modal(document.getElementById('test-Pump'));
-	modal.show();
+	hideAllModals();
+	document.getElementById('test-Pump').classList.remove('hidden');
+	document.getElementById('modal-backdrop').classList.remove('hidden');
+
 	document.getElementById('test-pump-start').onclick = function() {
 		var t = document.getElementById('test-pump-delay').value * 2;
     	var x = setInterval(function() {
@@ -1105,7 +1161,7 @@ function testPump(arg)
 			    log.onload = function() {
 			        if (log.status == 200) {
 						var xhr = new XMLHttpRequest();
-						xhr.open('GET', 'api?pump=' + arg, true);
+						xhr.open('GET', 'api?pump=1', true);
 					    xhr.send();
 					    xhr.onload = function() {
 					        if (xhr.status == 200) {
@@ -1392,14 +1448,34 @@ function testWater()
 
 function flushWater()
 {
-	$('.modal').modal('hide');
-	var modal = new bootstrap.Modal(document.getElementById('flush-Water'));
-	modal.show();
+	hideAllModals();
+	document.getElementById('flush-Water').classList.remove('hidden');
+	document.getElementById('modal-backdrop').classList.remove('hidden');
+
+	var timer;
+	var xhr = new XMLHttpRequest();
 	document.getElementById('flush-water-start').onclick = function() {
-    	testPump(2);
+    	xhr.open('GET', 'api?pump=2', true);
+	    xhr.send();
+	    xhr.onload = function() {
+	        if (xhr.status == 200) {
+	        	notify('', 'Flush Started', 'success');
+	        	timer = setInterval(function() {
+	        		notify('', 'Running Flush ...', 'warning');
+			    }, 5000);
+	        }
+	    }
 	}
 	document.getElementById('flush-water-stop').onclick = function() {
-    	testPump(0);
+		clearInterval(timer);
+    	xhr.open('GET', 'api?pump=0', true);
+	    xhr.send();
+	    xhr.onload = function() {
+	        if (xhr.status == 200) {
+	        	clearInterval(timer);
+	        	notify('', 'Flush Stopped', 'success');
+	        }
+	    }
 	}
 }
 
@@ -1458,32 +1534,18 @@ function infoOAuthToken()
 
 function getOAuthToken()
 {
-	var smtp = $('#AlertSMTPServer').val();
-
-	if(smtp == '') {
-		notify('', 'Enter SMTP Server', 'danger');
+	if(location.protocol == 'http:') {
+		notify('', 'OAuth2.0 only supported with HTTPS', 'danger');
 		return;
 	}
-
-	var client_id = window.prompt('OAuth 2.0 Client ID', '');
-	if (client_id == null || client_id == '') {
-		if(smtp.indexOf('gmail.com') != -1) {
-			document.getElementById('AlertGmailToken').classList.remove('d-none');
-		}else if(smtp.indexOf('office365.com') != -1) {
-
-		}
-	}else{
-		//192.168.8.8.nip.io
-		var redirect_uri = document.location.href.substring(0, document.location.href.lastIndexOf('/'));
-		if(smtp.indexOf('gmail.com') != -1) {
-			window.open('https://accounts.google.com/o/oauth2/v2/auth?scope=' + encodeURIComponent('openid https://www.googleapis.com/auth/gmail.send') + '&include_granted_scopes=false&response_type=token&state=&redirect_uri=' + encodeURIComponent(redirect_uri + '/oauth2.html') + '&client_id=' + encodeURIComponent(client_id), '_blank');
-			document.getElementById('gmail-redirect-uri').innerHTML = redirect_uri;
-			document.getElementById('AlertGmailTokenURL').classList.remove('d-none');
-		}else if(smtp.indexOf('office365.com') != -1) {
-			window.open('https://login.microsoftonline.com/common/oauth2/v2.0/authorize?scope=' + encodeURIComponent('openid offline_access https://graph.microsoft.com/v1.0/me/sendMail') + '&nonce=abcde&response_mode=fragment&response_type=token&redirect_uri=' + encodeURIComponent(redirect_uri + '/oauth2.html') + '&client_id=' + encodeURIComponent(client_id), '_blank');
-			//https://login.microsoftonline.com/common/v2.0/oauth2/token
-		}
-	}
+	if (typeof getAuthorizationCode !== 'function') {
+        var script = document.createElement('script');
+        script.src = 'js/oauth2.js';
+        script.onload = function(){ getAuthorizationCode() };
+        document.head.appendChild(script);
+    } else {
+        getAuthorizationCode();
+    }
 }
 
 function calcNextWaterCycle(start, stop, size)

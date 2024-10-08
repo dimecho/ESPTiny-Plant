@@ -4,79 +4,104 @@
         <title>tiny plant - graph</title>
         <meta charset="UTF-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <link rel="stylesheet" type="text/css" id="cssBootstrap">
-        <link rel="stylesheet" type="text/css" href="css/preloader.css" />
-        <link rel="stylesheet" type="text/css" href="css/rangeslider.css" />
-        <style>
-        .chartWrapper {
-          position: relative;
-          opacity: 0.9;
-        }
-        .chartWrapper > canvas {
-          position: absolute;
-          left: 0;
-          top: 0;
-          pointer-events:none;
-        }
-        .chartAreaWrapper {
-          overflow-x: scroll;
-          overflow-y: scroll;
-          position: relative;
-          width: 100%;
-        }
-        .chartAreaWrapper2 {
-          position: relative;
-        }
-        </style>
-        <link rel="shortcut icon" href="favicon.ico" />
+        <link rel="stylesheet" type="text/css" href="css/preloader.css">
+        <link rel="stylesheet" type="text/css" href="css/tailwind.css">
+        <link rel="stylesheet" type="text/css" href="css/rangeslider.css">
+        <link rel="icon" type="image/x-icon" href="favicon.ico">
         <script src="js/preloader.js"></script>
         <script src="js/jquery.core.js"></script>
-        <script src="js/bootstrap.js"></script>
         <script src="js/chart.js"></script>
         <script src="js/rangeslider.js"></script>
-        <script src="js/graph.js"></script>
+        <script defer src="js/graph.js"></script>
     </head>
-    <body class="preloader">
+
+    <body class="preloader bg-gray-100 dark:bg-gray-600">
         <div id="preloader"></div>
-        <div class="toast-container position-absolute top-0 end-0 p-3" id="notify" style="z-index:2000"></div>
-        <div class="container-fluid d-flex flex-column">
-            <div class="row d-flex mt-4">
-                <div class="col-auto mr-auto mb-auto mt-auto" id="buildGraphButtons"></div>
-                <div class="col-auto" id="buildGraphExport" align="center"></div>
+        <div class="fixed top-0 right-0 p-3 z-[2000]" id="notify"></div>
+        <div class="fixed inset-0 bg-black opacity-50 hidden" id="modal-backdrop"></div>
+        <div class="p-4">
+            <div class="flex w-full justify-between">
+                <button type="button" class="bg-green-500 hover:bg-green-600 text-white rounded w-full py-2 mt-4 mr-4" id="graph-start">Start Graph</button>
+                <button type="button" class="bg-red-500 hover:bg-red-600 text-white rounded w-full py-2 mt-4 mr-4" id="graph-stop" onclick="stopChart()">Stop Graph</button>
+                <button type="button" class="bg-yellow-500 hover:bg-yellow-600 text-white rounded w-full py-2 mt-4 mr-4" id="graph-clear">Clear Data</button>
+                <button type="button" class="bg-gray-400 hover:bg-gray-500 text-white rounded w-full py-2 mt-4 mr-4" id="graph-settings">Settings</button>
+                <button type="button" class="bg-gray-400 hover:bg-gray-500 text-white rounded w-full py-2 mt-4 mr-4" id="graph-image" onclick="exportPNG()">Export Image</button>
+                <button type="button" class="bg-gray-400 hover:bg-gray-500 text-white rounded w-full py-2 mt-4 mr-4" id="graph-csv" onclick="exportCSV()">Export CSV</button>
             </div>
-            <div class="row d-flex mt-4">
-                <div class="col">
-                    <!-- http://jsfiddle.net/jmpxgufu/100/ -->
-                    <div class="chartWrapper bg-light">
-                        <div class="chartAreaWrapper">
-                            <div class="chartAreaWrapper2">
-                                <canvas id="chartCanvas"></canvas>
+            <div id="scrollContainer" class="w-full overflow-x-auto">
+                <canvas id="chartCanvas"></canvas>
+            </div>
+            <div class="w-full">
+                <input type="text" id="chartSlider" name="chartSlider" data-provider="slider" />
+            </div>
+        </div>
+        <div class="fixed inset-0 flex items-center justify-center hidden modal" id="graph-settings-open">
+            <div class="bg-white dark:bg-gray-800 p-4 rounded-lg w-full max-w-md mx-auto">
+                <div class="flex modal-header justify-between items-center border-b mb-4">
+                    <h5 class="text-lg font-semibold text-gray-800 dark:text-white">Graph Settings</h5>
+                    <button id="close-modal" class="text-gray-500 hover:text-gray-800 dark:text-gray-400 dark:hover:text-gray-300 focus:outline-none text-2xl" onclick="hideModal(this)">&times;</button>
+                </div>
+                <div class="flex flex-wrap">
+                    <div class="w-full text-gray-900 dark:text-gray-300">
+                        <div class="flex items-center">
+                            <input type="checkbox" name="roundEdges" id="roundEdges">
+                            <label class="ml-2">Round Sharp Edges</label>
+                        </div>
+                        <div class="flex items-center">
+                            <input type="checkbox" name="dataLabels" id="dataLabels">
+                            <label class="ml-2">Show Data Labels</label>
+                        </div>
+                        <div class="flex items-center">
+                            <input type="checkbox" name="dataScroll" id="dataScroll">
+                            <label class="ml-2">Grid Data Scroll</label>
+                        </div>
+                        <div class="flex items-center">
+                            <input type="checkbox" name="dataAnimation" id="dataAnimation">
+                            <label class="ml-2">Show Animation</label>
+                        </div>
+                    </div>
+                </div>
+                <div class="flex flex-wrap mt-4">
+                    <div class="w-full text-gray-900 dark:text-gray-300 mr-4">
+                        <div class="flex justify-between items-center mb-4">
+                            <div class="w-1/2">Time Segments</div>
+                             <div class="w-1/2">
+                            <input type="text" name="graphDivision" id="graphDivision" class="ml-2 p-2 w-full rounded dark:bg-gray-700 dark:text-white">
                             </div>
                         </div>
-                        <canvas id="chartAxis" width="0"></canvas>
-                    </div>
+                        <div class="flex items-center mb-4">
+                            <div class="w-1/2">Line Width</div>
+                             <div class="w-1/2">
+                            <input type="text" name="lineWidth" id="lineWidth" class="ml-2 p-2 w-full rounded dark:bg-gray-700 dark:text-white">
+                            </div>
+                        </div>
+                        <div class="flex items-center mb-4">
+                            <div class="w-1/2">Max Scroll Pages</div>
+                            <div class="w-1/2">
+                                <input type="text" name="pageLimit" id="pageLimit" class="ml-2 p-2 w-full rounded dark:bg-gray-700 dark:text-white">
+                            </div>
+                        </div>
+                   </div>
                 </div>
-            </div>
-            <div class="row p-4">
-                <div class="col" id="buildGraphSlider"></div>
-            </div>
-            <div class="row mt-4"></div>
-        </div>
-        <div class="modal" id="graphStartConfirm">
-            <div class="modal-dialog modal-dialog-centered">
-                <div class="modal-content">
-                    <div class="modal-header">
-                        <h5 class="modal-title" id="confirmBoxTitle">Graph Data Exists</h5>
-                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                    </div>
-                    <div class="modal-body">Resume Data Collection?</div>
-                    <div class="modal-footer">
-                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal" onClick="startChart()">Start New</button>
-                        <button type="button" class="btn btn-primary" data-bs-dismiss="modal" onClick="updateChart()">Yes Resume</button>
-                    </div>
+                <div class="flex justify-between">
+                    <button type="button" class="bg-red-500 hover:bg-red-600 text-white rounded w-full py-2 mt-4 mr-2" onclick="hideModal(this)">Cancel</button>
+                    <button type="button" class="bg-green-500 hover:bg-green-600 text-white rounded w-full py-2 mt-4 mr-2" onclick="hideModal(this); saveSettings()">Save</button>
                 </div>
             </div>
         </div>
-        <img class="d-none" src="img/cert.svg" />
+        <div class="fixed inset-0 flex items-center justify-center hidden modal" id="graph-start-confirm">
+            <div class="bg-white dark:bg-gray-800 p-4 rounded-lg w-full max-w-md mx-auto">
+                <div class="flex modal-header justify-between items-center border-b mb-4">
+                    <h5 class="text-lg font-semibold text-gray-800 dark:text-white">Graph Data Exists</h5>
+                    <button id="close-modal" class="text-gray-500 hover:text-gray-800 dark:text-gray-400 dark:hover:text-gray-300 focus:outline-none text-2xl" onclick="hideModal(this)">&times;</button>
+                </div>
+                <label class="block text-gray-800 dark:text-gray-300">Resume Data Collection?</label>
+                <div class="flex justify-between">
+                    <button type="button" class="bg-red-500 hover:bg-red-600 text-white rounded w-full py-2 mt-4 mr-2" onclick="hideModal(this); startChart()">Start New</button>
+                    <button type="button" class="bg-green-500 hover:bg-green-600 text-white rounded w-full py-2 mt-4 mr-2" onclick="hideModal(this); updateChart()">Yes Resume</button>
+                </div>
+            </div>
+        </div>
+        <img class="hidden" src="img/eye-slash.svg" />
     </body>
 </html>

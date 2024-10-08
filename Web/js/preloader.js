@@ -156,41 +156,6 @@ ready(function() {
     Preloader.init();
 });
 
-function switchTheme(element, dark, light) {
-  if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
-    var e = document.querySelectorAll(element + '.' + light);
-    for (var i = 0; i < e.length; i++) {
-      e[i].classList.remove(light);
-      e[i].classList.add(dark);
-    }
-  } else {
-    var e = document.querySelectorAll(element + '.' + dark);
-    for (var i = 0; i < e.length; i++) {
-      e[i].classList.remove(dark);
-      e[i].classList.add(light);
-    }
-  }
-}
-
-function loadTheme() {
-    if((window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
-        document.getElementById('cssBootstrap').href = 'css/bootstrap.slate.css';
-    }else{
-        document.getElementById('cssBootstrap').href = 'css/bootstrap.css';
-    }
-    switchTheme('div','bg-primary','bg-light');
-    switchTheme('div','text-white','text-dark');
-    switchTheme('img','bg-secondary','bg-light');
-    switchTheme('button', 'btn-close-white', 'btn-close-dark');
-}
-
-function graphTheme() {
-    if((window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
-        ctxFontColor = 'white';
-        ctxGridColor = '#707070';           
-    }
-}
-
 function notify(messageHeader, messageBody, bg, id) {
     var toast = document.createElement('div');
     toast.className = 'toast fade show text-white bg-' + bg;
@@ -227,4 +192,3 @@ function notify(messageHeader, messageBody, bg, id) {
       document.getElementById('notify').removeChild(this);
     });
 }
-
