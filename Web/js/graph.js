@@ -1,6 +1,7 @@
-var roundEdges = true;
+var roundEdges = false;
 var dataLabels = true;
-var dataScroll = false;
+var dataScroll = true;
+var dataStream = false;
 var dataAnimation = false;
 var graphDivision = 60;
 var lineWidth = 3;
@@ -53,9 +54,6 @@ document.addEventListener("DOMContentLoaded", function(event)
         dataLabels = 'auto';
     }
 
-    if(roundEdges == false) {
-        Chart.defaults.elements.line.tension = 0;
-    }
     if(dataAnimation == true) {
         Chart.defaults.animation.duration = 800;
     }
@@ -63,7 +61,7 @@ document.addEventListener("DOMContentLoaded", function(event)
     Chart.defaults.color = ctxFontColor;
     Chart.defaults.font.size = ctxFont;
 
-    data = {
+    chartdata = {
         labels: initTimeAxis(graphDivision),
         datasets: [{
             type: 'line',
@@ -71,6 +69,7 @@ document.addEventListener("DOMContentLoaded", function(event)
             backgroundColor: 'rgba(0,123,255,0.5)',
             borderColor: 'rgba(0,123,255,1)',
             borderWidth: lineWidth,
+            tension: roundEdges ? 1 : 0,
             fill: false,
             data: [],
             xAxisID: 'x-axis-1',
@@ -81,10 +80,15 @@ document.addEventListener("DOMContentLoaded", function(event)
             backgroundColor: 'rgba(220,53,69,0.5)',
             borderColor: 'rgba(220,53,69,1)',
             borderWidth: lineWidth,
+            tension: roundEdges ? 1 : 0,
             fill: false,
             data: [],
             xAxisID: 'x-axis-0',
-            yAxisID: 'y-axis-0'
+            yAxisID: 'y-axis-0',
+            datalabels: {
+                align: 'end',
+                anchor: 'end'
+            }
         }]
     };
 
@@ -99,11 +103,12 @@ document.addEventListener("DOMContentLoaded", function(event)
             //console.log(s);
 
             chart.data.datasets[0].data = [];
+            chart.data.datasets[1].data = [];
             for (var i = 0; i < s.length; i++) {
                 if(s[i].indexOf('T:') != -1 || s[i].indexOf('M:') != -1) {
-                    chart.data.datasets[0].data.push(s[i]);
-                }else if(s[i].indexOf('W:') != -1) {
                     chart.data.datasets[1].data.push(s[i]);
+                }else if(s[i].indexOf('W:') != -1) {
+                    chart.data.datasets[0].data.push(s[i]);
                 }
             }
             chart.update();
@@ -135,20 +140,14 @@ document.addEventListener("DOMContentLoaded", function(event)
         onFinish: function (e) {
 
             var xhr = new XMLHttpRequest();
-            refreshSpeed = 1000; //1000 = 1 second
-            
             if(e.from == 0) { // Real-time, force disable log
-
-                refreshSpeed /= 10;
-
+                refreshSpeed = 1000;
                 xhr.open('GET', 'log?end=1', true);
                 xhr.send();
-
+                dataStream = true;
             }else{
-
-                refreshSpeed *= e.from;
-                refreshSpeed *= 60;
-
+                refreshSpeed = e.from;
+                refreshSpeed *= (1000 * 60);
                 xhr.open('GET', 'nvram.json?offset=' + LOG_INTERVAL + '&value=10', true);
                 xhr.send();
             }
@@ -214,16 +213,16 @@ function saveSettings() {
 	graphDivision = document.getElementById('graphDivision').value;
 	lineWidth = document.getElementById('lineWidth').value;
 	pageLimit = document.getElementById('pageLimit').value;
-    if(pageLimit < 2)
-        pageLimit = 2;
+    if(pageLimit < 1)
+        pageLimit = 1;
 
-    document.cookie = 'roundEdges=' + roundEdges + '; SameSite=None; Secure; Path=' + location.pathname;
-    document.cookie = 'dataLabels=' + dataLabels + '; SameSite=None; Secure; Path=' + location.pathname;
-    document.cookie = 'dataScroll=' + dataScroll + '; SameSite=None; Secure; Path=' + location.pathname;
-    document.cookie = 'dataAnimation=' + dataAnimation + '; SameSite=None; Secure; Path=' + location.pathname;
-    document.cookie = 'graphDivision=' + graphDivision + '; SameSite=None; Secure; Path=' + location.pathname;
-    document.cookie = 'lineWidth=' + lineWidth + '; SameSite=None; Secure; Path=' + location.pathname;
-    document.cookie = 'pageLimit=' + pageLimit + '; SameSite=None; Secure; Path=' + location.pathname;
+    document.cookie = 'roundEdges=' + roundEdges + '; Path=' + location.pathname;
+    document.cookie = 'dataLabels=' + dataLabels + '; Path=' + location.pathname;
+    document.cookie = 'dataScroll=' + dataScroll + '; Path=' + location.pathname;
+    document.cookie = 'dataAnimation=' + dataAnimation + '; Path=' + location.pathname;
+    document.cookie = 'graphDivision=' + graphDivision + '; Path=' + location.pathname;
+    document.cookie = 'lineWidth=' + lineWidth + '; Path=' + location.pathname;
+    document.cookie = 'pageLimit=' + pageLimit + '; Path=' + location.pathname;
 
 	if(dataLabels == true) {
 		dataLabels = 'auto';
@@ -377,7 +376,7 @@ function initChart() {
                 suggestedMax: 1024, //auto scale
                 title: {
                     display: true,
-                    text: data.datasets[1].label
+                    text: chartdata.datasets[1].label
                 },
                 ticks: {
                     stepSize: 10
@@ -395,7 +394,7 @@ function initChart() {
                 suggestedMax: 100, //auto scale
                 title: {
                     display: true,
-                    text: data.datasets[0].label
+                    text: chartdata.datasets[0].label
                 },
                 ticks: {
                     stepSize: 25
@@ -414,14 +413,21 @@ function initChart() {
                 display: dataLabels,
                 backgroundColor: function(context) {
                     return context.dataset.backgroundColor;
-                }
+                },
+                borderRadius: 2,
+                color: ctxFontColor,
+                font: {
+                    size: ctxFont,
+                    weight: 'bold'
+                },
+                padding: 6
             }
         }
     };
 
     chart = new Chart(canvas.getContext('2d'), {
         type: 'line',
-        data: data,
+        data: chartdata,
         options: options
     });
 }
@@ -488,81 +494,99 @@ function initTimeAxis(seconds, labels) {
     return xaxis;
 }
 
-function updateChart() {
+function adjustChart() {
+
     var l = chart.data.datasets[0].data.length;
     var limit = graphDivision * pageLimit;
 
     //Scroll
     if (l >= limit) {
-        //console.log('end limit');
         var p = graphDivision;
         if(dataScroll) {
             p = 1;
         }
+        //console.log('end limit ' + p);
         for (var x = 0; x < p; x++) {
             chart.data.labels.shift();
             chart.data.datasets[0].data.shift();
             chart.data.datasets[1].data.shift();
         }
-        var l = chart.data.datasets[0].data.length;
-    }else if (l > graphDivision && l == chart.data.labels.length) {
+        l = chart.data.datasets[0].data.length;
+    }
+    if (l >= graphDivision && l >= chart.data.labels.length) {
         //console.log('add page');
         initTimeAxis(graphDivision, chart.data.labels);
         initChart();
         scrollToEnd();
     }
+    
     //console.log(l);
+    return l;
+}
 
-    //Time-stamp
-    var d = new Date();
-    var options = { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric' };
-    if(!dataScroll) {
-        if (l / 10 % 1 == 0) {
-            chart.data.labels[l] = d.toLocaleDateString('en-US', options);
-        }else{
-            chart.data.labels[l] = d.getHours() + ':' + d.getMinutes() + ':' + d.getSeconds();
+function updateChart() {
+    var xhr = new XMLHttpRequest();
+    if(dataStream) {
+        var refresh = 0;
+        xhr.open('GET', 'api?stream=' + graphDivision, true);
+        xhr.onprogress = function(e) {
+            var value = e.currentTarget.response.split('\n');
+            for (var x = 0; x < value.length-1; x++) {
+                var s = value[x].split(':');
+                if (!dataScroll)
+                    var l = adjustChart();
+                setTimeout(function(water, moisture, n, l) {
+                    if (dataScroll)
+                        l = adjustChart();
+                    var d = new Date();
+                    if (dataScroll) {
+                        chart.data.labels.push(d.getHours() + ':' + d.getMinutes() + ':' + d.getSeconds());
+                    }else{
+                        chart.data.labels[l+n] = d.getHours() + ':' + d.getMinutes() + ':' + d.getSeconds();
+                    }
+                    chart.data.datasets[0].data.push(water);
+                    chart.data.datasets[1].data.push(moisture);
+                    chart.update();
+                    
+                }, 100 * refresh, s[0], s[1], x, l);
+                refresh++;
+            }
+        }
+        xhr.onload = function() {
+            refresh-=2;
+            refreshTimer = setTimeout(function() {
+                updateChart();
+            }, 100 * refresh);
         }
     }else{
-        //chart.data.labels.push(d.toLocaleDateString('en-US', options));
-        chart.data.labels.push(d.getHours() + ':' + d.getMinutes() + ':' + d.getSeconds());
-    }
-    chart.update();
-
-    var adc = new XMLHttpRequest();
-    adc.open('GET', 'api?adc=1', true);
-    adc.send();
-    adc.onload = function() {
-        if (adc.status == 200) {
-            var value = parseInt(adc.responseText) || Math.floor(Math.random() * (1024 - 500 + 1)) + 500;
-            chart.data.datasets[1].data.push(value);
-
-            var h2o = new XMLHttpRequest();
-            h2o.open('GET', 'api?adc=2', true);
-            h2o.send();
-            h2o.onload = function() {
-                var value = 0;
-                if (h2o.status == 200) {
-                    value = parseInt(h2o.responseText) || 25;;
+        xhr.open('GET', 'api?adc=1', true);
+        xhr.onload = function() {
+            if (xhr.status == 200) {
+                var l = adjustChart();
+                var d = new Date();
+                if (dataScroll) {
+                    chart.data.labels.push(d.getHours() + ':' + d.getMinutes() + ':' + d.getSeconds());
+                }else{
+                    chart.data.labels[l] = d.getHours() + ':' + d.getMinutes() + ':' + d.getSeconds();
                 }
-                chart.data.datasets[0].data.push(value);
-                //chart.update();
-
-                refreshTimer = setTimeout(function() {
-                    updateChart();
-                }, refreshSpeed);
+                var value = parseInt(xhr.responseText) || 0;
+                chart.data.datasets[1].data.push(value);
+            
+                var h2o = new XMLHttpRequest();
+                h2o.open('GET', 'api?adc=2', true);
+                h2o.send();
+                h2o.onload = function() {
+                    if (h2o.status == 200) {
+                        var v = parseInt(h2o.responseText) || 0;
+                        chart.data.datasets[0].data.push(v);
+                        chart.update();
+                    }
+                    refreshTimer = setTimeout(function() {
+                        updateChart();
+                    }, refreshSpeed);
+                }
             }
         }
     }
+    xhr.send();
 }
-
-function isEmpty( el ){
-    return !$.trim(el.html())
-}
-
-Array.prototype.max = function() {
-  return Math.max.apply(null, this);
-};
-
-Array.prototype.min = function() {
-  return Math.min.apply(null, this);
-};

@@ -656,7 +656,7 @@ function loadSVG(svgfile) {
 								        grid: true,
 								        step: 1,
 								        min: 0,
-								        max: 9,
+								        max: 8,
 								        from: pnp_adc.charAt(1)
 								    };
 				                    if (typeof ionRangeSlider !== "function") {

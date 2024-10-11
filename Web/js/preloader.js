@@ -157,22 +157,25 @@ ready(function() {
 });
 
 function notify(messageHeader, messageBody, bg, id) {
+    if(bg == 'danger') {
+        bg = 'bg-red-500';
+    }else if(bg == 'warning') {
+        bg = 'bg-yellow-500';
+    }else{
+        bg = 'bg-green-500';
+    }
     var toast = document.createElement('div');
-    toast.className = 'toast fade show text-white bg-' + bg;
-    toast.setAttribute('role', 'alert');
-    toast.setAttribute('aria-live', 'assertive');
-    toast.setAttribute('aria-atomic', 'true');
+    toast.className = 'px-4 py-1 rounded text-white ' + bg;
 
     if (messageHeader != '') {
         var toastHeader = document.createElement('div');
-        toastHeader.className = 'toast-header text-white bg-' + bg;
+        toastHeader.className = 'flex border-b ' + bg;
         toastHeader.textContent = messageHeader;
         
         var btnClose = document.createElement('button');
-        btnClose.className = 'btn-close';
-        btnClose.setAttribute('data-bs-dismiss', 'toast');
+        btnClose.className = 'flex ml-auto';
+        btnClose.textContent = 'X';
         toastHeader.appendChild(btnClose);
-        
         toast.appendChild(toastHeader);
     }
 
@@ -182,13 +185,9 @@ function notify(messageHeader, messageBody, bg, id) {
         toastBody.textContent = messageBody;
         toast.appendChild(toastBody);
     }
-
     document.getElementById('notify').appendChild(toast);
 
-    var toastNotify = new bootstrap.Toast(toast, {delay: 5000});
-    toastNotify.show();
-
-    toast.addEventListener('hidden.bs.toast', function () {
-      document.getElementById('notify').removeChild(this);
-    });
+    setTimeout(function(toast) {
+        document.getElementById('notify').removeChild(toast);
+    }, 3500, toast);
 }
