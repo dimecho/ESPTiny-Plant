@@ -34,13 +34,15 @@ rm -rf data/img
 rm -rf data/svg/extra
 rm -rf data/nvram.json
 rm -rf data/svg/index.html
+if [ $esp != 1 ]; then
+    rm -rf data/js/chartjs-plugin-annotation.js
+fi
 mkdir data/img
 cp -rf Web/img/cert.svg data/img
-purgecss --css data/bootstrap.css --content data/*.html --whitelist bg-success,bg-danger,bg-warning --output data/css/bootstrap.css
-purgecss --css data/bootstrap.slate.css --content data/*.html --whitelist bg-success,bg-danger,bg-warning  --output data/css/bootstrap.slate.css
+cp -rf Web/img/eye-slash.svg data/img
+cp -rf Web/img/eye-slash-fill.svg data/img
 purgecss --css data/roundslider.css --content data/*.html --whitelist --output data/css/roundslider.css
 purgecss --css data/rangeslider.css --content data/*.html --whitelist --output data/css/rangeslider.css
-purgecss --css data/igrowl.css --content data/*.html --whitelist --output data/css/igrowl.css
 
 echo "> Build with Extra SVG? (y/n)"
 read yn
@@ -102,7 +104,8 @@ else
     #_size:             0x001F0000 (2031616)
     #$esp_path_littlefs/$gcc/mklittlefs -c ./data/ -b 4096 -p 256 -d 5 -s 2031616 ./build/flash-littlefs.bin
     #$esp_path_littlefs/$gcc/mklittlefs -c ./data/ -b 4096 -p 256 -d 5 -s 1036288 ./build/flash-littlefs.bin
-    $esp_path_littlefs/$gcc/mklittlefs -c ./data/ -b 4096 -p 256 -d 5 -s 518144 ./build/flash-littlefs.bin
+    #$esp_path_littlefs/$gcc/mklittlefs -c ./data/ -b 4096 -p 256 -d 5 -s 518144 ./build/flash-littlefs.bin
+    $esp_path_littlefs/$gcc/mklittlefs -c ./data/ -b 4096 -p 256 -d 5 -s 283648 ./build/flash-littlefs.bin
 fi
 
 #Compress LittleFS

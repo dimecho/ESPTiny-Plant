@@ -34,7 +34,7 @@ function getOAuthToken(oauthCode, oauthScope)
 	            if(refreshToken == undefined) { //&prompt=consent
 	            	notify('','The Refresh Token is only provided on first authorization', 'danger');
 	            }else{
-				   	notify('','Received Refresh Token', 'success');
+				   			notify('','Received Refresh Token', 'success');
 	            }
 	            notify('','Received Access Token', 'success');
 	          }

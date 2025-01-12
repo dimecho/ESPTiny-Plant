@@ -2,7 +2,8 @@
 <html>
     <head>
         <title>tiny plant</title>
-        <meta charset="UTF-8" />
+        <meta charset="UTF-8">
+        <meta http-equiv="Cache-Control" content="max-age=36000, public">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <link rel="stylesheet" type="text/css" id="cssSVG">
         <link rel="stylesheet" type="text/css" href="css/preloader.css">
@@ -10,9 +11,9 @@
         <link rel="stylesheet" type="text/css" href="css/roundslider.css">
         <link rel="icon" type="image/x-icon" href="favicon.ico">
         <script src="js/preloader.js"></script>
-        <script src="js/jquery.core.js"></script>
         <script src="js/roundslider.js"></script>
         <script defer src="js/index.js"></script>
+        <script defer src="js/common.js"></script>
     </head>
     <body class="preloader bg-gray-100 dark:bg-gray-700">
         <div id="preloader"></div>
@@ -21,19 +22,38 @@
 	    <div class="flex justify-center px-20">
 	        <div id="svgInteractive" class="bg-gray-100 dark:bg-gray-600 svglayer w-full"></div>
 	    </div>
-		<div class="fixed inset-0 flex items-center justify-center hidden modal" id="water-Settings">
-		    <div class="w-full max-w-md mx-auto">
-  				<div id="water-Slider"></div>
-		    </div>
-		</div>
-		<div class="fixed inset-0 flex items-center justify-center hidden modal" id="moisture-Settings">
-  			<div id="moisture-Slider"></div>
-		</div>
-		<div class="fixed inset-0 flex items-center justify-center hidden modal" id="pot-size-Settings">
-  			<div id="pot-size-Slider"></div>
-		</div>
-		<div class="fixed inset-0 flex items-center justify-center hidden modal" id="power-Settings">
-  			<div id="power-Slider"></div>
+		<div class="fixed inset-0 flex items-center justify-center hidden modal" id="roundslider">
+			<div class="relative w-[300px] h-[300px] select-none">
+		        <div class="roundslider-knob">
+		          <div class="roundslider-rotator">
+		            <div class="roundslider-text">0</div>
+		          </div>
+		          <div class="roundslider-pointer">
+		            <svg height="24" viewBox="0 0 24 24" width="24"><path d="M0 0h24v24H0z" fill="none"/><path d="M8 5v14l11-7z"/></svg>
+		          </div>
+		        </div>
+		        <svg class="w-full h-full roundslider-progress-bar">
+		          <circle cx="50%" cy="50%" r="140"></circle>
+		          <circle
+		            id="roundslider-progress-circle"
+		           	cx="50%" 
+			        cy="50%" 
+			        r="140"
+		            style="
+		              stroke: url(#gradient);
+		              stroke-width: 16px;
+		              stroke-linecap: round;
+		            "
+		          ></circle>
+		          <defs>
+		            <linearGradient id="gradient" x1="0%" y1="0%" x2="100%" y2="100%">
+		              <stop offset="0%" style="stop-color: red" />
+		              <stop offset="50%" style="stop-color: orange" />
+		              <stop offset="100%" style="stop-color: rgb(29, 209, 94)" />
+		            </linearGradient>
+		          </defs>
+		        </svg>
+	      	</div>
 		</div>
 		<div class="fixed inset-0 flex items-center justify-center hidden modal" id="soil-Settings">
 			<div class="bg-white dark:bg-gray-800 w-[50%] rounded-lg border border-gray-300 dark:border-gray-600">
@@ -72,7 +92,7 @@
 	                        <button class="tab-link text-gray-600 dark:text-gray-400 hover:text-blue-500 border-blue-500" onclick="changeTab(event, 'tabAlerts')">Alerts</button>
 	                    </li>
 	                    <li class="mr-4">
-	                        <button class="tab-link text-gray-600 dark:text-gray-400 hover:text-blue-500 border-blue-500" onclick="changeTab(event, 'tabDemo')">Settings</button>
+	                        <button class="tab-link text-gray-600 dark:text-gray-400 hover:text-blue-500 border-blue-500" onclick="changeTab(event, 'tabDemo');initRangeSlider(avslider);">Settings</button>
 	                    </li>
 	                    <li class="mr-4">
 	                        <button class="tab-link text-gray-600 dark:text-gray-400 hover:text-blue-500 border-blue-500" onclick="changeTab(event, 'tabLayout')">Layout</button>
@@ -81,13 +101,13 @@
 	                        <button class="tab-link text-gray-600 dark:text-gray-400 hover:text-blue-500 border-blue-500" onclick="changeTab(event, 'tabTest')">Test</button>
 	                    </li>
 	                    <li class="mr-4">
-	                        <button class="tab-link text-gray-600 dark:text-gray-400 hover:text-blue-500 border-blue-500" onclick="changeTab(event, 'tabFirmware')">Firmware</button>
+	                        <button class="tab-link text-gray-600 dark:text-gray-400 hover:text-blue-500 border-blue-500" onclick="changeTab(event, 'tabFirmware');initRangeSlider(pnpslider);initRangeSlider(adcslider)">Firmware</button>
 	                    </li>
 	                </ul>
 	                <div class="tab-content mt-4">
 	                    <div class="tab-pane" id="tabWireless">
-							<form method="POST" action="/nvram?wireless" id="wireless-SettingsForm" class="p-4">
-							    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+							<form method="POST" action="/nvram?wireless" id="wireless-SettingsForm" class="text-gray-800 dark:text-gray-300">
+							    <div class="grid grid-cols-1 md:grid-cols-2">
 							        <div>
 							            <fieldset class="mb-4">
 							                <legend class="text-gray-800 dark:text-gray-300">WiFi Mode</legend>
@@ -114,28 +134,24 @@
 							                </div>
 							            </fieldset>
 							        </div>
-							        <div class="flex justify-center">
-							            <a href="" id="qrcode-dl">
-							                <img id="qrcode" class="dark:invert">
-							            </a>
-							        </div>
+							        <div class="flex justify-center dark:invert" id="qrcode"></div>
 							    </div>
-							    <div class="mb-2">
+							    <div>
 							        <div class="bg-yellow-500 text-white mb-4 hidden" id="AlertWiFiPower">WiFi power may not reach AP</div>
 							        <div class="bg-yellow-500 text-white mb-4 hidden" id="AlertWiFiDHCP">Don't forget to enable DHCP</div>
 							    </div>
-							    <div class="mb-4">
+							    <div>
 							        <label class="text-gray-800 dark:text-gray-300">Antenna</label>
-							        <select id="WiFiPhyMode" class="form-select px-2 py-1 w-full dark:bg-gray-700 dark:text-gray-300 rounded-sm" name="WiFiPhyMode">
+							        <select id="WiFiPhyMode" class="mt-1 block w-full p-2 border rounded dark:bg-gray-700" name="WiFiPhyMode">
 							            <option value="1">802.11 b</option>
 							            <option value="2">802.11 g</option>
 							            <option value="3">802.11 n</option>
 							        </select>
 							    </div>
-							    <div class="mb-4">
+							    <div>
 							        <label class="text-gray-800 dark:text-gray-300">Power</label>
 							        <div class="flex justify-center">
-							            <select id="WiFiPower" class="form-select px-2 w-[80%] dark:bg-gray-700 dark:text-gray-300 rounded-sm" name="WiFiPower" onchange="SetWiFiMode()">
+							            <select id="WiFiPower" class="mt-1 block w-full p-2 border rounded dark:bg-gray-700" name="WiFiPower" onchange="SetWiFiMode()">
 							                <option value="1">1 dBm (1mW)</option>
 							                <option value="2">2 dBm (1mW)</option>
 							                <option value="3">3 dBm (1mW)</option>
@@ -163,7 +179,7 @@
 							    </div>
 							    <div class="mb-4">
 							        <label class="block text-gray-800 dark:text-gray-300">Channel</label>
-							        <select id="WiFiChannel" class="form-select px-2 py-1 w-full dark:bg-gray-700 dark:text-gray-300 rounded-sm" name="WiFiChannel">
+							        <select id="WiFiChannel" class="mt-1 block w-full p-2 border rounded dark:bg-gray-700" name="WiFiChannel">
 							            <option>1</option>
 							            <option>2</option>
 							            <option>3</option>
@@ -179,53 +195,53 @@
 							    </div>
 							    <div class="mb-4">
 							        <label class="block text-gray-800 dark:text-gray-300">Network</label>
-							        <input type="text" id="WiFiSSID" name="WiFiSSID" class="px-2 w-full dark:bg-gray-700 dark:text-gray-300 rounded-sm" placeholder="SSID" required />
+							        <input type="text" id="WiFiSSID" name="WiFiSSID" class="mt-1 block w-full p-2 border rounded dark:bg-gray-700" placeholder="SSID" oninput="generateWiFiQR()" required>
 							    </div>
 							    <div class="mb-4">
 							        <label class="block text-gray-800 dark:text-gray-300">Username (WPA2 Enterprise)</label>
-							        <input type="text" id="WiFiUsername" name="WiFiUsername" class="px-2 w-full dark:bg-gray-700 dark:text-gray-300 rounded-sm" placeholder="Username" oninput="inputValidate(this)" />
+							        <input type="text" id="WiFiUsername" name="WiFiUsername" class="mt-1 block w-full p-2 border rounded dark:bg-gray-700" placeholder="Username" oninput="inputValidate(this)">
 							    </div>
 							    <div class="mb-4">
 							        <label class="block text-gray-800 dark:text-gray-300">Password</label>
 							        <div class="flex items-center">
-							            <input type="password" id="WiFiPassword" name="WiFiPassword" class="px-2 w-full dark:bg-gray-700 dark:text-gray-300 rounded-sm" placeholder="Password" oninput="generateWiFiQR()" />
-							            <img class="mx-2 dark:invert cursor-pointer" data-target="WiFiPassword" src="img/eye-slash.svg" />
+							            <input type="password" id="WiFiPassword" name="WiFiPassword" class="mt-1 block w-full p-2 border rounded dark:bg-gray-700" placeholder="Password" oninput="generateWiFiQR()">
+							            <img class="mx-2 dark:invert cursor-pointer" data-target="WiFiPassword" src="img/eye-slash.svg">
 							        </div>
 							    </div>
 							    <div class="mb-4">
 							        <fieldset class="mb-4">
 							            <div class="flex items-center">
 							                <input type="hidden" id="EnableLog" name="EnableLog" value="0">
-							                <input type="checkbox" id="EnableLogCheckbox" class="form-checkbox text-blue-500" onclick="HiddenCheck('EnableLog',this)">
+							                <input type="checkbox" id="EnableLogCheckbox" class="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded dark:bg-gray-700 dark:border-gray-600 focus:ring-blue-500 dark:focus:ring-blue-600" onclick="HiddenCheck('EnableLog',this)">
 							                <label for="EnableLogCheckbox" class="ml-2 text-gray-800 dark:text-gray-300">Enable Data Log</label>
 							            </div>
 							        </fieldset>
-							        <input type="text" id="EnableLogInterval" name="EnableLogInterval" data-provider="slider" />
+							        <input type="text" id="EnableLogInterval" name="EnableLogInterval">
 							    </div>
 							    <div class="mb-4">
 							        <fieldset class="mb-4">
 							            <div class="flex items-center">
 							                <input type="hidden" id="WiFiDHCP" name="WiFiDHCP" value="0">
-							                <input type="checkbox" id="WiFiDHCPCheckbox" class="form-checkbox text-blue-500" onclick="HiddenCheck('WiFiDHCP',this)">
+							                <input type="checkbox" id="WiFiDHCPCheckbox" class="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded dark:bg-gray-700 dark:border-gray-600 focus:ring-blue-500 dark:focus:ring-blue-600" onclick="HiddenCheck('WiFiDHCP',this)">
 							                <label for="WiFiDHCPCheckbox" class="ml-2 text-gray-800 dark:text-gray-300">Enable DHCP</label>
 							            </div>
 							        </fieldset>
 							    </div>
 							    <div class="mb-4">
 							        <label class="block text-gray-800 dark:text-gray-300">IPv4 Address</label>
-							        <input type="text" id="WiFiIP" name="WiFiIP" class="px-2 w-full dark:bg-gray-700 dark:text-gray-300 rounded-sm" placeholder="IPv4 Address (192.168.0.2)" required />
+							        <input type="text" id="WiFiIP" name="WiFiIP" class="mt-1 block w-full p-2 border rounded dark:bg-gray-700" placeholder="IPv4 Address (192.168.0.2)" required>
 							    </div>
 							    <div class="mb-4">
 							        <label class="block text-gray-800 dark:text-gray-300">Subnet Mask</label>
-							        <input type="text" id="WiFiSubnet" name="WiFiSubnet" class="px-2 w-full dark:bg-gray-700 dark:text-gray-300 rounded-sm" placeholder="Subnet Mask (255.255.255.0)" required />
+							        <input type="text" id="WiFiSubnet" name="WiFiSubnet" class="mt-1 block w-full p-2 border rounded dark:bg-gray-700" placeholder="Subnet Mask (255.255.255.0)" required>
 							    </div>
 							    <div class="mb-4">
 							        <label class="block text-gray-800 dark:text-gray-300">Gateway Address</label>
-							        <input type="text" id="WiFiGateway" name="WiFiGateway" class="px-2 w-full dark:bg-gray-700 dark:text-gray-300 rounded-sm" placeholder="Gateway Address (192.168.0.1)" required />
+							        <input type="text" id="WiFiGateway" name="WiFiGateway" class="mt-1 block w-full p-2 border rounded dark:bg-gray-700" placeholder="Gateway Address (192.168.0.1)" required>
 							    </div>
 							    <div class="mb-4">
 							        <label class="block text-gray-800 dark:text-gray-300">DNS Address</label>
-							        <input type="text" id="WiFiDNS" name="WiFiDNS" class="px-2 w-full dark:bg-gray-700 dark:text-gray-300 rounded-sm" placeholder="DNS Address (8.8.8.8)" required />
+							        <input type="text" id="WiFiDNS" name="WiFiDNS" class="mt-1 block w-full p-2 border rounded dark:bg-gray-700" placeholder="DNS Address (8.8.8.8)" required>
 							    </div>
 							    <div class="flex justify-between mt-4">
 							        <button type="button" class="px-4 py-2 bg-red-500 hover:bg-red-600 text-white rounded" onclick="hideModal(this)">Cancel</button>
@@ -244,60 +260,60 @@
 							    <div class="space-y-4 text-gray-800 dark:text-gray-300">
 							        <div>
 							            <label class="block">Email Server</label>
-							            <input type="text" id="AlertEmail" name="AlertEmail" class="mt-2 w-full p-2 border rounded dark:bg-gray-700 dark:text-white" placeholder="Recipient Email" oninput="inputValidate(this)" required />
-							            <input type="text" id="AlertSMTPServer" name="AlertSMTPServer" class="mt-2 w-full p-2 border rounded dark:bg-gray-700 dark:text-white" placeholder="SMTP Server" oninput="inputValidate(this)" required />
-							            <input type="text" id="AlertSMTPUsername" name="AlertSMTPUsername" class="mt-2 w-full p-2 border rounded dark:bg-gray-700 dark:text-white" placeholder="SMTP Username" oninput="inputValidate(this)" />
+							            <input type="text" id="AlertEmail" name="AlertEmail" class="mt-2 w-full p-2 border rounded dark:bg-gray-700 dark:text-white" placeholder="Recipient Email" oninput="inputValidate(this)" required>
+							            <input type="text" id="AlertSMTPServer" name="AlertSMTPServer" class="mt-2 w-full p-2 border rounded dark:bg-gray-700 dark:text-white" placeholder="SMTP Server" oninput="inputValidate(this)" required>
+							            <input type="text" id="AlertSMTPUsername" name="AlertSMTPUsername" class="mt-2 w-full p-2 border rounded dark:bg-gray-700 dark:text-white" placeholder="SMTP Username" oninput="inputValidate(this)">
 							            <div class="relative mt-2">
-							                <input type="password" id="AlertSMTPPassword" name="AlertSMTPPassword" class="w-full p-2 border rounded dark:bg-gray-700 dark:text-white" placeholder="SMTP Password" />
-							                <img class="absolute right-3 top-3 cursor-pointer dark:invert" data-target="AlertSMTPPassword" src="img/eye-slash.svg" />
+							                <input type="password" id="AlertSMTPPassword" name="AlertSMTPPassword" class="w-full p-2 border rounded dark:bg-gray-700 dark:text-white" placeholder="SMTP Password">
+							                <img class="absolute right-3 top-3 cursor-pointer dark:invert" data-target="AlertSMTPPassword" src="img/eye-slash.svg">
 							            </div>
 							            <div class="flex justify-center mt-2">
-							                <input type="password" id="AlertSMTPToken" name="AlertSMTPToken" class="p-2 w-[80%] border rounded dark:bg-gray-700 dark:text-white" placeholder="OAuth2.0 Access Token" />
+							                <input type="password" id="AlertSMTPToken" name="AlertSMTPToken" class="p-2 w-[80%] border rounded dark:bg-gray-700 dark:text-white" placeholder="OAuth2.0 Access Token">
 							                <button type="button" class="ml-2 px-2 py-1 w-[20%] bg-gray-300 hover:bg-gray-500 text-gray-800 rounded" onclick="getOAuthToken()">Generate Token</button>
 							            </div>
 							        </div>
 							        <div>
 							            <label class="block">Identity</label>
-							            <input type="text" id="AlertPlantName" name="AlertPlantName" class="mt-2 w-full p-2 border rounded dark:bg-gray-700 dark:text-white" placeholder="Plant Name" />
+							            <input type="text" id="AlertPlantName" name="AlertPlantName" class="mt-2 w-full p-2 border rounded dark:bg-gray-700 dark:text-white" placeholder="Plant Name">
 							        </div>
 							        <div class="m-4">
-							            <input type="hidden" id="Alerts" name="Alerts" value="" />
+							            <input type="hidden" id="Alerts" name="Alerts" value="">
 							            <label class="block">Send Email Alerts:</label>
 							        </div>
 							        <div class="m-4 grid grid-cols-1 md:grid-cols-2 gap-4" id="AlertSet">
 							            <div class="space-y-2">
 							                <div class="flex items-center">
-							                    <input type="checkbox" class="form-check-input" />
+							                    <input type="checkbox" class="form-check-input">
 							                    <label class="ml-2">DHCP IP</label>
 							                </div>
 							                <div class="flex items-center">
-							                    <input type="checkbox" class="form-check-input" />
+							                    <input type="checkbox" class="form-check-input">
 							                    <label class="ml-2">Low Battery</label>
 							                </div>
 							                <div class="flex items-center">
-							                    <input type="checkbox" class="form-check-input" />
+							                    <input type="checkbox" class="form-check-input">
 							                    <label class="ml-2">Low Moisture</label>
 							                </div>
 							                <div class="flex items-center">
-							                    <input type="checkbox" class="form-check-input" />
+							                    <input type="checkbox" class="form-check-input">
 							                    <label class="ml-2">Pump Run</label>
 							                </div>
 							            </div>
 							            <div class="space-y-2">
 							                <div class="flex items-center">
-							                    <input type="checkbox" class="form-check-input" />
+							                    <input type="checkbox" class="form-check-input">
 							                    <label class="ml-2">Over Water</label>
 							                </div>
 							                <div class="flex items-center">
-							                    <input type="checkbox" class="form-check-input" />
+							                    <input type="checkbox" class="form-check-input">
 							                    <label class="ml-2">Empty Water</label>
 							                </div>
 							                <div class="flex items-center">
-							                    <input type="checkbox" class="form-check-input" />
+							                    <input type="checkbox" class="form-check-input">
 							                    <label class="ml-2">Internal Errors</label>
 							                </div>
 							                <div class="flex items-center">
-							                    <input type="checkbox" class="form-check-input" />
+							                    <input type="checkbox" class="form-check-input">
 							                    <label class="ml-2">High Priority</label>
 							                </div>
 							            </div>
@@ -315,8 +331,8 @@
 							        <div>
 							            <label class="block">Security</label>
 							            <div class="relative mt-1">
-							                <input type="password" id="DemoPassword" name="DemoPassword" class="w-full p-2 border rounded dark:bg-gray-700" placeholder="Settings Password" />
-							                <img class="absolute right-3 top-2.5 cursor-pointer dark:invert" data-target="DemoPassword" src="img/eye-slash.svg" />
+							                <input type="password" id="DemoPassword" name="DemoPassword" class="w-full p-2 border rounded dark:bg-gray-700" placeholder="Settings Password">
+							                <img class="absolute right-3 top-2.5 cursor-pointer dark:invert" data-target="DemoPassword" src="img/eye-slash.svg">
 							            </div>
 							        </div>
 							        <div>
@@ -331,43 +347,43 @@
 							            </select>
 							        </div>
 							    </div>
-							    <input type="hidden" id="DemoAvailability" name="DemoAvailability" value="" />
+							    <input type="hidden" id="DemoAvailability" name="DemoAvailability" value="">
 							    <label class="block">WiFi Availability:</label>
 							    <div class="flex">
 							        <div class="flex-1">
 							            <div id="DemoAvailabilityWeek" class="space-y-1">
 							                <div class="flex items-center">
-							                    <input type="checkbox" class="form-check-input" />
+							                    <input type="checkbox" class="form-check-input">
 							                    <label class="ml-2">Sunday</label>
 							                </div>
 							                <div class="flex items-center">
-							                    <input type="checkbox" class="form-check-input" />
+							                    <input type="checkbox" class="form-check-input">
 							                    <label class="ml-2">Monday</label>
 							                </div>
 							                <div class="flex items-center">
-							                    <input type="checkbox" class="form-check-input" />
+							                    <input type="checkbox" class="form-check-input">
 							                    <label class="ml-2">Tuesday</label>
 							                </div>
 							                <div class="flex items-center">
-							                    <input type="checkbox" class="form-check-input" />
+							                    <input type="checkbox" class="form-check-input">
 							                    <label class="ml-2">Wednesday</label>
 							                </div>
 							                <div class="flex items-center">
-							                    <input type="checkbox" class="form-check-input" />
+							                    <input type="checkbox" class="form-check-input">
 							                    <label class="ml-2">Thursday</label>
 							                </div>
 							                <div class="flex items-center">
-							                    <input type="checkbox" class="form-check-input" />
+							                    <input type="checkbox" class="form-check-input">
 							                    <label class="ml-2">Friday</label>
 							                </div>
 							                <div class="flex items-center">
-							                    <input type="checkbox" class="form-check-input" />
+							                    <input type="checkbox" class="form-check-input">
 							                    <label class="ml-2">Saturday</label>
 							                </div>
 							            </div>
 							        </div>
 							        <div class="flex-1">
-							            <div id="Availability-Slider"></div>
+							            <input type="text" id="availability-slider" name="availability-slider">
 							        </div>
 							    </div>
 							    <div class="flex justify-between mt-4">
@@ -381,8 +397,8 @@
 							    <div class="grid grid-cols-1 sm:grid-cols-3 gap-2">
 							        <div class="col-span-1">
 							            <form method="POST" action="/upload" enctype="multipart/form-data" id="formLayout">
-							                <input type="file" accept=".svg,.css" name="filesystem" id="fileLayout" class="hidden" />
-							                <input type="submit" class="hidden" />
+							                <input type="file" accept=".svg,.css" name="filesystem" id="fileLayout" class="hidden">
+							                <input type="submit" class="hidden">
 							            </form>
 							            <button class="bg-blue-500 hover:bg-blue-600 w-full py-2 rounded" type="button" id="browseLayout">Upload Layout</button>
 							        </div>
@@ -456,22 +472,24 @@
 							            <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-2">
 							                <div>
 							                    <form method="POST" action="/update" enctype="multipart/form-data" id="formLittleFS">
-							                        <input type="file" accept=".bin,.signed" name="filesystem" id="fileLittleFS" class="hidden" />
-							                        <input type="submit" class="hidden" />
+							                        <input type="file" accept=".bin,.signed" name="filesystem" id="fileLittleFS" class="hidden">
+							                        <input type="submit" class="hidden">
 							                    </form>
 							                    <button class="py-2 bg-gray-500 hover:bg-gray-600 w-full rounded" type="button" id="browseLittleFS">Flash LittleFS</button>
 							                </div>
 							                <div>
 							                    <form method="POST" action="/update" enctype="multipart/form-data" id="formFirmware">
-							                        <input type="file" accept=".bin,.signed" name="firmware" id="fileFirmware" class="hidden" />
-							                        <input type="submit" class="hidden" />
+							                        <input type="file" accept=".bin,.signed" name="firmware" id="fileFirmware" class="hidden">
+							                        <input type="submit" class="hidden">
 							                    </form>
 							                    <button class="py-2 bg-gray-500 hover:bg-gray-600 w-full rounded" type="button" id="browseFirmware">Flash Firmware</button>
 							                </div>
 							            </div>
-							            <input type="text" id="EnablePNP" name="EnablePNP" class="border border-gray-300 rounded-md p-2 w-full" data-provider="slider" />
-							            <label for="ADCSensitivity" class="mt-4 text-gray-800 dark:text-gray-300">Moisture Sensor Sensitivity</label>
-							            <input type="text" id="ADCSensitivity" name="ADCSensitivity" class="border border-gray-300 rounded-md p-2 w-full" data-provider="slider" />
+							            <div class="w-[85%]">
+							            	<input type="text" id="EnablePNP" name="EnablePNP">
+							            	<label for="ADCSensitivity" class="mt-4 text-gray-800 dark:text-gray-300 p-4">Moisture Sensor Sensitivity</label>
+							            	<input type="text" id="ADCSensitivity" name="ADCSensitivity">
+							        	</div>
 							        </div>
 							        <div class="w-1/2 text-gray-800 dark:text-gray-300 p-4">
 							            <small class="block">GUI Version: 1.0.6</small>
@@ -494,20 +512,20 @@
 							    <div class="mt-4 grid grid-cols-1 lg:grid-cols-3 gap-4">
 							        <div>
 							            <form method="POST" action="/upload" enctype="multipart/form-data" id="formCertificate">
-							                <input type="file" accept=".der,.cer" name="cert" id="fileCertificate" class="hidden" />
-							                <input type="submit" class="hidden" />
+							                <input type="file" accept=".der,.cer" name="cert" id="fileCertificate" class="hidden">
+							                <input type="submit" class="hidden">
 							            </form>
 							            <button class="bg-blue-500 text-white w-full py-2 rounded hover:bg-blue-600" type="button" id="browseCertificate">Certificate</button>
 							        </div>
 							        <div>
 							            <form method="POST" action="/upload" enctype="multipart/form-data" id="formPrivateKey">
-							                <input type="file" accept=".der,.key" name="key" id="filePrivateKey" class="hidden" />
-							                <input type="submit" class="hidden" />
+							                <input type="file" accept=".der,.key" name="key" id="filePrivateKey" class="hidden">
+							                <input type="submit" class="hidden">
 							            </form>
 							            <button class="bg-blue-500 text-white w-full py-2 rounded hover:bg-blue-600" type="button" id="browsePrivateKey">Private Key</button>
 							        </div>
 							        <div class="flex justify-center items-center">
-							            <img src="img/cert.svg" loading="lazy" alt="Certificate Icon" width="64" height="64" />
+							            <img src="img/cert.svg" loading="lazy" alt="Certificate Icon" width="64" height="64">
 							        </div>
 							    </div>
 							    <div class="progress bg-gray-200 dark:bg-gray-700 rounded-sm mt-4">
@@ -544,8 +562,8 @@
                 <div class="badge bg-danger text-white mb-4 d-none" id="AlertTokenError"></div>
             	<div class="badge bg-danger text-white mb-4 d-none" id="AlertGmailToken"><a href="https://console.cloud.google.com/apis/library/gmail.googleapis.com?project=clever-acolyte-161503" target="_blank">Enable Gmail API</a> and <a href="https://console.cloud.google.com/apis/credentials/oauthclient?project=clever-acolyte-161503" target="_blank">Create OAuth client ID</a> (Review: <a href="https://console.cloud.google.com/apis/credentials/consent?project=clever-acolyte-161503" target="_blank">OAuth consent screen</a>)</div>
 				<div class="badge bg-warning text-white mb-4 d-none" id="AlertGmailTokenURL">Add Authorized redirect URIs <b class="bg-dark" id="gmail-redirect-uri">http://localhost</b></div>
-                <input type="text" id="oauth-clientid" name="oauth-clientid" class="mt-2 w-full p-1 border rounded dark:bg-gray-700 dark:text-white" placeholder="Client ID: 6841945-5er1v2bt1.apps.googleusercontent.com" required />
-                <input type="password" id="oauth-secret" name="oauth-secret" class="mt-2 w-full p-1 border rounded dark:bg-gray-700 dark:text-white" placeholder="Secret: GOVSNX-7P0JIfhcehhpkkLZd5Nyn-EI023q" required />
+                <input type="text" id="oauth-clientid" name="oauth-clientid" class="mt-2 w-full p-1 border rounded dark:bg-gray-700 dark:text-white" placeholder="Client ID: 6841945-5er1v2bt1.apps.googleusercontent.com" required>
+                <input type="password" id="oauth-secret" name="oauth-secret" class="mt-2 w-full p-1 border rounded dark:bg-gray-700 dark:text-white" placeholder="Secret: GOVSNX-7P0JIfhcehhpkkLZd5Nyn-EI023q" required>
 		        <div class="flex justify-between">
 		        	<input type="file" accept=".json" name="token" id="oauth-file" hidden>
 		            <button type="button" class="bg-yellow-500 hover:bg-yellow-600 text-white rounded w-full py-2 mt-4 mr-2" id="oauth-json">Browse OAuth Client JSON</button>
@@ -560,7 +578,7 @@
 		            <button id="close-modal" class="text-gray-500 hover:text-gray-800 dark:text-gray-400 dark:hover:text-gray-300 focus:outline-none text-2xl" onclick="hideModal(this)">&times;</button>
 		        </div>
 		        <form method="POST" action="login" id="demo-LockForm">
-		            <input type="password" id="DemoPassword" name="password" class="border border-gray-300 dark:border-gray-600 focus:ring focus:ring-green-500 rounded-md p-2 w-full" placeholder="Password" required />
+		            <input type="password" id="DemoPassword" name="password" class="border border-gray-300 dark:border-gray-600 focus:ring focus:ring-green-500 rounded-md p-2 w-full" placeholder="Password" required>
 		        	<button type="submit" class="bg-green-500 hover:bg-green-600 text-white rounded w-full px-4 py-2 mt-4" id="demo-lock-ok">Login</button>
 		        </form>
 		    </div>
@@ -571,7 +589,7 @@
 		            <h5 class="text-lg font-semibold text-gray-800 dark:text-white">Test Pump</h5>
 		            <button id="close-modal" class="text-gray-500 hover:text-gray-800 dark:text-gray-400 dark:hover:text-gray-300 focus:outline-none text-2xl" onclick="hideModal(this)">&times;</button>
 		        </div>
-	            <input type="text" id="test-pump-delay" name="test-pump-delay" data-provider="slider" />
+	            <input type="text" id="test-pump-delay" name="test-pump-delay">
 	            <div class="mt-2 text-sm text-gray-600 dark:text-gray-300">
 	                Delay Test in Seconds <span id="test-pump-delay-timer"></span>
 	            </div>
@@ -587,7 +605,7 @@
 		            <h5 class="text-lg font-semibold text-gray-800 dark:text-white">Flush Water</h5>
 		            <button id="close-modal" class="text-gray-500 hover:text-gray-800 dark:text-gray-400 dark:hover:text-gray-300 focus:outline-none text-2xl" onclick="hideModal(this)">&times;</button>
 		        </div>
-	            <p class="text-gray-800 dark:text-white">Empty large water containers.<br/><span class="bg-yellow-500 font-semibold px-1 rounded-sm">Warning:</span> Pump will run until stopped!</p>
+	            <p class="text-gray-800 dark:text-white">Empty large water containers.<br><span class="bg-yellow-500 font-semibold px-1 rounded-sm">Warning:</span> Pump will run until stopped!</p>
 		        <div class="flex justify-between">
 		            <button type="button" class="bg-red-500 hover:bg-red-600 text-white rounded w-full py-2 mt-4 mr-2" id="flush-water-stop">Stop Pump</button>
 		            <button type="button" class="bg-green-500 hover:bg-green-600 text-white rounded w-full py-2 mt-4 ml-2" id="flush-water-start">Start Pump</button>

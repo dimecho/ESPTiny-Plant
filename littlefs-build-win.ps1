@@ -18,8 +18,8 @@ Remove-Item -Recurse -Force .\data -ErrorAction SilentlyContinue
 Copy-Item -Path .\Web\ -Filter *.* -Destination .\data\ -Recurse
 Remove-Item -Recurse -Force .\data\img -ErrorAction SilentlyContinue
 Remove-Item -Recurse -Force .\data\svg\extra -ErrorAction SilentlyContinue
-Remove-Item -Recurse -Force .\data\svg\index.html -ErrorAction SilentlyContinue
 Remove-Item -Recurse -Force .\data\nvram.json -ErrorAction SilentlyContinue
+Remove-Item -Recurse -Force .\data\svg\index.html -ErrorAction SilentlyContinue
 New-Item -ItemType directory -Path .\data\img
 Copy-Item -Path .\Web\img\cert.svg -Destination .\data\img
 

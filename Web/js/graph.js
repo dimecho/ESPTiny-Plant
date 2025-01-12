@@ -1,5 +1,5 @@
 var roundEdges = false;
-var dataLabels = true;
+var dataLabels = false;
 var dataScroll = true;
 var dataStream = false;
 var dataAnimation = false;
@@ -72,6 +72,9 @@ document.addEventListener("DOMContentLoaded", function(event)
             tension: roundEdges ? 1 : 0,
             fill: false,
             data: [],
+            datalabels: {
+                display: false
+            },
             xAxisID: 'x-axis-1',
             yAxisID: 'y-axis-1'
         },{
@@ -83,14 +86,15 @@ document.addEventListener("DOMContentLoaded", function(event)
             tension: roundEdges ? 1 : 0,
             fill: false,
             data: [],
-            xAxisID: 'x-axis-0',
-            yAxisID: 'y-axis-0',
             datalabels: {
-                align: 'end',
-                anchor: 'end'
-            }
+                display: dataLabels
+            },
+            xAxisID: 'x-axis-0',
+            yAxisID: 'y-axis-0'
         }]
     };
+
+    //Chart.register(ChartDataLabels);
 
     initChart();
 
@@ -127,29 +131,30 @@ document.addEventListener("DOMContentLoaded", function(event)
         }
         return n;
     };
-    
-    $('#chartSlider').ionRangeSlider({
-        skin: 'big',
-        grid: true,
-        step: 1,
-        min: 0,
-        max: 120,
-        from: (refreshSpeed / 60 / 1000),
-        //prettify: speed_prettify,
-        postfix: ' Minutes',
-        onFinish: function (e) {
 
-            var xhr = new XMLHttpRequest();
-            if(e.from == 0) { // Real-time, force disable log
+    var timeSlider = new rSlider({
+        target: '#chartSlider',
+        values: Array.from({ length: 13 }, (_, i) => i * 10),
+        range: false,
+        tooltip: true,
+        scale: true,
+        labels: true,
+        set: [10],
+        onChange: function (e) {
+            //var xhr = new XMLHttpRequest();
+
+            if(e == 0) { // Real-time
                 refreshSpeed = 1000;
-                xhr.open('GET', 'log?end=1', true);
-                xhr.send();
                 dataStream = true;
+                //xhr.open('GET', 'log?end=1', true);
+                //xhr.send();
             }else{
-                refreshSpeed = e.from;
+                refreshSpeed = e;
                 refreshSpeed *= (1000 * 60);
-                xhr.open('GET', 'nvram.json?offset=' + LOG_INTERVAL + '&value=10', true);
-                xhr.send();
+                //xhr.open('GET', 'nvram.json?offset=' + LOG_INTERVAL + '&value=10', true);
+                //xhr.send();
+
+                //TODO: Retrive a page once in a while to prevent WiFi sleep
             }
 
             if(refreshTimer != null) {
@@ -345,8 +350,6 @@ function initChart() {
         },
         responsive: false, //true,
         maintainAspectRatio: false,
-        hoverMode: 'index',
-        stacked: false,
         scales: {
             'x-axis-0': {
                 //type: 'linear',
@@ -405,22 +408,14 @@ function initChart() {
             }
         },
         plugins: {
-            tooltip: {
-                enabled: false
-            },
             datalabels: {
-                align: 'top',
-                display: dataLabels,
                 backgroundColor: function(context) {
                     return context.dataset.backgroundColor;
                 },
                 borderRadius: 2,
                 color: ctxFontColor,
-                font: {
-                    size: ctxFont,
-                    weight: 'bold'
-                },
-                padding: 6
+                font: ctxFont,
+                padding: 2
             }
         }
     };
@@ -457,6 +452,9 @@ function csvDatasets(dataset) {
 
 function stopChart() {
     clearTimeout(refreshTimer);
+    if(dataStream){
+        notify('', 'Stopping Data Stream ...', 'warning');
+    }
 }
 
 function startChart() {
@@ -524,7 +522,15 @@ function adjustChart() {
     return l;
 }
 
+function getRandomInt(min, max) {
+  return Math.floor(Math.random() * (max - min + 1)) + min;
+}
+
 function updateChart() {
+    //Debug
+    //dataStream = false;
+    //refreshSpeed = 100;
+
     var xhr = new XMLHttpRequest();
     if(dataStream) {
         var refresh = 0;
@@ -533,22 +539,24 @@ function updateChart() {
             var value = e.currentTarget.response.split('\n');
             for (var x = 0; x < value.length-1; x++) {
                 var s = value[x].split(':');
-                if (!dataScroll)
+                if (!dataScroll) {
                     var l = adjustChart();
-                setTimeout(function(water, moisture, n, l) {
-                    if (dataScroll)
-                        l = adjustChart();
+                }
+                setTimeout(function(water, moisture, a, b) {
+                    if (dataScroll) {
+                        a = adjustChart();
+                    }
                     var d = new Date();
                     if (dataScroll) {
                         chart.data.labels.push(d.getHours() + ':' + d.getMinutes() + ':' + d.getSeconds());
                     }else{
-                        chart.data.labels[l+n] = d.getHours() + ':' + d.getMinutes() + ':' + d.getSeconds();
+                        chart.data.labels[a+b] = d.getHours() + ':' + d.getMinutes() + ':' + d.getSeconds();
                     }
                     chart.data.datasets[0].data.push(water);
                     chart.data.datasets[1].data.push(moisture);
                     chart.update();
                     
-                }, 100 * refresh, s[0], s[1], x, l);
+                }, 100 * refresh, s[0], s[1], l, x);
                 refresh++;
             }
         }
@@ -569,7 +577,7 @@ function updateChart() {
                 }else{
                     chart.data.labels[l] = d.getHours() + ':' + d.getMinutes() + ':' + d.getSeconds();
                 }
-                var value = parseInt(xhr.responseText) || 0;
+                var value = parseInt(xhr.responseText) || getRandomInt(100, 1024);
                 chart.data.datasets[1].data.push(value);
             
                 var h2o = new XMLHttpRequest();
