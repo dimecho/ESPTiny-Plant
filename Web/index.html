@@ -12,6 +12,7 @@
         <link rel="icon" type="image/x-icon" href="favicon.ico">
         <script src="js/preloader.js"></script>
         <script src="js/roundslider.js"></script>
+        <script src="js/rangeslider.js"></script>
         <script defer src="js/index.js"></script>
         <script defer src="js/common.js"></script>
     </head>
@@ -67,8 +68,8 @@
   			</div>
 		</div>
 		<div class="fixed inset-0 flex items-center justify-center hidden modal" id="plant-Type">
-			<div class="bg-white dark:bg-gray-800 w-[50%] rounded-lg border border-gray-300 dark:border-gray-600">
-		        <div class="flex justify-between items-center p-2 border-b">
+			<div class="bg-white dark:bg-gray-800 w-[50%] rounded-lg border border-gray-600 dark:border-gray-300">
+		        <div class="flex justify-between items-center p-2 border-b border-gray-600 dark:border-gray-300">
 		            <h5 class="text-lg font-semibold text-gray-800 dark:text-white">Plant Type</h5>
 		            <button id="close-modal" class="text-gray-500 hover:text-gray-800 dark:text-gray-400 dark:hover:text-gray-300 focus:outline-none text-2xl p-1" onclick="hideModal(this)">&times;</button>
 		        </div>
@@ -78,8 +79,8 @@
   			</div>
 		</div>
 		<div class="fixed inset-0 flex items-center justify-center hidden modal" id="wireless-Settings" tabindex="-1" aria-hidden="true">
-			<div class="bg-white dark:bg-gray-800 w-[50%] rounded-lg border border-gray-300 dark:border-gray-600">
-		        <div class="flex justify-between items-center p-2 border-b">
+			<div class="bg-white dark:bg-gray-800 w-[50%] rounded-lg border border-gray-600 dark:border-gray-300">
+		        <div class="flex justify-between items-center p-2 border-b border-gray-600 dark:border-gray-300">
 		            <h5 class="text-lg font-semibold text-gray-800 dark:text-white">WiFi Settings</h5>
 		            <button id="close-modal" class="text-gray-500 hover:text-gray-800 dark:text-gray-400 dark:hover:text-gray-300 focus:outline-none text-2xl p-1" onclick="hideModal(this)">&times;</button>
 		        </div>
@@ -92,7 +93,7 @@
 	                        <button class="tab-link text-gray-600 dark:text-gray-400 hover:text-blue-500 border-blue-500" onclick="changeTab(event, 'tabAlerts')">Alerts</button>
 	                    </li>
 	                    <li class="mr-4">
-	                        <button class="tab-link text-gray-600 dark:text-gray-400 hover:text-blue-500 border-blue-500" onclick="changeTab(event, 'tabDemo');initRangeSlider(avslider);">Settings</button>
+	                        <button class="tab-link text-gray-600 dark:text-gray-400 hover:text-blue-500 border-blue-500" onclick="changeTab(event, 'tabDemo')">Settings</button>
 	                    </li>
 	                    <li class="mr-4">
 	                        <button class="tab-link text-gray-600 dark:text-gray-400 hover:text-blue-500 border-blue-500" onclick="changeTab(event, 'tabLayout')">Layout</button>
@@ -101,7 +102,7 @@
 	                        <button class="tab-link text-gray-600 dark:text-gray-400 hover:text-blue-500 border-blue-500" onclick="changeTab(event, 'tabTest')">Test</button>
 	                    </li>
 	                    <li class="mr-4">
-	                        <button class="tab-link text-gray-600 dark:text-gray-400 hover:text-blue-500 border-blue-500" onclick="changeTab(event, 'tabFirmware');initRangeSlider(pnpslider);initRangeSlider(adcslider)">Firmware</button>
+	                        <button class="tab-link text-gray-600 dark:text-gray-400 hover:text-blue-500 border-blue-500" onclick="changeTab(event, 'tabFirmware')">Firmware</button>
 	                    </li>
 	                </ul>
 	                <div class="tab-content mt-4">
@@ -216,7 +217,13 @@
 							                <label for="EnableLogCheckbox" class="ml-2 text-gray-800 dark:text-gray-300">Enable Data Log</label>
 							            </div>
 							        </fieldset>
-							        <input type="text" id="EnableLogInterval" name="EnableLogInterval">
+							        <div>
+								        <div class="slider" data-min="0" data-max="200" data-step="1" data-default="0" data-id="slider-log" id="EnableLogInterval"></div>
+								        <div class="mt-4 text-center text-gray-800 dark:text-gray-300">
+								            <span class="text-lg font-semibold">Log Interval: </span>
+								            <span class="slider-value text-lg" id="log-interval">0</span>
+								        </div>
+								    </div>
 							    </div>
 							    <div class="mb-4">
 							        <fieldset class="mb-4">
@@ -485,11 +492,27 @@
 							                    <button class="py-2 bg-gray-500 hover:bg-gray-600 w-full rounded" type="button" id="browseFirmware">Flash Firmware</button>
 							                </div>
 							            </div>
-							            <div class="w-[85%]">
-							            	<input type="text" id="EnablePNP" name="EnablePNP">
-							            	<label for="ADCSensitivity" class="mt-4 text-gray-800 dark:text-gray-300 p-4">Moisture Sensor Sensitivity</label>
-							            	<input type="text" id="ADCSensitivity" name="ADCSensitivity">
-							        	</div>
+							            <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-2 text-gray-800 dark:text-gray-300">
+							                <div class="text-left">
+							                	<span class="text-lg">NPN</span>
+							                </div>
+							                <div class="text-right">
+							              		<span class="text-lg">PNP</span>
+							                </div>
+							            </div>
+							            <div class="mt-4">
+						            		<div class="slider" data-min="0" data-max="1" data-step="1" data-default="0" data-id="slider-pnp" id="EnablePNP"></div>
+						            		<span class="slider-value hidden" id="adc-sensitivity">0</span>
+									    </div>
+									    <div class="p-4">
+									    </div>
+									    <div class="mt-4">
+							            	<div class="slider" data-min="0" data-max="9" data-step="1" data-default="0" data-id="slider-adc-sensitivity" id="ADCSensitivity"></div>
+									        <div class="mt-4 text-center text-gray-800 dark:text-gray-300">
+									            <span class="text-lg font-semibold">Moisture Sensor Sensitivity </span>
+									            <span class="slider-value text-lg" id="adc-sensitivity">0</span>
+									        </div>
+								    	</div>
 							        </div>
 							        <div class="w-1/2 text-gray-800 dark:text-gray-300 p-4">
 							            <small class="block">GUI Version: 1.0.6</small>
@@ -538,8 +561,8 @@
 			</div>
 		</div>
         <div class="fixed inset-0 flex items-center justify-center hidden modal" id="keep-EEPROM">
-		    <div class="bg-white dark:bg-gray-800 p-4 rounded-lg w-full max-w-md mx-auto border border-gray-300 dark:border-gray-600">
-		        <div class="flex modal-header justify-between items-center border-b mb-4">
+		    <div class="bg-white dark:bg-gray-800 p-4 rounded-lg w-full max-w-md mx-auto border border-gray-600 dark:border-gray-300">
+		        <div class="flex modal-header justify-between items-center border-b border-gray-600 dark:border-gray-300 mb-4">
 		            <h5 class="text-lg font-semibold text-gray-800 dark:text-white">EEPROM</h5>
 		            <button id="close-modal" class="text-gray-500 hover:text-gray-800 dark:text-gray-400 dark:hover:text-gray-300 focus:outline-none text-2xl" onclick="hideModal(this)">&times;</button>
 		        </div>
@@ -554,8 +577,8 @@
 		    </div>
 		</div>
         <div class="fixed inset-0 flex items-center justify-center hidden modal" id="oauth-ClientID">
-		    <div class="bg-white dark:bg-gray-800 p-4 w-[50%] rounded-lg border border-gray-300 dark:border-gray-600">
-		        <div class="flex modal-header justify-between items-center border-b mb-4">
+		    <div class="bg-white dark:bg-gray-800 p-4 w-[50%] rounded-lg border border-gray-600 dark:border-gray-300">
+		        <div class="flex modal-header justify-between items-center border-b border-gray-600 dark:border-gray-300 mb-4">
 		            <h5 class="text-lg font-semibold text-gray-800 dark:text-white">OAuth 2.0 (Client ID + Secret)</h5>
 		            <button id="close-modal" class="text-gray-500 hover:text-gray-800 dark:text-gray-400 dark:hover:text-gray-300 focus:outline-none text-2xl" onclick="hideModal(this)">&times;</button>
 		        </div>
@@ -572,8 +595,8 @@
 		    </div>
 		</div>
 		<div class="fixed inset-0 flex items-center justify-center hidden modal" id="demo-Lock">
-		    <div class="bg-white dark:bg-gray-800 p-4 rounded-lg w-full max-w-md mx-auto border border-gray-300 dark:border-gray-600">
-		        <div class="flex modal-header justify-between items-center border-b mb-4">
+		    <div class="bg-white dark:bg-gray-800 p-4 rounded-lg w-full max-w-md mx-auto border border-gray-600 dark:border-gray-300">
+		        <div class="flex modal-header justify-between items-center border-b border-gray-600 dark:border-gray-300">
 		        	<h5 class="text-lg font-semibold text-gray-800 dark:text-white">Login</h5>
 		            <button id="close-modal" class="text-gray-500 hover:text-gray-800 dark:text-gray-400 dark:hover:text-gray-300 focus:outline-none text-2xl" onclick="hideModal(this)">&times;</button>
 		        </div>
@@ -584,24 +607,27 @@
 		    </div>
 		</div>
         <div class="fixed inset-0 flex items-center justify-center hidden modal" id="test-Pump">
-		    <div class="bg-white dark:bg-gray-800 p-4 rounded-lg w-full max-w-md mx-auto border border-gray-300 dark:border-gray-600">
-		        <div class="flex modal-header justify-between items-center border-b mb-4">
+		    <div class="bg-white dark:bg-gray-800 p-4 rounded-lg w-full max-w-md mx-auto border border-gray-600 dark:border-gray-300">
+		        <div class="flex modal-header justify-between items-center border-b border-gray-600 dark:border-gray-300">
 		            <h5 class="text-lg font-semibold text-gray-800 dark:text-white">Test Pump</h5>
 		            <button id="close-modal" class="text-gray-500 hover:text-gray-800 dark:text-gray-400 dark:hover:text-gray-300 focus:outline-none text-2xl" onclick="hideModal(this)">&times;</button>
 		        </div>
-	            <input type="text" id="test-pump-delay" name="test-pump-delay">
-	            <div class="mt-2 text-sm text-gray-600 dark:text-gray-300">
-	                Delay Test in Seconds <span id="test-pump-delay-timer"></span>
-	            </div>
+		        <div class="pt-4">
+			        <div class="slider" data-min="0" data-max="200" data-step="5" data-default="0" data-id="slider-test-pump-delay" id="test-pump-delay"></div>
+			        <div class="mt-4 text-center text-gray-600 dark:text-gray-300">
+			            <span class="text-lg font-semibold">Delay Test in Seconds: </span>
+			            <span class="slider-value text-lg" id="test-pump-delay-timer">0</span>
+			        </div>
+			    </div>
 	            <div class="progress bg-gray-200 dark:bg-gray-700 rounded-sm mt-4">
 	                <div class="progress-bar bg-blue-500 h-2 rounded-sm" style="width:0%"></div>
 	            </div>
-		        <button type="button" class="bg-green-500 hover:bg-green-600 text-white rounded w-full py-2 mt-4" id="test-pump-start">Run Pump Test</button>
+		        <button type="button" class="get-value-btn bg-green-500 hover:bg-green-600 text-white rounded w-full py-2 mt-4" id="test-pump-start">Run Pump Test</button>
 		    </div>
 		</div>
 		<div class="fixed inset-0 flex items-center justify-center hidden modal" id="flush-Water">
-		    <div class="bg-white dark:bg-gray-800 p-4 rounded-lg w-full max-w-md mx-auto border border-gray-300 dark:border-gray-600">
-		        <div class="flex modal-header justify-between items-center border-b mb-4">
+		    <div class="bg-white dark:bg-gray-800 p-4 rounded-lg w-full max-w-md mx-auto border border-gray-600 dark:border-gray-300">
+		        <div class="flex modal-header justify-between items-center border-b border-gray-600 dark:border-gray-300">
 		            <h5 class="text-lg font-semibold text-gray-800 dark:text-white">Flush Water</h5>
 		            <button id="close-modal" class="text-gray-500 hover:text-gray-800 dark:text-gray-400 dark:hover:text-gray-300 focus:outline-none text-2xl" onclick="hideModal(this)">&times;</button>
 		        </div>

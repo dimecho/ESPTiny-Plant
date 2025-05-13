@@ -56,10 +56,10 @@ Sketch (Firmware)
 
 Additional Libraries
 
-* https://github.com/mathieucarbou/ESPAsyncWebServer
+* https://github.com/ESP32Async/ESPAsyncWebServer
+* https://github.com/ESP32Async/AsyncTCP
+* https://github.com/ESP32Async/ESPAsyncTCP
 * https://github.com/devyte/ESPAsyncDNSServer
-* https://github.com/mathieucarbou/AsyncTCPSock
-* https://github.com/mathieucarbou/esphome-ESPAsyncTCP
 * https://github.com/me-no-dev/ESPAsyncUDP
 * https://github.com/mobizt/ESP-Mail-Client
 

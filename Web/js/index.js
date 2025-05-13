@@ -2,7 +2,7 @@ var pnpslider, adcslider, avslider;
 
 document.addEventListener('DOMContentLoaded', function(event)
 {
-	if(document.cookie != "") {
+	if(document.cookie != '') {
 		const params = new URLSearchParams(window.location.search);
 		let oauthCode = params.get('code');
         let oauthScope = params.get('scope');
@@ -16,18 +16,18 @@ document.addEventListener('DOMContentLoaded', function(event)
         }else{
         	var ArrayCookies = {};
 			try {
-				ArrayCookies = document.cookie.split(";");
+				ArrayCookies = document.cookie.split(';');
 				for (i = 0; i < ArrayCookies.length; i++) {
-			        var c_name = ArrayCookies[i].substr(0, ArrayCookies[i].indexOf("="));
-			        var c_value = ArrayCookies[i].substr(ArrayCookies[i].indexOf("=") + 1);
-			        c_name = c_name.replace(/^\s+|\s+$/g, "");
+			        var c_name = ArrayCookies[i].substr(0, ArrayCookies[i].indexOf('='));
+			        var c_value = ArrayCookies[i].substr(ArrayCookies[i].indexOf('=') + 1);
+			        c_name = c_name.replace(/^\s+|\s+$/g, '');
 			        saveSetting(c_name, unescape(c_value));
 			    }
 		   	}catch(error){
 		    	notify('',error, 'danger');
 		    }finally{
 		    	if(ArrayCookies.length > 1) {
-		    		document.getElementById('keep-eeprom-text').textContent="Restoring Settings ...";
+		    		document.getElementById('keep-eeprom-text').textContent = 'Restoring Settings ...';
 					document.getElementById('keep-eeprom-footer').classList.add('hidden');
 					document.getElementById('keep-EEPROM').classList.remove('hidden');
 
@@ -63,10 +63,10 @@ document.addEventListener('DOMContentLoaded', function(event)
 			PlantLogin();
 		}else{
 	        if(document.getElementById('EnableLogCheckbox').checked === true) {
-	        	var loginterval = document.getElementById('EnableLogInterval').getAttribute("value");
+	        	var loginterval = document.getElementById('EnableLogInterval').value;
 				var deepsleep = document.getElementById('power-text').textContent;
 
-	        	//console.log(loginterval  + " < " + deepsleep);
+	        	//console.log(loginterval  + ' < ' + deepsleep);
 	        	if(loginterval < (deepsleep * 60)) {
 				    saveSetting(DEEP_SLEEP, 1); //in minutes
 					notify('','Deep Sleep is longer than Log Interval', 'danger');
@@ -169,7 +169,7 @@ function loadSVG(svgfile) {
 									var listdiv = document.createElement('div');
 									listdiv.classList.add('form-check');
 								    var listlabel = document.createElement('label');
-								    listlabel.classList.add('form-check-label');
+								    listlabel.classList.add('ml-2');
 								    listlabel.textContent = item;
 									var listcheckbox = document.createElement('input');
 									listcheckbox.setAttribute('type', 'checkbox');
@@ -233,6 +233,12 @@ function loadSVG(svgfile) {
 									}
 								}
 			                    var pnp_adc = nvram.response['nvram'][PNP_ADC] + '000';
+
+		                    	pnpslider = new RangeSlider(document.getElementById('EnablePNP'));
+								adcslider = new RangeSlider(document.getElementById('ADCSensitivity'));
+								pnpslider.setValue(pnp_adc.charAt(0));
+								adcslider.setValue(pnp_adc.charAt(1));
+
 			                    document.getElementById('WaterLevel').value = pnp_adc.charAt(2);
 			                    svgwaterLevelAdjust(pnp_adc.charAt(2));
 							}
@@ -360,7 +366,7 @@ function loadSVG(svgfile) {
 				        document.getElementById('timer').onclick = function() {
 				            var timerStep = 1;
 				            roundSliderInit({
-				                value: document.getElementById('moisture-text').textContent,
+				                value: document.getElementById('timer-text').textContent,
 				                borderWidth: 2,
   								rangeColor: document.getElementById('moisture-badge').firstElementChild.getAttribute('fill'),
 				                radius: 280,
@@ -474,7 +480,7 @@ function loadSVG(svgfile) {
 				                    var v = data['nvram'][0].split('|');
 				                    document.getElementById('coreVersion').textContent = 'Core Version: ' + v[0];
 				                    document.getElementById('sdkVersion').textContent = 'SDK Version: ' + v[1];
-				                    document.getElementById('fsVersion').textContent = 'LittleFS Version: ' + (0xffff & (v[2] >> 16)) + "." + (0xffff & (v[2] >> 0)) + "." + (0xffff & (v[2] >> 20));
+				                    document.getElementById('fsVersion').textContent = 'LittleFS Version: ' + (0xffff & (v[2] >> 16)) + '.' + (0xffff & (v[2] >> 0)) + '.' + (0xffff & (v[2] >> 20));
 				                    document.getElementById('firmwareVersion').textContent = 'Firmware Version: ' + v[3];
 				                    document.getElementById('iram').textContent = 'IRAM: ' + Math.round(v[4]/1024) + ' KB (' + v[4] + ')';
 									document.getElementById('dram').textContent = 'DRAM: ' + Math.round(v[5]/1024) + ' KB (' + v[5] + ')';
@@ -497,14 +503,15 @@ function loadSVG(svgfile) {
 				                    bool_value = data['nvram'][LOG_ENABLE] == '1' ? true : false;
 				                   	document.getElementById('EnableLog').value = data['nvram'][LOG_ENABLE];
 									document.getElementById('EnableLogCheckbox').checked = bool_value;
-									document.getElementById('EnableLogInterval').value = data['nvram'][LOG_INTERVAL];
+									var slider_log = new RangeSlider(document.getElementById('EnableLogInterval'));
+									slider_log.setValue(data['nvram'][LOG_INTERVAL]);
 
+									/*
 				                    var pnp_adc = data['nvram'][PNP_ADC] + '000';
-				                    document.getElementById('EnablePNP').value = pnp_adc.charAt(0);
-									document.getElementById('ADCSensitivity').value = pnp_adc.charAt(1);
 									bool_value = pnp_adc.charAt(2) == '1' ? true : false;
 									document.getElementById('WaterLevel').value = pnp_adc.charAt(2);
 									document.getElementById('WaterLevelCheckbox').checked = bool_value;
+									*/
 
 				                    bool_value = data['nvram'][NETWORK_DHCP] == '1' ? true : false;
 				                    document.getElementById('WiFiDHCP').value = data['nvram'][NETWORK_DHCP];
@@ -536,28 +543,19 @@ function loadSVG(svgfile) {
 									document.getElementById('AlertPlantName').value = data['nvram'][PLANT_NAME];
 									document.getElementById('Timezone').value = data['nvram'][TIMEZONE_OFFSET];
 
-						            document.getElementById('EnablePNP').addEventListener('input', function() {
-						            	const enablePNP = document.getElementById('EnablePNP').getAttribute("value");
-									    const waterLevel = document.getElementById('WaterLevel').getAttribute("value");
-									    const adcValue = document.getElementById('ADCSensitivity').getAttribute("value");
-									    if (enablePNP === 'PNP') {
+						            document.getElementById('EnablePNP').addEventListener('mouseup', function() {
+									    const waterLevel = document.getElementById('WaterLevel').getAttribute('value');
+									    if (pnpslider.currentValue == 1) {
 									        notify('', 'PNP Transistor! Controlled with LOW (Negative)', 'danger');
 									        notify('', 'If you get this WRONG, Pump will run Non-Stop!', 'warning');
-									        saveSetting(PNP_ADC, '1' + adcValue + waterLevel);
-									    } else {
-									        saveSetting(PNP_ADC, '0' + adcValue + waterLevel);
 									    }
+									    saveSetting(PNP_ADC, pnpslider.currentValue + '' + adcslider.currentValue + '' + waterLevel);
 									});
 
-						            document.getElementById('ADCSensitivity').addEventListener('input', function() {
-									    const enablePNP = document.getElementById('EnablePNP').getAttribute("value");
-									    const waterLevel = document.getElementById('WaterLevel').getAttribute("value");
-									    const adcValue = document.getElementById('ADCSensitivity').getAttribute("value");
-									    if (enablePNP === 'PNP') {
-									        saveSetting(PNP_ADC, '1' + adcValue + waterLevel);
-									    } else {
-									        saveSetting(PNP_ADC, '0' + adcValue + waterLevel);
-									    }
+						            document.getElementById('ADCSensitivity').addEventListener('mouseup', function() {
+									    const waterLevel = document.getElementById('WaterLevel').getAttribute('value');
+									    console.log(document.getElementById('WaterLevel'));
+									    saveSetting(PNP_ADC, pnpslider.currentValue + '' + adcslider.currentValue + '' + waterLevel);
 									});
 
 									document.getElementById('fileLayout').addEventListener('change', function() {
@@ -583,9 +581,7 @@ function loadSVG(svgfile) {
 											PlantLogin();
 										}else{
 											document.getElementById('formFirmware').setAttribute('action', 'http://' + window.location.hostname + '/update'); // force HTTP
-											document.getElementById('keep-eeprom-text').textContent="After firmware upgrade, keep current settings?";
-											//document.querySelectorAll("#keep-EEPROM .modal-footer")[0].style.display = "";
-
+											document.getElementById('keep-eeprom-text').textContent = 'After firmware upgrade, keep current settings?';
 											document.getElementById('wireless-Settings').classList.add('hidden');
 											document.getElementById('keep-EEPROM').classList.remove('hidden');
 											document.getElementById('keep-eeprom-yes').onclick = function() {
@@ -633,6 +629,7 @@ function loadSVG(svgfile) {
 					            			}
 							            }
 						            });
+						            /*
 								    pnpslider = {
 								        target: '#EnablePNP',
 								        values: ['NPN', 'PNP'],
@@ -659,9 +656,10 @@ function loadSVG(svgfile) {
 										    document.getElementById('ADCSensitivity').value = e;
 								        }
 								    };
+								    */
 								    const times = Array.from({ length: 25 }, (_, i) => {
 									  const hour = (6 + i) % 24;
-									  const period = hour < 12 ? "am" : "pm";
+									  const period = hour < 12 ? 'am' : 'pm';
 									  const formattedHour = hour % 12 || 12; // Converts 0 to 12 for 12-hour clock
 									  return `${formattedHour}:00${period}`;
 									});
@@ -679,23 +677,7 @@ function loadSVG(svgfile) {
 										    //document.getElementById('ADCSensitivity').value = e;
 								        }
 								    };
-								    var logslider = {
-								   		target: '#EnableLogInterval',
-								        values: Array.from({ length: 60 }, (_, i) => i * 10),
-								        range: false,
-								        tooltip: true,
-								        scale: true,
-								        labels: false,
-								        //step: 1,
-								        set: [data['nvram'][LOG_INTERVAL]],
-								        onChange: function (e) {
-								        	if (e < 10) {
-										        notify('', 'Flash memory will fill up fast!', 'danger');
-										    }
-										    document.getElementById('EnableLogInterval').value = e;
-								        }
-								    };
-								    initRangeSlider(logslider);
+
 									/*
 						            $('#Availability-Slider').roundSlider({
 						                svgMode: true,
@@ -770,7 +752,7 @@ function loadSVG(svgfile) {
 				    }
 				}
 
-				if(nvram.response['nvram'][DEMO_PASSWORD] != "")
+				if(nvram.response['nvram'][DEMO_PASSWORD] != '')
 	            {
 	            	DEMOLOCK = true;
 	            }
@@ -784,31 +766,6 @@ function loadSVG(svgfile) {
 	    	notify('','The browser does not support SVG graphics', 'danger');
 	    }
     }
-}
-
-function initRangeSlider(options) {
-	var nodeid = options.target.replace('#','');
-	if (typeof rSlider !== "function") {
-    	var stylesheet = document.createElement('link');
-    	stylesheet.rel = 'stylesheet';
-    	stylesheet.type = 'text/css';
-		stylesheet.href = 'css/rslider.css';
-    	document.head.appendChild(stylesheet);
-
-	    var script = document.createElement('script');
-		script.onload = function() {
-			new rSlider(options);
-		};
-		script.src = 'js/rslider.js';
-		document.head.appendChild(script);
-	}else{
-		if (document.getElementById(nodeid).style.display !== 'none') {
-			new rSlider(options);
-		}
-	}
-	//document.querySelectorAll(options.target).forEach(element => {
-	//	element.remove();
-	//});
 }
 
 function saveSetting(offset, value, callback) {
@@ -832,7 +789,7 @@ function saveSetting(offset, value, callback) {
 }
 
 const _timerScroll = function (event) {
-	var value = document.querySelector(".roundslider-text").textContent;
+	var value = document.querySelector('.roundslider-text').textContent;
 	document.getElementById('timer-text').textContent = value;
 
     saveSetting(PLANT_MANUAL_TIMER, value, function(lock) {
@@ -862,19 +819,19 @@ const _timerScroll = function (event) {
 };
 
 function _moistureScroll (event) {
-	var value = document.querySelector(".roundslider-text").textContent;
+	var value = document.querySelector('.roundslider-text').textContent;
 	document.getElementById('moisture-text').textContent = value;
     saveSetting(PLANT_SOIL_MOISTURE, value);
 };
 
 function _potsizeScroll (event) {
-	var value = document.querySelector(".roundslider-text").textContent;
+	var value = document.querySelector('.roundslider-text').textContent;
 	document.getElementById('pot-size-text').textContent = value;
     saveSetting(PLANT_POT_SIZE, value);
 };
 
 function _powerScroll (event) {
-	var value = document.querySelector(".roundslider-text").textContent;
+	var value = document.querySelector('.roundslider-text').textContent;
     if(value == 0) {
 		notify('', 'Sleep Disabled!', 'danger');
 		notify('', 'Wireless Always On', 'success');
@@ -892,11 +849,8 @@ function _powerScroll (event) {
 };
 
 function _waterScroll (event) {
-	var value = document.querySelector(".roundslider-text").textContent;
-	var pnp = 0;
-    if(document.getElementById('EnablePNP').value == 'PNP')
-    	pnp = 1;
-    saveSetting(PNP_ADC, pnp + document.getElementById('ADCSensitivity').getAttribute('value') + value, function(lock) {
+	var value = document.querySelector('.roundslider-text').textContent;
+	saveSetting(PNP_ADC, pnpslider.currentValue + '' + adcslider.currentValue + '' + value, function(lock) {
     	if (lock != 'Locked') {
     		svgwaterLevelAdjust(value);
         }
@@ -906,11 +860,11 @@ function _waterScroll (event) {
 
 function _unbindScroll() {
 	var roundslider = document.getElementById('roundslider');
-	roundslider.removeEventListener("mouseup", _timerScroll);
-    roundslider.removeEventListener("mouseup", _moistureScroll);
-    roundslider.removeEventListener("mouseup", _potsizeScroll);
-    roundslider.removeEventListener("mouseup", _powerScroll);
-    roundslider.removeEventListener("mouseup", _waterScroll);
+	roundslider.removeEventListener('mouseup', _timerScroll);
+    roundslider.removeEventListener('mouseup', _moistureScroll);
+    roundslider.removeEventListener('mouseup', _potsizeScroll);
+    roundslider.removeEventListener('mouseup', _powerScroll);
+    roundslider.removeEventListener('mouseup', _waterScroll);
 }
 
 function hideModal(button) {
@@ -986,7 +940,7 @@ function AvailabilityWeek(availability) {
     		week[i].checked = true;
     	}
     }
-    var availabilityText = availability.join("");
+    var availabilityText = availability.join('');
     var slider = $('#Availability-Slider').data('roundSlider').getValue().split(',')
     if(slider[0] < 10) {
     	availabilityText += '0' + slider[0];
@@ -1047,21 +1001,21 @@ function WarningWiFiMode() {
 	document.getElementById('AlertWiFiPower').classList.add('d-none');
 	document.getElementById('AlertWiFiDHCP').classList.add('d-none');
 
-	if(document.getElementById("WiFiPower").value < 20) {
+	if(document.getElementById('WiFiPower').value < 20) {
 		document.getElementById('AlertWiFiPower').classList.remove('d-none');
 	}
-	if(document.getElementById("WiFiDHCP").value == 0) {
+	if(document.getElementById('WiFiDHCP').value == 0) {
 		document.getElementById('AlertWiFiDHCP').classList.remove('d-none');
 	}
 }
 
 function HiddenCheck(id, element) {
-    //console.log(id);
+    console.log(id);
 
     if(element.checked) {
-        document.getElementById(id).getAttribute('value') = 1;
+        document.getElementById(id).value = 1;
     }else{
-        document.getElementById(id).getAttribute('value') = 0;
+        document.getElementById(id).value = 0;
     }
 
     if(id == 'WiFiHidden') {
@@ -1077,10 +1031,7 @@ function HiddenCheck(id, element) {
     		saveSetting(LOG_ENABLE, 0, function(lock) {if (lock != 'Locked') {notify('','Graph & Log Collection is OFF', 'success')}});
     	}
     }else if(id == 'WaterLevel') {
-    	var pnp = 0;
-        if(document.getElementById('EnablePNP').getAttribute('value')== 'PNP')
-        	pnp = 1;
-        saveSetting(PNP_ADC, pnp + document.getElementById('ADCSensitivity').getAttribute('value') + document.getElementById('WaterLevel').getAttribute('value'), function(lock) {if (lock != 'Locked') {notify('','Make sure Water Sensor is OK and Water Full', 'info')}});
+        saveSetting(PNP_ADC, pnpslider.currentValue + '' + adcslider.currentValue + '' + document.getElementById('WaterLevel').getAttribute('value'), function(lock) {if (lock != 'Locked') {notify('','Make sure Water Sensor is OK and Water Full', 'info')}});
         svgwaterLevelAdjust(document.getElementById('WaterLevel').getAttribute('value'));
     }else if(id == 'WiFiDHCP') {
         var b = false;
@@ -1143,26 +1094,17 @@ function resetFlash()
 
 function testPump()
 {
-	var delayslider_parameters = {
-        skin: 'big',
-        grid: true,
-        step: 1,
-        min: 0,
-        max: 60,
-        from: 0
-    };
-	ionRangeSlider('#test-pump-delay', delayslider_parameters);
-
 	hideAllModals();
 	document.getElementById('test-Pump').classList.remove('hidden');
 	document.getElementById('modal-backdrop').classList.remove('hidden');
 
+	var slider_test_pump_delay = new RangeSlider(document.getElementById('test-pump-delay'));
 	document.getElementById('test-pump-start').onclick = function() {
-		var t = document.getElementById('test-pump-delay').value * 2;
+		var t = slider_test_pump_delay.getValue()-1;
     	var x = setInterval(function() {
 			if (t == 0) {
 			    clearInterval(x);
-			    document.getElementById('test-pump-delay-timer').innerHTML = '';
+			    document.getElementById('test-pump-delay-timer').innerHTML = slider_test_pump_delay.getValue();
 			    var log = new XMLHttpRequest();
 				log.open('GET', 'log?start=1', true);
 			    log.send();
@@ -1174,7 +1116,7 @@ function testPump()
 					    xhr.onload = function() {
 					        if (xhr.status == 200) {
 					        	var tm = parseInt(document.getElementById('pot-size-text').textContent) + 1;
-					        	if(xhr.responseText == "Locked") {
+					        	if(xhr.responseText == 'Locked') {
 					        		PlantLogin();
 					        	}else if(document.getElementById('WaterLevel').getAttribute('value') == 1) {
 					        		notify('', 'Water Level Sensor is On', 'warning');
@@ -1199,11 +1141,11 @@ function testPump()
 					    };
 			        }
 			    };
-			}else if ((t/2) % 1 == 0) {
-			  	document.getElementById('test-pump-delay-timer').innerHTML = '(' + (t/2) + ')';
+			}else if (t % 1 == 0) {
+			  	document.getElementById('test-pump-delay-timer').innerHTML = t;
 			}
 			t--;
-		}, 500);
+		}, 1000);
 	}
 }
 
@@ -1295,7 +1237,7 @@ function testFlood(water)
 	xhr.open('GET', 'api?water=' + water + '&empty=1', true);
     xhr.onload = function() {
         if (xhr.status == 200) {
-        	if(xhr.responseText == "Locked") {
+        	if(xhr.responseText == 'Locked') {
         		PlantLogin();
         	}else if(water > 3) {
     			notify('', 'Flood Protection Started', 'success');
@@ -1313,10 +1255,10 @@ function testEmpty(loop, flood)
 	xhr.open('GET', 'pump', true);
     xhr.onload = function() {
         if (xhr.status == 200) {
-        	if(xhr.responseText == "Locked") {
+        	if(xhr.responseText == 'Locked') {
         		PlantLogin();
         	}else{
-        		var interval = document.getElementById('EnableLogInterval').value * 1000;
+        		var loginterval = document.getElementById('EnableLogInterval').value * 1000;
         		if(loop == 1)
         			notify('', 'Empty Simulation Started', 'success');
 		        if(loop < 3) {
@@ -1354,7 +1296,7 @@ function testEmpty(loop, flood)
 		        	if (email) {
 			        	setTimeout(function() {
 			        		notify('', 'Check Email for Alert', 'success');
-						}, interval + 8000);
+						}, loginterval + 8000);
 			        }
 		        }
         	}
@@ -1382,7 +1324,7 @@ function generateRandomNumbers(count, min, max) {
 		numbers.push(randomNumber);
 		var MANUAL_TIMER = parseInt(document.getElementById('moisture-text').textContent);
 		if(randomNumber <= MANUAL_TIMER) {
-        	numbers.push("T:" + MANUAL_TIMER + ",M:" + randomNumber);
+        	numbers.push('T:' + MANUAL_TIMER + ',M:' + randomNumber);
 		}
     }
     return numbers;
@@ -1394,16 +1336,16 @@ function testGraph()
 	xhr.open('GET', 'log?clear=1', true);
     xhr.onload = function() {
         if (xhr.status == 200) {
-        	if(xhr.responseText == "Locked") {
+        	if(xhr.responseText == 'Locked') {
         		PlantLogin();
-        	}else{ //if(xhr.responseText == "...") {
+        	}else{
     			notify('', 'Generating Random Graph ...', 'success');
 
     			const randomNumbers = generateRandomNumbers(100, 500, 1024);
 				const fileContent = randomNumbers.join('\n');
 				const blob = new Blob([fileContent], { type: 'text/plain' });
 				console.log(blob);
-				const file = new File([blob], "log", { type: 'text/plain' });
+				const file = new File([blob], 'log', { type: 'text/plain' });
 				const formData = new FormData();
 				formData.append('file', file);
 				fetch('/upload', {
@@ -1507,13 +1449,13 @@ function testEmail()
 	    xhr.send();
 	    xhr.onload = function() {
 	        if (xhr.status == 200) {
-	        	if(xhr.responseText == "Locked") {
+	        	if(xhr.responseText == 'Locked') {
 	        		PlantLogin();
 	        	}else{
 		            progressTimer(62,0,function() {
 		            	if(xhr.responseText == 'OK') {
 							notify('', 'SMTP OK', 'success');
-						}else if(xhr.responseText == "AUTH") {
+						}else if(xhr.responseText == 'AUTH') {
 							notify('', 'SMTP Bad Authentication', 'danger');
 						}else{
 							notify('', 'SMTP Error ' + xhr.responseText, 'warning');
@@ -1652,10 +1594,10 @@ function progressTimer(speed, bar, callback)
 function deleteCookies()
 {
 	var result = document.cookie;
-	var cookieArray = result.split(";");
+	var cookieArray = result.split(';');
 	for(var i=0;i<cookieArray.length;i++){
-	   var keyValArr = cookieArray[i].split("=");
-	   document.cookie=keyValArr[0]+"=; expires=Thu, 01 Jan 1970 00:00:00 UTC; SameSite=Lax";
+	   var keyValArr = cookieArray[i].split('=');
+	   document.cookie=keyValArr[0]+'=; expires=Thu, 01 Jan 1970 00:00:00 UTC; SameSite=Lax';
 	}
 }
 
@@ -1681,13 +1623,13 @@ function generateWiFiQR()
     var qroptions = {
 		msg   :  qrstring
 		,dim   :   256
-		,ecl   :  "M"
+		,ecl   :  'M'
 	};
 
 	var a = document.getElementById('qrcode');
 	a.innerHTML = '';
     
-	if (typeof QRCode !== "function") {
+	if (typeof QRCode !== 'function') {
 	    var script = document.createElement('script');
 		script.onload = function() { var qrcode = new QRCode(qroptions); a.appendChild(qrcode) };
 		script.src = 'js/qrcode.js';
