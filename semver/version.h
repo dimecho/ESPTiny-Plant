@@ -3,9 +3,9 @@
 #define _VERSION_MINOR 0
 #define _VERSION_PATCH 0
 #define _VERSION_BUILD 1
-#define _VERSION_DATE "01/01/2023"
+#define _VERSION_DATE "01/01/2026"
 #define _VERSION_TIME "20:20:02"
 #define _VERSION_ONLY "1.0.0"
-#define _VERSION_NOBUILD "1.0.0 (01/01/2023)"
-#define _VERSION "1.0.0+2 (01/01/2023)"
+#define _VERSION_NOBUILD "1.0.0 (01/01/2026)"
+#define _VERSION "1.0.0+6 (01/01/2026)"
 //The version information is created automatically, more information here: https://github.com/rvdbreemen/autoinc-semver

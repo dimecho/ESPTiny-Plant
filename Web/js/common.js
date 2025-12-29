@@ -3,11 +3,11 @@ var refreshSpeed = 10000;
 var saveReminder;
 var notifyTimer;
 
-var pot_values = [10, 70, 120];
+var pot_values = [10, 30, 60];
 var pot_labels = ['Small', 'Medium', 'Large'];
 
-var soil_values = [300, 780];
-var soil_labels = ['Dry (Cactus)', 'Wet (Tropical)'];
+var soil_values = [0, 300, 780];
+var soil_labels = ['Off', 'Dry (Cactus)', 'Wet (Tropical)'];
 
 var timer_values = [0, 86400, 172800, 259200];
 var timer_labels = ['Dynamic', 'Once a Day', 'Every 2nd Day', 'Every 3rd Day'];

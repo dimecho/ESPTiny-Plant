@@ -182,7 +182,7 @@ function loadSVG(svgfile) {
 							});
 						}catch{}
 					}
-					document.getElementById('cssSVG').href = 'svg/' + svgfile.replace('.svg', '.css');
+					document.getElementById('css-svg').href = 'svg/' + svgfile.replace('.svg', '.css');
 
 				    // Request the SVG file
 				    var xhr = new XMLHttpRequest();
@@ -196,54 +196,20 @@ function loadSVG(svgfile) {
 
 			            if(nvram.response != undefined) {
 			                NVRAMtoSVG(nvram.response);
+
+			                var pnp_adc = nvram.response['nvram'][PNP_ADC] + '000';
+	                    	pnpslider = new RangeSlider(document.getElementById('EnablePNP'));
+							adcslider = new RangeSlider(document.getElementById('ADCSensitivity'));
+							pnpslider.setValue(pnp_adc.charAt(0));
+							adcslider.setValue(pnp_adc.charAt(1));
+
+							var bool_value = pnp_adc.charAt(2) == '1' ? true : false;
+		                    document.getElementById('WaterLevel').value = pnp_adc.charAt(2);
+							document.getElementById('WaterLevelCheckbox').checked = bool_value;
+		                    svgwaterLevelAdjust(pnp_adc.charAt(2));
 			            }
-			            var adc = new XMLHttpRequest();
-			            adc.open('GET', 'api?adc=1', true);
-			            adc.send();
-			            adc.onloadend = function() {
-						    if(adc.status == 200) {
-						    	var a = parseInt(adc.responseText);
-						    	if((ESP32 && a > 4000 && a < 4095) || (!ESP32 && a > 1010 && a < 1024))
-			                    {
-			                        notify('', 'Detecting Excess Moisture!', 'danger');
-			                        if(nvram.response['nvram'][17] > 20) {
-			                            notify('', 'Lower Pot Size value', 'info');
-			                            notify('', 'Adjust sensor to soil height', 'info');
-			                        }else{
-			                            notify('', 'Compact soil water channels', 'info');
-			                            notify('', 'Move sensor away from water', 'info');
-			                        }
-			                    //}else{
-			                    	//notify('', 'Current Moisture: ' + a, 'info');
-			                    }
-			                    document.getElementById('moisture-adc').textContent = a;
+			            adcSoilValue();
 
-			                    var ts = new XMLHttpRequest();
-					            ts.open('GET', 'api?temp=1', true);
-					            ts.send();
-					            ts.onloadend = function() {
-								    if(adc.status == 200) {
-								    	var t = parseInt(ts.responseText) - 18;
-								    	if(t > 0) {
-					                    	document.getElementById('moisture-adc').textContent = document.getElementById('moisture-adc').textContent + ' (' + t + '°C)';
-						                    if(t < 4) {
-						                        notify('', 'Water Freeze Warning', 'danger');
-						                    }
-					                	}
-									}
-								}
-			                    var pnp_adc = nvram.response['nvram'][PNP_ADC] + '000';
-
-		                    	pnpslider = new RangeSlider(document.getElementById('EnablePNP'));
-								adcslider = new RangeSlider(document.getElementById('ADCSensitivity'));
-								pnpslider.setValue(pnp_adc.charAt(0));
-								adcslider.setValue(pnp_adc.charAt(1));
-
-			                    document.getElementById('WaterLevel').value = pnp_adc.charAt(2);
-			                    svgwaterLevelAdjust(pnp_adc.charAt(2));
-							}
-						}
-	                    
 				        document.getElementById('background').onclick = function() {
 				            var svgPlant = document.getElementById('svgPlant');
 						    svgPlant.innerHTML = '';
@@ -309,32 +275,47 @@ function loadSVG(svgfile) {
 				        }
 
 				        document.getElementById('pot-size').onclick = function() {
-				        	roundSliderInit({
-				                value: document.getElementById('pot-size-text').textContent,
-				                borderWidth: 2,
-  								rangeColor: document.getElementById('pot-size-badge').firstElementChild.getAttribute('fill'),
-				                radius: 280,
-				                width: 32,
-				                handleSize: 64,
-				                min: 2,
-				                max: 40
-				            });
-				            document.getElementById('roundslider').addEventListener('mouseup', _potsizeScroll);
+				        	var container = document.getElementById('roundslider-knob');
+				        	var slider_color = document.getElementById('pot-size-badge').firstElementChild.getAttribute('fill');
+							var windowSize = Math.min(window.innerWidth, window.innerHeight);
+    						var dynamicRadius = windowSize * 0.3;
+							if (container._roundslider) {
+							   container._roundslider.destroy();
+							}
+							var slider = new RoundSlider(container, {
+							    radius: dynamicRadius,
+							    min: 2, max: 40, value: document.getElementById('pot-size-text').textContent,
+							    color: slider_color, colorEnd: slider_color,
+							    onComplete: function(v) { document.getElementById('pot-size-text').textContent = v; saveSetting(PLANT_POT_SIZE, v) }
+							});
+							container._roundslider = slider;
 				            document.getElementById('roundslider').classList.remove('hidden');
 				        	document.getElementById('modal-backdrop').classList.remove('hidden');
 				        }
 
 				        document.getElementById('water').onclick = function() {
-				        	roundSliderInit({
-				                value: document.getElementById('WaterLevel').getAttribute('value'),
-				                borderWidth: 2,
-				                radius: 100,
-				                width: 32,
-				                handleSize: 64,
-				                min: 0,
-				                max: 1
-				            });
-				            document.getElementById('roundslider').addEventListener('mouseup', _waterScroll);
+				        	var container = document.getElementById('roundslider-knob');
+							var windowSize = Math.min(window.innerWidth, window.innerHeight);
+    						var dynamicRadius = windowSize * 0.1;
+							if (container._roundslider) {
+							   container._roundslider.destroy();
+							}
+							var slider = new RoundSlider(container, {
+							    radius: dynamicRadius,
+							    min: 0, max: 1, value: document.getElementById('WaterLevel').getAttribute('value'),
+							    color: '#4facfe', colorEnd: '#00f2fe',
+							    onComplete: function(v) {
+							    	saveSetting(PNP_ADC, pnpslider.currentValue + '' + adcslider.currentValue + '' + v, function(lock) {
+								    	if (lock != 'Locked') {
+								    		var bool_value = v == '1' ? true : false;
+								    		document.getElementById('WaterLevel').value = v;
+								    		document.getElementById('WaterLevelCheckbox').checked = bool_value;
+								    		svgwaterLevelAdjust(v);
+								        }
+								    });
+							    }
+							});
+							container._roundslider = slider;
 				            document.getElementById('roundslider').classList.remove('hidden');
 				        	document.getElementById('modal-backdrop').classList.remove('hidden');
 				        }
@@ -347,36 +328,70 @@ function loadSVG(svgfile) {
 				            	moistureMin = 100;
 				            	moistureMax = 2000;
 				            }
-				            roundSliderInit({
-				                value: document.getElementById('moisture-text').textContent,
-				                borderWidth: 2,
-  								rangeColor: document.getElementById('moisture-badge').firstElementChild.getAttribute('fill'),
-				                radius: 280,
-				                width: 32,
-				                handleSize: 64,
-				                min: moistureMin,
-				                max: moistureMax,
-				                step: moistureStep,
-				            });
-				            document.getElementById('roundslider').addEventListener('mouseup', _moistureScroll);
+				            var container = document.getElementById('roundslider-knob');
+				        	var slider_color = document.getElementById('moisture-badge').firstElementChild.getAttribute('fill');
+							var windowSize = Math.min(window.innerWidth, window.innerHeight);
+    						var dynamicRadius = windowSize * 0.3;
+							if (container._roundslider) {
+							   container._roundslider.destroy();
+							}
+							var slider = new RoundSlider(container, {
+							    radius: dynamicRadius,
+							    min: moistureMin, max: moistureMax, value: document.getElementById('moisture-text').textContent,
+							    color: slider_color, colorEnd: slider_color,
+							    onComplete: function(v) {
+							    	document.getElementById('moisture-text').textContent = v;
+							    	saveSetting(PLANT_SOIL_MOISTURE, v);
+							    	adcSoilValue();
+							    }
+							});
+							container._roundslider = slider;
 				            document.getElementById('roundslider').classList.remove('hidden');
 				        	document.getElementById('modal-backdrop').classList.remove('hidden');
 				        }
 
 				        document.getElementById('timer').onclick = function() {
-				            var timerStep = 1;
-				            roundSliderInit({
-				                value: document.getElementById('timer-text').textContent,
-				                borderWidth: 2,
-  								rangeColor: document.getElementById('moisture-badge').firstElementChild.getAttribute('fill'),
-				                radius: 280,
-				                width: 32,
-				                handleSize: 64,
-				                min: 0,
-				                max: 96,
-				                step: timerStep,
-				            });
-				            document.getElementById('roundslider').addEventListener('mouseup', _timerScroll);
+				        	var container = document.getElementById('roundslider-knob');
+				        	var slider_color = document.getElementById('moisture-badge').firstElementChild.getAttribute('fill');
+							var windowSize = Math.min(window.innerWidth, window.innerHeight);
+    						var dynamicRadius = windowSize * 0.3;
+							if (container._roundslider) {
+							   container._roundslider.destroy();
+							}
+							var slider = new RoundSlider(container, {
+							    radius: dynamicRadius,
+							    min: 0, max: 120, value: document.getElementById('timer-text').textContent,
+							    color: slider_color, colorEnd: slider_color,
+							    onComplete: function(v) { 
+								    document.getElementById('timer-text').textContent = v; 
+									saveSetting(PLANT_MANUAL_TIMER, v, function(lock) {
+								    	if (lock != 'Locked') {
+								    		if (v == 0) {
+								                document.getElementById('timer-enabled').classList.add('hidden');
+								                document.getElementById('timer-disabled').classList.remove('hidden');
+
+								                document.getElementById('power-text').textContent = 4;
+								                if (document.getElementById('EnableLogCheckbox').checked === false) {
+								                	saveSetting(DEEP_SLEEP, 4);
+								                }
+								            }else{
+								                document.getElementById('timer-enabled').classList.remove('hidden');
+								                document.getElementById('timer-disabled').classList.add('hidden');
+
+								                //document.getElementById('power-text').textContent = 30;
+								                //if($('#EnableLogCheckbox').prop('checked') == false)
+								                //	saveSetting(DEEP_SLEEP, 30);
+								                notify('', 'Timer disables Soil Sensor', 'danger');
+								                if(v < 8) //less than 8 hours
+								                	notify('', 'Timer is Low! No Overwater protection', 'warning');
+								                notify('', 'Enable when issues with Sensor', 'info');
+								            }
+								        }
+								    });
+								    adcSoilValue();
+								}
+							});
+							container._roundslider = slider;
 				            document.getElementById('roundslider').classList.remove('hidden');
 				        	document.getElementById('modal-backdrop').classList.remove('hidden');
 				        }
@@ -386,17 +401,35 @@ function loadSVG(svgfile) {
 				            if(ESP32) {
 				            	sleepMax = 1440;
 				            }
-				            roundSliderInit({
-				                value: document.getElementById('power-text').textContent,
-				                borderWidth: 2,
-  								rangeColor: document.getElementById('power-badge').firstElementChild.getAttribute('fill'),
-				                radius: 280,
-				                width: 32,
-				                handleSize: 64,
-				                min: 0,
-				                max: sleepMax
-				            });
-				            document.getElementById('roundslider').addEventListener('mouseup', _powerScroll);
+				            var container = document.getElementById('roundslider-knob');
+				        	var slider_color = document.getElementById('power-badge').firstElementChild.getAttribute('fill');
+							var windowSize = Math.min(window.innerWidth, window.innerHeight);
+    						var dynamicRadius = windowSize * 0.3;
+							if (container._roundslider) {
+							   container._roundslider.destroy();
+							}
+							var slider = new RoundSlider(container, {
+							    radius: dynamicRadius,
+							    min: 0, max: sleepMax, value: document.getElementById('power-text').textContent,
+							    color: slider_color, colorEnd: slider_color,
+							    onComplete: function(v) {
+							    	if(v == 0) {
+										notify('', 'Sleep Disabled!', 'danger');
+										notify('', 'Wireless Always On', 'success');
+										//notify('', 'Battery Will Discharge Quickly!', 'warning');
+									}else if(v < 5) {
+										notify('', 'Low Sleep = High Power Consumption!', 'warning');
+										notify('', 'Sleep > 5 Minutes Recommended', 'success');
+									}
+								    document.getElementById('power-text').textContent = v;
+								    if(v == 0) {
+								    	saveSetting(DEEP_SLEEP, 1);
+								    }else{
+								    	saveSetting(DEEP_SLEEP, v);
+								    } 
+							 	}
+							});
+							container._roundslider = slider;
 				            document.getElementById('roundslider').classList.remove('hidden');
 				        	document.getElementById('modal-backdrop').classList.remove('hidden');
 				        }
@@ -410,6 +443,9 @@ function loadSVG(svgfile) {
 				                xhr.onload = function(e) {
 				                	svgSoil.innerHTML = xhr.responseText;
 
+				                	if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
+										document.getElementById('g3679').setAttribute('fill', 'white');
+									}
 				                	document.getElementById('soil-moss').onclick = function() {
 										var moss_color = document.getElementById('soil-rock-badge').firstElementChild.getAttribute('fill');
 										document.getElementById('soil-type-color').style.fill = moss_color;
@@ -488,7 +524,13 @@ function loadSVG(svgfile) {
 				                    var bool_value = data['nvram'][WIFI_HIDE] == '1' ? true : false;
 									document.getElementById('WiFiHidden').value = data['nvram'][WIFI_HIDE];
 									document.getElementById('WiFiHiddenCheckbox').checked = bool_value;
-									document.getElementById('WiFiPhyMode').value = data['nvram'][WIFI_PHY_MODE];
+									if(ESP32) {
+									    const select = document.getElementById("WiFiPhyMode");
+									    const newOption = document.createElement("option");
+									    newOption.value = "4";
+									    newOption.text = "802.11 ax";
+									    select.appendChild(newOption);
+								    }
 				                    if(data['nvram'][WIFI_PHY_MODE] == 3) {
 				                    	var optionObject = document.getElementById('WiFiPower').options;
 				                    	optionObject[17].setAttribute('hidden','true');
@@ -496,6 +538,11 @@ function loadSVG(svgfile) {
 				                    	optionObject[19].setAttribute('hidden','true');
 				                    	optionObject[20].setAttribute('hidden','true');
 				                    }
+				                    setWiFiChannels(data['nvram'][WIFI_PHY_MODE]);
+				                    document.getElementById('WiFiPhyMode').addEventListener("change", function () {
+								    	setWiFiChannels(this.value);
+								    });
+								    document.getElementById('WiFiPhyMode').value = data['nvram'][WIFI_PHY_MODE];
 				                    document.getElementById('WiFiPower').value = data['nvram'][WIFI_PHY_POWER];
 									document.getElementById('WiFiChannel').value = data['nvram'][WIFI_CHANNEL];
 									document.getElementById('WiFiSSID').value = data['nvram'][WIFI_SSID];
@@ -503,15 +550,16 @@ function loadSVG(svgfile) {
 				                    bool_value = data['nvram'][LOG_ENABLE] == '1' ? true : false;
 				                   	document.getElementById('EnableLog').value = data['nvram'][LOG_ENABLE];
 									document.getElementById('EnableLogCheckbox').checked = bool_value;
-									var slider_log = new RangeSlider(document.getElementById('EnableLogInterval'));
-									slider_log.setValue(data['nvram'][LOG_INTERVAL]);
 
-									/*
-				                    var pnp_adc = data['nvram'][PNP_ADC] + '000';
-									bool_value = pnp_adc.charAt(2) == '1' ? true : false;
-									document.getElementById('WaterLevel').value = pnp_adc.charAt(2);
-									document.getElementById('WaterLevelCheckbox').checked = bool_value;
-									*/
+									document.getElementById('EnableLogInterval').value = data['nvram'][LOG_INTERVAL];
+									var slider_log = new RangeSlider(document.getElementById('silder-log-interval'));
+									slider_log.setValue(data['nvram'][LOG_INTERVAL]);
+									document.getElementById('silder-log-interval').addEventListener('mouseup', function() {
+									    if (slider_log.currentValue < 10) {
+									      	notify('', 'Flash memory will fill up fast!', 'danger');
+									    }
+									    document.getElementById('EnableLogInterval').value = slider_log.currentValue;
+									});
 
 				                    bool_value = data['nvram'][NETWORK_DHCP] == '1' ? true : false;
 				                    document.getElementById('WiFiDHCP').value = data['nvram'][NETWORK_DHCP];
@@ -554,7 +602,6 @@ function loadSVG(svgfile) {
 
 						            document.getElementById('ADCSensitivity').addEventListener('mouseup', function() {
 									    const waterLevel = document.getElementById('WaterLevel').getAttribute('value');
-									    console.log(document.getElementById('WaterLevel'));
 									    saveSetting(PNP_ADC, pnpslider.currentValue + '' + adcslider.currentValue + '' + waterLevel);
 									});
 
@@ -768,6 +815,33 @@ function loadSVG(svgfile) {
     }
 }
 
+function setWiFiChannels(mode) {
+	var channels = [
+      1, 2, 3, 4,
+      5, 6, 7, 8,
+      9, 10, 11
+    ];
+	const select = document.getElementById("WiFiChannel");
+	const value = select.value;
+	if(mode == 4) {
+		channels = [
+	      36, 40, 44, 48,
+	      52, 56, 60, 64,
+	      100, 104, 108, 112, 116,
+	      120, 124, 128, 132, 136, 140, 144,
+	      149, 153, 157, 161, 165
+	    ];
+	}
+	select.innerHTML = "";
+	channels.forEach(channel => {
+		const option = document.createElement("option");
+		option.value = channel;
+		option.textContent = channel;
+		select.appendChild(option);
+    });
+	select.value = value;
+}
+
 function saveSetting(offset, value, callback) {
 
 	if(DEMOLOCK) {
@@ -818,55 +892,6 @@ const _timerScroll = function (event) {
     });
 };
 
-function _moistureScroll (event) {
-	var value = document.querySelector('.roundslider-text').textContent;
-	document.getElementById('moisture-text').textContent = value;
-    saveSetting(PLANT_SOIL_MOISTURE, value);
-};
-
-function _potsizeScroll (event) {
-	var value = document.querySelector('.roundslider-text').textContent;
-	document.getElementById('pot-size-text').textContent = value;
-    saveSetting(PLANT_POT_SIZE, value);
-};
-
-function _powerScroll (event) {
-	var value = document.querySelector('.roundslider-text').textContent;
-    if(value == 0) {
-		notify('', 'Sleep Disabled!', 'danger');
-		notify('', 'Wireless Always On', 'success');
-		//notify('', 'Battery Will Discharge Quickly!', 'warning');
-	}else if(value < 5) {
-		notify('', 'Low Sleep = High Power Consumption!', 'warning');
-		notify('', 'Sleep > 5 Minutes Recommended', 'success');
-	}
-    document.getElementById('power-text').textContent = value;
-    if(value == 0) {
-    	saveSetting(DEEP_SLEEP, 1);
-    }else{
-    	saveSetting(DEEP_SLEEP, value);
-    }
-};
-
-function _waterScroll (event) {
-	var value = document.querySelector('.roundslider-text').textContent;
-	saveSetting(PNP_ADC, pnpslider.currentValue + '' + adcslider.currentValue + '' + value, function(lock) {
-    	if (lock != 'Locked') {
-    		svgwaterLevelAdjust(value);
-        }
-    });
-    document.getElementById('WaterLevel').value = value;
-};
-
-function _unbindScroll() {
-	var roundslider = document.getElementById('roundslider');
-	roundslider.removeEventListener('mouseup', _timerScroll);
-    roundslider.removeEventListener('mouseup', _moistureScroll);
-    roundslider.removeEventListener('mouseup', _potsizeScroll);
-    roundslider.removeEventListener('mouseup', _powerScroll);
-    roundslider.removeEventListener('mouseup', _waterScroll);
-}
-
 function hideModal(button) {
     let modal = button.closest('.flex');
     while (modal && !modal.classList.contains('modal')) {
@@ -876,7 +901,6 @@ function hideModal(button) {
     	const backdrop = document.getElementById('modal-backdrop');
     	backdrop.classList.add('hidden');
         modal.classList.add('hidden');
-        _unbindScroll();
     }
 }
 
@@ -887,7 +911,6 @@ function hideAllModals() {
         modal.classList.add('hidden');
     });
     backdrop.classList.add('hidden');
-    _unbindScroll();
 }
 
 function PlantLogin() {
@@ -1031,7 +1054,7 @@ function HiddenCheck(id, element) {
     		saveSetting(LOG_ENABLE, 0, function(lock) {if (lock != 'Locked') {notify('','Graph & Log Collection is OFF', 'success')}});
     	}
     }else if(id == 'WaterLevel') {
-        saveSetting(PNP_ADC, pnpslider.currentValue + '' + adcslider.currentValue + '' + document.getElementById('WaterLevel').getAttribute('value'), function(lock) {if (lock != 'Locked') {notify('','Make sure Water Sensor is OK and Water Full', 'info')}});
+        saveSetting(PNP_ADC, pnpslider.currentValue + '' + adcslider.currentValue + '' + document.getElementById('WaterLevel').getAttribute('value'), function(lock) {if (lock != 'Locked' && element.checked) {notify('','Check Water Sensor and Water is Full', 'info')}});
         svgwaterLevelAdjust(document.getElementById('WaterLevel').getAttribute('value'));
     }else if(id == 'WiFiDHCP') {
         var b = false;
@@ -1077,9 +1100,9 @@ function NVRAMtoSVG(data)
 
     AlertSet([data['nvram'][ALERTS].charAt(0), data['nvram'][ALERTS].charAt(1), data['nvram'][ALERTS].charAt(2), data['nvram'][ALERTS].charAt(3), data['nvram'][ALERTS].charAt(4), data['nvram'][ALERTS].charAt(5), data['nvram'][ALERTS].charAt(6), data['nvram'][ALERTS].charAt(7)]);
     
-    document.getElementById('pot-size-text').textContent = data['nvram'][PLANT_POT_SIZE];
-    document.getElementById('moisture-text').textContent = data['nvram'][PLANT_SOIL_MOISTURE];
     document.getElementById('timer-text').textContent = data['nvram'][PLANT_MANUAL_TIMER];
+    document.getElementById('moisture-text').textContent = data['nvram'][PLANT_SOIL_MOISTURE];
+    document.getElementById('pot-size-text').textContent = data['nvram'][PLANT_POT_SIZE];
     document.getElementById('power-text').textContent = data['nvram'][DEEP_SLEEP];
     document.getElementById('soil-type-color').style.fill = soil_type_color[data['nvram'][PLANT_SOIL_TYPE]];
     document.getElementById('soil-type-text').textContent = soil_type_labels[data['nvram'][PLANT_SOIL_TYPE]];
@@ -1361,6 +1384,72 @@ function testGraph()
     xhr.send();
 }
 
+function adcSoilValue()
+{
+    var adc = new XMLHttpRequest();
+    adc.open('GET', 'api?adc=1', true);
+    adc.send();
+    adc.onloadend = function() {
+	    if(adc.status == 200) {
+	    	let arr = (adc?.responseText || '0|0').split('|');
+	    	var a = parseInt(arr[0]);
+	    	if((ESP32 && a > 4000 && a < 4095) || (!ESP32 && a > 1010 && a < 1024))
+            {
+                notify('', 'Detecting Excess Moisture!', 'danger');
+                if(nvram.response['nvram'][PLANT_SOIL_MOISTURE] > 20) {
+                    notify('', 'Lower Pot Size value', 'info');
+                    notify('', 'Adjust sensor to soil height', 'info');
+                }else{
+                    notify('', 'Compact soil water channels', 'info');
+                    notify('', 'Move sensor away from water', 'info');
+                }
+            //}else{
+            	//notify('', 'Current Moisture: ' + a, 'info');
+            }
+            var adc_time = parseInt(document.getElementById('timer-text').textContent);
+			if (adc_time == 0) {
+                document.getElementById('moisture-adc').textContent = a;
+
+                var ts = new XMLHttpRequest();
+	            ts.open('GET', 'api?temp=1', true);
+	            ts.send();
+	            ts.onloadend = function() {
+				    if(adc.status == 200) {
+				    	var t = parseInt(ts.responseText) - 18;
+				    	if(t > 0) {
+	                    	document.getElementById('moisture-adc').textContent = document.getElementById('moisture-adc').textContent + ' (' + t + '°C)';
+		                    if(t < 4) {
+		                        notify('', 'Water Freeze Warning', 'danger');
+		                    }
+	                	}
+					}
+				}
+		    }else{
+		    	let time_countdown = adc_time * (60 * 24) - arr[1];
+			    const days = Math.floor(time_countdown / 86400);
+			    const hours = Math.floor((time_countdown % 86400) / 3600);
+			    if(days > 0) {
+			    	document.getElementById('moisture-adc').textContent = `${days}d ${hours}h`;
+			    }else if(hours > 0) {
+			    	const minutes = Math.floor((time_countdown % 3600) / 60);
+			    	document.getElementById('moisture-adc').textContent = `${hours}h ${minutes}m`;
+			    }else{
+				    const time_countdown_interval = setInterval(() => {
+					    if (time_countdown <= 0) {
+					        clearInterval(time_countdown_interval);
+					        return;
+					    }
+					    const minutes = Math.floor((time_countdown % 3600) / 60);
+				    	const seconds = time_countdown % 60;
+				    	document.getElementById('moisture-adc').textContent = `${minutes}m ${seconds}s`;
+			    	    time_countdown--;
+					}, 1000);
+			    }
+		    }
+		}
+	}
+}
+
 function testSoil()
 {
     var adc = new XMLHttpRequest();
@@ -1368,7 +1457,8 @@ function testSoil()
     adc.send();
     adc.onloadend = function() {
 	    if(adc.status == 200) {
-	    	var a = parseInt(adc.responseText);
+	    	let arr = (adc?.responseText || '0|0').split('|');
+			var a = parseInt(arr[0]);
 	    	notify('', 'Soil Moisture = ' + a, 'success');
 		}
 	}

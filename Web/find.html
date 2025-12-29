@@ -1,21 +1,27 @@
 <!DOCTYPE html>
 <html>
 <header>
-    <meta http-equiv="Content-Security-Policy" content="upgrade-insecure-requests">
 </header>
     <body>
         <script>
+        let foundGlobal = false;
         async function scanRange(startIP, endIP) {
             const startIPInt = ipToInt(startIP);
             const endIPInt = ipToInt(endIP);
             for (let currentIPInt = startIPInt; currentIPInt <= endIPInt; currentIPInt++) {
-                const currentIP = intToIp(currentIPInt);
-                fetch('http://' + currentIP + '/update', { method: 'GET' })
-                .then(response => {
-                    if (response.ok) {
-                        window.location.href = 'http://' + currentIP;
-                    }
-                });
+                if(foundGlobal) {
+                    break;
+                }else{
+                    const currentIP = intToIp(currentIPInt);
+                    fetch('http://' + currentIP + '/update', { method: 'GET' })
+                    .then(response => {
+                        if (response.ok) {
+                            foundGlobal = true;
+                            document.write('Found IP: ' + currentIP);
+                            window.location.href = 'http://' + currentIP;
+                        }
+                    });
+                }
             }
         }
         function ipToInt(ip) {
@@ -29,10 +35,15 @@
                 int & 255
             ].join('.');
         }
-        scanRange('192.168.8.8', '192.168.8.8');
-        scanRange('10.0.0.2', '10.0.0.254');
-        scanRange('192.168.0.2', '192.168.0.254');
-        scanRange('192.168.1.2', '192.168.1.254');
+        fetch('/reboot');
+        document.write('Rebooting ... ')
+        setTimeout(() => {
+            scanRange('192.168.8.8', '192.168.8.8');
+            scanRange('10.0.0.2', '10.0.0.254');
+            scanRange('192.168.0.2', '192.168.0.254');
+            scanRange('192.168.1.2', '192.168.1.254');
+            scanRange('192.168.50.2', '192.168.1.254');
+        }, 15000);
         </script>
     </body>
 </html>

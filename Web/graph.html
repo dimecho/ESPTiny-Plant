@@ -6,15 +6,13 @@
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <link rel="stylesheet" type="text/css" href="css/preloader.css">
         <link rel="stylesheet" type="text/css" href="css/tailwind.css">
-        <link rel="stylesheet" type="text/css" href="css/rslider.css">
         <link rel="icon" type="image/x-icon" href="favicon.ico">
         <script src="js/preloader.js"></script>
         <script src="js/chart.js"></script>
         <script src="js/chartjs-plugin-datalabels.js"></script>
-        <script src="js/rslider.js"></script>
+        <script src="js/rangeslider.js"></script>
         <script defer src="js/graph.js"></script>
     </head>
-
     <body class="preloader bg-gray-100 dark:bg-gray-600">
         <div id="preloader"></div>
         <div class="fixed top-0 right-0 p-3 z-[2000]" id="notify"></div>
@@ -31,8 +29,12 @@
             <div id="scrollContainer" class="w-full overflow-x-auto">
                 <canvas id="chartCanvas"></canvas>
             </div>
-            <div class="w-full">
-                <input type="text" id="chartSlider" name="chartSlider" data-provider="slider" />
+            <div class="w-full p-4">
+                <div class="slider" data-min="0" data-max="20" data-step="1" data-default="0" data-id="slider-time" id="chart-slider" data-marks="true"></div>
+                <div class="mt-4 text-center text-gray-600 dark:text-gray-300">
+                    <span class="text-lg font-semibold">Refresh in Minutes: </span>
+                    <span class="slider-value text-lg" id="chart-slider-time">0</span>
+                </div>
             </div>
         </div>
         <div class="fixed inset-0 flex items-center justify-center hidden modal" id="graph-settings-open">

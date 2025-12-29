@@ -19,6 +19,7 @@ var chart;
 var ctxFont = 14;
 var ctxFontColor = 'black';
 var ctxGridColor = '#BEBEBE';
+var timeSlider;
 var data;
 
 document.addEventListener("DOMContentLoaded", function(event)
@@ -132,37 +133,27 @@ document.addEventListener("DOMContentLoaded", function(event)
         return n;
     };
 
-    var timeSlider = new rSlider({
-        target: '#chartSlider',
-        values: Array.from({ length: 13 }, (_, i) => i * 10),
-        range: false,
-        tooltip: true,
-        scale: true,
-        labels: true,
-        set: [10],
-        onChange: function (e) {
-            //var xhr = new XMLHttpRequest();
+    timeSlider = new RangeSlider(document.getElementById('chart-slider'));
+    document.getElementById('chart-slider').onclick = function() {
+        if(timeSlider.getValue() == 0) { // Real-time
+            refreshSpeed = 1000;
+            dataStream = true;
+            //xhr.open('GET', 'log?end=1', true);
+            //xhr.send();
+        }else{
+            refreshSpeed = timeSlider.getValue();
+            refreshSpeed *= (1000 * 60);
+            //xhr.open('GET', 'nvram.json?offset=' + LOG_INTERVAL + '&value=10', true);
+            //xhr.send();
 
-            if(e == 0) { // Real-time
-                refreshSpeed = 1000;
-                dataStream = true;
-                //xhr.open('GET', 'log?end=1', true);
-                //xhr.send();
-            }else{
-                refreshSpeed = e;
-                refreshSpeed *= (1000 * 60);
-                //xhr.open('GET', 'nvram.json?offset=' + LOG_INTERVAL + '&value=10', true);
-                //xhr.send();
-
-                //TODO: Retrive a page once in a while to prevent WiFi sleep
-            }
-
-            if(refreshTimer != null) {
-                clearTimeout(refreshTimer);
-                updateChart();
-            }
+            //TODO: Retrive a page once in a while to prevent WiFi sleep
         }
-    });
+
+        if(refreshTimer != null) {
+            clearTimeout(refreshTimer);
+            updateChart();
+        }
+    }
 
     const modals = document.querySelectorAll('.modal');
     modals.forEach(modal => {
@@ -577,7 +568,8 @@ function updateChart() {
                 }else{
                     chart.data.labels[l] = d.getHours() + ':' + d.getMinutes() + ':' + d.getSeconds();
                 }
-                var value = parseInt(xhr.responseText) || getRandomInt(100, 1024);
+                let arr = (xhr?.responseText || '|').split('|');
+                var value = parseInt(arr[0]) || getRandomInt(100, 1024);
                 chart.data.datasets[1].data.push(value);
             
                 var h2o = new XMLHttpRequest();

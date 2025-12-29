@@ -3,12 +3,10 @@
     <head>
         <title>tiny plant</title>
         <meta charset="UTF-8">
-        <meta http-equiv="Cache-Control" content="max-age=36000, public">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <link rel="stylesheet" type="text/css" id="cssSVG">
+        <link rel="stylesheet" type="text/css" id="css-svg">
         <link rel="stylesheet" type="text/css" href="css/preloader.css">
         <link rel="stylesheet" type="text/css" href="css/tailwind.css">
-        <link rel="stylesheet" type="text/css" href="css/roundslider.css">
         <link rel="icon" type="image/x-icon" href="favicon.ico">
         <script src="js/preloader.js"></script>
         <script src="js/roundslider.js"></script>
@@ -24,41 +22,11 @@
 	        <div id="svgInteractive" class="bg-gray-100 dark:bg-gray-600 svglayer w-full"></div>
 	    </div>
 		<div class="fixed inset-0 flex items-center justify-center hidden modal" id="roundslider">
-			<div class="relative w-[300px] h-[300px] select-none">
-		        <div class="roundslider-knob">
-		          <div class="roundslider-rotator">
-		            <div class="roundslider-text">0</div>
-		          </div>
-		          <div class="roundslider-pointer">
-		            <svg height="24" viewBox="0 0 24 24" width="24"><path d="M0 0h24v24H0z" fill="none"/><path d="M8 5v14l11-7z"/></svg>
-		          </div>
-		        </div>
-		        <svg class="w-full h-full roundslider-progress-bar">
-		          <circle cx="50%" cy="50%" r="140"></circle>
-		          <circle
-		            id="roundslider-progress-circle"
-		           	cx="50%" 
-			        cy="50%" 
-			        r="140"
-		            style="
-		              stroke: url(#gradient);
-		              stroke-width: 16px;
-		              stroke-linecap: round;
-		            "
-		          ></circle>
-		          <defs>
-		            <linearGradient id="gradient" x1="0%" y1="0%" x2="100%" y2="100%">
-		              <stop offset="0%" style="stop-color: red" />
-		              <stop offset="50%" style="stop-color: orange" />
-		              <stop offset="100%" style="stop-color: rgb(29, 209, 94)" />
-		            </linearGradient>
-		          </defs>
-		        </svg>
-	      	</div>
+		    <div id="roundslider-knob"></div>
 		</div>
 		<div class="fixed inset-0 flex items-center justify-center hidden modal" id="soil-Settings">
-			<div class="bg-white dark:bg-gray-800 w-[50%] rounded-lg border border-gray-300 dark:border-gray-600">
-		        <div class="flex justify-between items-center p-2 border-b">
+			<div class="bg-white dark:bg-gray-800 w-[50%] rounded-lg border border-gray-600 dark:border-gray-300">
+		        <div class="flex justify-between items-center p-2 border-b border-gray-600 dark:border-gray-300">
 		            <h5 class="text-lg font-semibold text-gray-800 dark:text-white">Soil Type</h5>
 		            <button id="close-modal" class="text-gray-500 hover:text-gray-800 dark:text-gray-400 dark:hover:text-gray-300 focus:outline-none text-2xl p-1" onclick="hideModal(this)">&times;</button>
 		        </div>
@@ -180,19 +148,7 @@
 							    </div>
 							    <div class="mb-4">
 							        <label class="block text-gray-800 dark:text-gray-300">Channel</label>
-							        <select id="WiFiChannel" class="mt-1 block w-full p-2 border rounded dark:bg-gray-700" name="WiFiChannel">
-							            <option>1</option>
-							            <option>2</option>
-							            <option>3</option>
-							            <option>4</option>
-							            <option>5</option>
-							            <option>6</option>
-							            <option>7</option>
-							            <option>8</option>
-							            <option>9</option>
-							            <option>10</option>
-							            <option>11</option>
-							        </select>
+							        <select id="WiFiChannel" class="mt-1 block w-full p-2 border rounded dark:bg-gray-700" name="WiFiChannel"></select>
 							    </div>
 							    <div class="mb-4">
 							        <label class="block text-gray-800 dark:text-gray-300">Network</label>
@@ -217,11 +173,13 @@
 							                <label for="EnableLogCheckbox" class="ml-2 text-gray-800 dark:text-gray-300">Enable Data Log</label>
 							            </div>
 							        </fieldset>
+							        <input type="hidden" id="EnableLogInterval" name="EnableLogInterval" value="1">
 							        <div>
-								        <div class="slider" data-min="0" data-max="200" data-step="1" data-default="0" data-id="slider-log" id="EnableLogInterval"></div>
-								        <div class="mt-4 text-center text-gray-800 dark:text-gray-300">
-								            <span class="text-lg font-semibold">Log Interval: </span>
-								            <span class="slider-value text-lg" id="log-interval">0</span>
+								        <div class="slider" data-min="2" data-max="200" data-step="1" data-default="0" data-id="slider-log" data-marks="true" id="silder-log-interval"></div>
+								        <div class="mt-4 text-lg text-center text-gray-800 dark:text-gray-300">
+								            <span>Log Interval: </span>
+								            <span class="slider-value" id="log-interval">2</span>
+								            <span> seconds</span>
 								        </div>
 								    </div>
 							    </div>
@@ -507,7 +465,7 @@
 									    <div class="p-4">
 									    </div>
 									    <div class="mt-4">
-							            	<div class="slider" data-min="0" data-max="9" data-step="1" data-default="0" data-id="slider-adc-sensitivity" id="ADCSensitivity"></div>
+							            	<div class="slider" data-min="0" data-max="9" data-step="1" data-default="0" data-id="slider-adc-sensitivity" data-marks="true" id="ADCSensitivity"></div>
 									        <div class="mt-4 text-center text-gray-800 dark:text-gray-300">
 									            <span class="text-lg font-semibold">Moisture Sensor Sensitivity </span>
 									            <span class="slider-value text-lg" id="adc-sensitivity">0</span>
@@ -613,7 +571,7 @@
 		            <button id="close-modal" class="text-gray-500 hover:text-gray-800 dark:text-gray-400 dark:hover:text-gray-300 focus:outline-none text-2xl" onclick="hideModal(this)">&times;</button>
 		        </div>
 		        <div class="pt-4">
-			        <div class="slider" data-min="0" data-max="200" data-step="5" data-default="0" data-id="slider-test-pump-delay" id="test-pump-delay"></div>
+			        <div class="slider" data-min="1" data-max="200" data-step="1" data-default="0" data-id="slider-test-pump-delay" id="test-pump-delay" data-marks="true"></div>
 			        <div class="mt-4 text-center text-gray-600 dark:text-gray-300">
 			            <span class="text-lg font-semibold">Delay Test in Seconds: </span>
 			            <span class="slider-value text-lg" id="test-pump-delay-timer">0</span>

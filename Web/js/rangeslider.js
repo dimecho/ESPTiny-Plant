@@ -5,10 +5,12 @@ class RangeSlider {
         this.max = parseFloat(element.dataset.max) || 100;
         this.step = parseFloat(element.dataset.step) || 1;
         this.defaultValue = parseFloat(element.dataset.default) || this.min;
-        this.id = element.dataset.id; // Unique identifier for the slider
+        this.id = element.dataset.id;
+        this.showMarks = element.dataset.marks === 'true';
         this.isDragging = false;
         this.handleWidth = 24; // Handle width in pixels (w-6 = 24px in Tailwind)
-        this.currentValue = this.defaultValue; // Store current value
+        this.currentValue = this.defaultValue;
+
         this.init();
     }
 
@@ -16,8 +18,9 @@ class RangeSlider {
         // Create slider components
         this.element.innerHTML = `
             <div class="relative">
-                <div class="h-2 bg-gray-300 rounded-full">
+                <div class="h-2 bg-gray-300 rounded-full relative">
                     <div class="h-full bg-blue-500 rounded-full slider-progress" style="width: 0%"></div>
+                    <div class="slider-marks"></div>
                 </div>
                 <div class="absolute w-6 h-6 bg-blue-500 rounded-full -top-2 cursor-pointer shadow-md slider-handle border border-gray-500" style="left: 0%"></div>
             </div>
@@ -25,12 +28,33 @@ class RangeSlider {
 
         this.handle = this.element.querySelector('.slider-handle');
         this.progress = this.element.querySelector('.slider-progress');
+        this.marksContainer = this.element.querySelector('.slider-marks');
         this.track = this.handle.parentElement;
         this.valueDisplay = this.element.parentElement.querySelector('.slider-value');
+
+        // Add marks if enabled
+        if (this.showMarks) {
+            this.addMarks();
+        }
 
         // Set initial value
         this.setValue(this.defaultValue);
         this.addEventListeners();
+    }
+
+    addMarks() {
+        // Calculate mark interval (e.g., every 10 units or 10% of range)
+        const range = this.max - this.min;
+        const markInterval = Math.max(this.step, Math.round(range / 10)); // At least step size, roughly 10 marks
+
+        // Generate marks
+        for (let value = this.min; value <= this.max; value += markInterval) {
+            const position = (value - this.min) / range * 100;
+            const mark = document.createElement('div');
+            mark.className = 'absolute w-[1px] h-[6px] bg-gray-500 -bottom-3'; // 2px gap below track
+            mark.style.left = `${position}%`;
+            this.marksContainer.appendChild(mark);
+        }
     }
 
     getTrackBounds() {
@@ -42,7 +66,7 @@ class RangeSlider {
         // Ensure value is within bounds and aligns with step
         value = Math.max(this.min, Math.min(this.max, value));
         value = Math.round(value / this.step) * this.step;
-        this.currentValue = value; // Update current value
+        this.currentValue = value;
         
         // Calculate position (0 to 1)
         const position = (value - this.min) / (this.max - this.min);
@@ -60,7 +84,7 @@ class RangeSlider {
     }
 
     getValue() {
-        return this.currentValue; // Public method to get current value
+        return this.currentValue;
     }
 
     updateSlider(clientX) {

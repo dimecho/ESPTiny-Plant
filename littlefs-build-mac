@@ -100,12 +100,11 @@ if [ $esp = 1 ]; then
     #_size:             0x001FA000 (2072576)
     $esp_path_littlefs/$gcc/mklittlefs -c ./data/ -b 8192 -p 256 -d 5 -s 2072576 ./build/flash-littlefs.bin
 else
+    echo "ESP32 1.5MB SPIFFS"
     #_start:            0x00210000 (2162688)
     #_size:             0x001F0000 (2031616)
-    #$esp_path_littlefs/$gcc/mklittlefs -c ./data/ -b 4096 -p 256 -d 5 -s 2031616 ./build/flash-littlefs.bin
-    #$esp_path_littlefs/$gcc/mklittlefs -c ./data/ -b 4096 -p 256 -d 5 -s 1036288 ./build/flash-littlefs.bin
-    #$esp_path_littlefs/$gcc/mklittlefs -c ./data/ -b 4096 -p 256 -d 5 -s 518144 ./build/flash-littlefs.bin
-    $esp_path_littlefs/$gcc/mklittlefs -c ./data/ -b 4096 -p 256 -d 5 -s 283648 ./build/flash-littlefs.bin
+    #$esp_path_littlefs/$gcc/mklittlefs -c ./data/ -b 4096 -p 256 -d 5 -s 283648 ./build/flash-littlefs.bin
+    $esp_path_littlefs/$gcc/mklittlefs -c ./data/ -b 4096 -p 256 -d 5 -s 786432 ./build/flash-littlefs.bin
 fi
 
 #Compress LittleFS

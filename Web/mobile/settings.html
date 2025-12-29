@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <title>tiny plant - mobile</title>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <link rel="stylesheet" type="text/css" href="../css/tailwind.css">
+        <link rel="stylesheet" type="text/css" href="css/rslider.css">
+        <script src="js/rslider.js"></script>
+        <script defer src="js/settings.js"></script>
+        <script defer src="../js/common.js"></script>
+    </head>
+    <body class="bg-gray-100">
+        <div class="items-center justify-center p-4">
+            <button type="button" class="bg-yellow-500 hover:bg-yellow-600 text-white rounded w-full py-2 mt-4" onclick="">Graph</button>
+            <button type="button" class="bg-gray-400 hover:bg-gray-500 text-white rounded w-full py-2 mt-4" onclick="window.location.href='index.html'"><<</button>
+            <div class="bg-white border border-gray-300 rounded-[5px] mt-4">
+                <div class="p-4">
+                    <div class="slider-container">PNP/NPN Transistor
+                        <input type="text" id="pnp" name="pnp" class="slider"></div>
+                    <div class="slider-container">Timer (Pump Hours)
+                        <input type="text" id="timer" name="timer" class="slider"></div>
+                    <div class="slider-container">Moisture (Soil Sensor)
+                        <input type="text" id="moisture" name="moisture" class="slider"></div>
+                    <div class="slider-container">Pot Size (Pump Seconds)
+                    <input type="text" id="pot" name="pot" class="slider"></div>
+                    <div class="slider-container">Power (Sleep Minutes)
+                    <input type="text" id="power" name="power" class="slider"></div>
+                    <div class="slider-container">Soil Type
+                    <input type="text" id="soil" name="soil" class="slider"></div>
+                    <div class="slider-container">Water Level (Full %)
+                    <input type="text" id="water" name="water" class="slider"></div>
+                    <center>
+                        <br><br>
+                        <button class="bg-blue-500 hover:bg-blue-600 text-white rounded py-2 px-4" onclick="">Save Settings</button>
+                    </center>
+                </div>
+            </div>
+        </div>
+    </body>
+</html>
