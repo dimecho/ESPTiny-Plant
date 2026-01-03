@@ -11,7 +11,7 @@ Remember: Brand new ESP-12 short GPIO0 to GND (flash mode) then UART TX/RX
 #define THREADED 0
 #define TIMECLIENT_NTP 0
 //#define ARDUINO_SIGNING 0
-#define EEPROM_ID 0xAB01  //Identify Sketch by EEPROM
+#define EEPROM_ID 0xAB02  //Identify Sketch by EEPROM
 #define EMAILCLIENT_SMTP 0
 #define ASYNCSERVER_DNS 0
 #define SYNCSERVER_mDNS 0
@@ -58,7 +58,9 @@ Notes for Async HTTPS
 */
 #include <EEPROM.h>
 #ifdef ESP32
+#define LFS_VERSION 0x0002000b
 #define U_FS U_SPIFFS
+//#include <esp_chip_info.h>
 //#define fs_info LittleFS
 //#include <ESP32Ticker.h>
 #include <WiFi.h>
@@ -419,38 +421,39 @@ byte testSMTP = 0;
 #define _PNP_ADC 31
 
 const int NVRAM_Map[] = {
-  16,  //_EEPROM_ID
-  8,   //_WIRELESS_MODE
-  8,   //_WIRELESS_HIDE
-  8,   //_WIRELESS_PHY_MODE
-  8,   //_WIRELESS_PHY_POWER
-  8,   //_WIRELESS_CHANNEL
-  16,  //_WIRELESS_SSID
-  32,  //_WIRELESS_USERNAME
-  32,  //_WIRELESS_PASSWORD
-  8,   //_LOG_ENABLE
-  32,  //_LOG_INTERVAL
-  8,   //_NETWORK_DHCP
-  16,  //_NETWORK_IP
-  16,  //_NETWORK_SUBNET
-  16,  //_NETWORK_GATEWAY
-  16,  //_NETWORK_DNS
-  16,  //_PLANT_POT_SIZE
-  16,  //_PLANT_SOIL_MOISTURE
-  32,  //_PLANT_MANUAL_TIMER
-  16,  //_PLANT_SOIL_TYPE
-  16,  //_PLANT_TYPE
-  32,  //_DEEP_SLEEP
-  64,  //_EMAIL_ALERT
-  64,  //_SMTP_SERVER
-  32,  //_SMTP_USERNAME
-  32,  //_SMTP_PASSWORD
-  32,  //_PLANT_NAME
-  16,  //_ALERTS
-  32,  //_DEMO_PASSWORD
-  16,  //_TIMEZONE_OFFSET
-  16,  //_DEMO_AVAILABILITY
-  16   //_PNP_ADC
+  0,   //_EEPROM_ID 16
+  16,  //_WIRELESS_MODE 8
+  24,  //_WIRELESS_HIDE 8
+  32,  //_WIRELESS_PHY_MODE 8
+  40,  //_WIRELESS_PHY_POWER 8
+  48,  //_WIRELESS_CHANNEL 8
+  64,  //_WIRELESS_SSID 16
+  160, //_WIRELESS_USERNAME 96
+  192, //_WIRELESS_PASSWORD 32
+  200, //_LOG_ENABLE 8
+  232, //_LOG_INTERVAL 32
+  240, //_NETWORK_DHCP 8
+  304, //_NETWORK_IP 64
+  368, //_NETWORK_SUBNET 64
+  432, //_NETWORK_GATEWAY 64
+  496, //_NETWORK_DNS 64
+  512, //_PLANT_POT_SIZE 16
+  528, //_PLANT_SOIL_MOISTURE 16
+  560, //_PLANT_MANUAL_TIMER 32
+  576, //_PLANT_SOIL_TYPE 16
+  592, //_PLANT_TYPE 16
+  624, //_DEEP_SLEEP 32
+  688, //_EMAIL_ALERT 64
+  752, //_SMTP_SERVER 64
+  848, //_SMTP_USERNAME 96
+  880, //_SMTP_PASSWORD 32
+  912, //_PLANT_NAME 32
+  928, //_ALERTS 16
+  960, //_DEMO_PASSWORD 32
+  976, //_TIMEZONE_OFFSET 16
+  992, //_DEMO_AVAILABILITY 16
+  1008,//_PNP_ADC 16
+  1024 //+1
 };
 
 uint8_t WIRELESS_MODE = 0;  //WIRELESS_AP = 0, WIRELESS_STA(WPA2) = 1, WIRELESS_STA(WPA2 ENT) = 2, WIRELESS_STA(WEP) = 3
@@ -567,14 +570,14 @@ void setup() {
   //NVRAM type of Settings
   //======================
   EEPROM.begin(1024);
-  long e = NVRAM_Read(_EEPROM_ID).toInt();
+  long eid = NVRAM_Read(_EEPROM_ID).toInt();
 #if DEBUG
   Serial.print("EEPROM CRC Stored: 0x");
-  Serial.println(e, HEX);
+  Serial.println(eid, HEX);
   Serial.print("EEPROM CRC Calculated: 0x");
   Serial.println(EEPROM_ID, HEX);
 #endif
-  if (e != EEPROM_ID) {
+  if (eid != EEPROM_ID) {
     //Check for multiple Plant SSIDs
     //WiFi.mode(WIFI_STA);
     //WiFi.disconnect();
@@ -1206,7 +1209,7 @@ void setupWebServer() {
     if (request->getParam("password", true)->value() == DEMO_PASSWORD) {
       DEMO_PASSWORD[0] = 0;  //reset
     }
-    request->redirect("/index.html");
+    request->redirect("/");
   });
   server.on("/reboot", HTTP_GET, [](AsyncWebServerRequest *request) {
     if (DEMO_PASSWORD != "") {
@@ -1232,70 +1235,119 @@ void setupWebServer() {
         request->send(200, text_html, locked_html);
       }
     } else {
-      uint8_t mask[] = { 8, 25, 28 };
-      String out = NVRAM(1, 31, mask);
-      request->send(200, text_json, out);
+      char json[512];
+      size_t len = snprintf(json, sizeof(json), "{\n\t\"nvram\": [\"");
+#ifdef ESP8266
+      len += snprintf(json + len, sizeof(json) - len, "%s ESP8266 ", ESP.getCoreVersion().c_str());
+#else
+        //esp_chip_info_t chip_info;
+        //esp_chip_info(&chip_info);
+        len += snprintf(json + len, sizeof(json) - len, "%d.%d.%d %s ", ESP_ARDUINO_VERSION_MAJOR, ESP_ARDUINO_VERSION_MINOR, ESP_ARDUINO_VERSION_PATCH, ESP.getChipModel());
+#if (ASYNC_TCP_SSL_ENABLED)
+        len += snprintf(json + len, sizeof(json) - len, MBEDTLS_VERSION_NUMBER);
+#endif
+#endif
+      len += snprintf(json + len, sizeof(json) - len, "|%s|", ESP.getSdkVersion());
+      //uint16_t major = (LFS_VERSION >> 16) & 0xFFFF; // 0x0002
+      //uint16_t minor = LFS_VERSION & 0xFFFF;         // 0x0005
+      //len += snprintf(json + len, sizeof(json) - len, "%u.%u", major, minor);
+      len += snprintf(json + len, sizeof(json) - len, "%u", LFS_VERSION);
+      len += snprintf(json + len, sizeof(json) - len, "|%s|", _VERSION);
+      {
+    #if (ESP8266 && ARDUINO_ESP8266_MAJOR >= 3)
+        HeapSelectIram ephemeral;
+    #endif
+        len += snprintf(json + len, sizeof(json) - len, "%d", ESP.getFreeHeap());  //esp_himem_get_free_size()
+    #if DEBUG
+        Serial.printf("IRAM free: %6d bytes\r\n", ESP.getFreeHeap());
+    #endif
+      }
+      len += snprintf(json + len, sizeof(json) - len, "|");
+      {
+    #ifdef ESP8266
+    #if (ARDUINO_ESP8266_MAJOR >= 3)
+        HeapSelectDram ephemeral;
+    #endif
+        len += snprintf(json + len, sizeof(json) - len, "%d", ESP.getFreeHeap());
+    #else
+        len += snprintf(json + len, sizeof(json) - len, "%d", ESP.getFreePsram());
+    #endif
+    #if DEBUG
+        Serial.printf("DRAM free: %6d bytes\r\n", ESP.getFreeHeap());
+    #endif
+      }
+      len += snprintf(json + len, sizeof(json) - len, "\",");
+
+      for (uint8_t i = 1; i <= 31; i++) {
+        if (i == 8 || i == 25 || i == 28) {
+          if (DEMO_PASSWORD == "") {
+            len += snprintf(json + len, sizeof(json) - len, "\"\",");
+          } else {
+    #if DEBUG
+            Serial.printf("NVRAM Mask: %u\n", i);
+    #endif
+            len += snprintf(json + len, sizeof(json) - len, "\"*****\",");
+          }
+        } else {
+          len += snprintf(json + len, sizeof(json) - len, "\"%s\",", NVRAM_Read(i));
+        }
+      }
+      json[len - 1] = '\0'; len--; // remove last character
+      snprintf(json + len, sizeof(json) - len, "]\n}");
+      request->send(200, text_json, json);
     }
   });
+  /*
+  server.on("/nvram", HTTP_GET, [](AsyncWebServerRequest *request) {
+    char out[2048];
+    size_t len = 0;
+    for (uint32_t i = 0; i < EEPROM.length(); i++) {
+      len += snprintf(out + len, sizeof(out) - len, "%02X", EEPROM.read(i));
+    }
+    request->send(200, text_plain, out);
+  });
+  */
   server.on("/nvram", HTTP_POST, [](AsyncWebServerRequest *request) {
     if (DEMO_PASSWORD != "") {
       request->send(200, text_html, locked_html);
     } else {
 
-      String out = "<pre>";
-      uint8_t c = 1, from = 0, to = 0, skip = 32;
+      char out[512];
+      char refreshURL[32];
+      size_t len = 0;
+      uint8_t n = 1, skip = 32;
 
-      if (request->hasParam("WiFiMode", true)) {
-        //skip confirm password (9)
-        if (request->hasParam("WiFiIP", true)) {
-          from = 1, to = 15;  //, skip = 9;
-        } else {
-          from = 1, to = 11;  //, skip = 9;
+      len = snprintf(refreshURL, sizeof(refreshURL), "4;url=/");
+
+      if (request->getParam(0)->name() == "wifi") {
+        if (request->getParam("Mode", true)->value().toInt() == 0) {
+          len += snprintf(refreshURL + len, sizeof(refreshURL) - len, "update?boot=1");
+        } else if (request->getParam("DHCP", true)->value().toInt() == 1) {
+            len += snprintf(refreshURL + len, sizeof(refreshURL) - len, "find.html");
+          //} else {
+          //  len += snprintf(RefreshURL + len, sizeof(RefreshURL) - len, "http://%s", request->getParam("WiFiIP", true)->value().c_str());
         }
-      } else if (request->hasParam("Alerts", true)) {
-        from = 22, to = 28, skip = 26;
-      } else if (request->hasParam("DemoPassword", true)) {
-        from = 28, to = 30;  //, skip = 29;
+      }else if (request->getParam(0)->name() == "alert") {
+        n = 22;
+        skip = 5;
+      } else if (request->getParam(0)->name() == "demo") {
+        n = 28;
+        //skip = 1;
       }
 
-      uint8_t n = 0;
-      for (uint8_t i = from; i <= to; i++) {
-        n = i;
-        if (i > skip)
-          n--;
-
+      len = 0;
+      for (size_t i = 1; i < request->params(); i++) {
         if (i != skip) {
-          out += "[";
-          out += n;
-          out += +"] ";
-          out += request->getParam(c)->name() + ": ";
-          NVRAM_Write(n, request->getParam(c)->value());
-          out += NVRAM_Read(n) + "\n";
+          NVRAM_Write(n, request->getParam(i)->value().c_str());
+          len += snprintf(out + len, sizeof(out) - len, "[%d] %s:%s\n", n, request->getParam(i)->name().c_str(), NVRAM_Read(n));
+          n++;
         }
-        c++;
       }
+      AsyncWebServerResponse *response = request->beginResponse(200, text_plain, out);
 #if DEBUG
       Serial.println("NVRAM Forcig Restart");
 #endif
-      out += "</pre>";
-
-      //char RefreshURL[32];
-      //snprintf(RefreshURL, sizeof(RefreshURL), "8;url=/");
-      String RefreshURL = "4;url=/update?boot=";
-      AsyncWebServerResponse *response = request->beginResponse(200, text_html, out);
-
-      if (request->getParam("WiFiMode", true)->value().toInt() == 0) {
-        RefreshURL += "1";
-      } else {
-        if (request->getParam("WiFiDHCP", true)->value().toInt() == 1) {
-          //strncat(RefreshURL, "find", sizeof(RefreshURL) - strlen(RefreshURL) - 1);
-          RefreshURL += "find";
-        } else {
-          //snprintf(RefreshURL, sizeof(RefreshURL),"http://%s", request->getParam("WiFiIP", true)->value());
-          RefreshURL += "http://" + request->getParam("WiFiIP", true)->value();
-        }
-      }
-      response->addHeader(refresh_http, RefreshURL);
+      response->addHeader(refresh_http, refreshURL);
       request->send(response);
     }
   });
@@ -1312,16 +1364,15 @@ void setupWebServer() {
           return request->requestAuthentication();
 #endif
       char updateHTML[512];
-      snprintf(updateHTML, sizeof(updateHTML), "<!DOCTYPE html><html><body>");
+      size_t len = snprintf(updateHTML, sizeof(updateHTML), "<!DOCTYPE html><html><body>");
       if (request->hasParam("boot")) {
-        strncat(updateHTML, "<script>fetch('reboot').then((async()=>{for(;;){if((await fetch('update')).ok){location='/'}await new Promise(r=>setTimeout(r,999))}})())</script>...", sizeof(updateHTML) - strlen(updateHTML) - 1);
+        len += snprintf(updateHTML + len, sizeof(updateHTML) - len, "<script>fetch('reboot').then((async()=>{for(;;){if((await fetch('update')).ok){location='/'}await new Promise(r=>setTimeout(r,999))}})())</script>...");
       } else {
-        strncat(updateHTML, buildFormPostButton(NETWORK_IP.c_str(), "Firmware"), sizeof(updateHTML) - strlen(updateHTML) - 1);
-        strncat(updateHTML, buildFormPostButton(NETWORK_IP.c_str(), "Filesystem"), sizeof(updateHTML) - strlen(updateHTML) - 1);
+        len += snprintf(updateHTML + len, sizeof(updateHTML) - len, buildFormPostButton(NETWORK_IP.c_str(), "Firmware"));
+        len += snprintf(updateHTML + len, sizeof(updateHTML) - len, buildFormPostButton(NETWORK_IP.c_str(), "Filesystem"));
       }
-      strncat(updateHTML, "</body></html>", sizeof(updateHTML) - strlen(updateHTML) - 1);
-      AsyncWebServerResponse *response = request->beginResponse(200, text_html, updateHTML);
-      request->send(response);
+      snprintf(updateHTML + len, sizeof(updateHTML) - len, "</body></html>");
+      request->send(200, text_html, updateHTML);
     });
   /*
     server.on("/format", HTTP_GET, [](AsyncWebServerRequest *request) {
@@ -1375,14 +1426,27 @@ void setupWebServer() {
       if (DEMO_PASSWORD != "")
         if (!request->authenticate("", DEMO_PASSWORD.c_str()))
           return request->requestAuthentication();
-      request->redirect("/index.html");  //request->send(200);
+      request->redirect("/");  //request->send(200);
     },
     onUpload);
 
   server.on("/", [](AsyncWebServerRequest *request) {
     if (LittleFS.exists("/index.html")) {
       blinkDuration = 0;
-      request->redirect("/index.html");
+      bool isPhone = false;
+      if (request->hasHeader("User-Agent")) {
+        const char *ua = request->getHeader("User-Agent")->value().c_str();
+        if (strstr(ua, "iPhone")) {
+          isPhone = true;
+        } else if (strstr(ua, "Android") && strstr(ua, "Mobile")) {
+          isPhone = true;
+        }
+      }
+      if (isPhone) {
+        request->redirect("/mobile/index.html");
+      }else{
+        request->redirect("/index.html");
+      }
     } else {
       AsyncWebServerResponse *response = request->beginResponse(200, text_html, "File System Not Found ...");
       response->addHeader(refresh_http, "4; url=/update");
@@ -1436,9 +1500,6 @@ void setupWebServer() {
         response->addHeader("Access-Control-Allow-Origin", "*");  // Allow all origins
       }
       response->addHeader("Content-Encoding", "gzip");
-#ifdef ESP8266
-      response->addHeader("Cache-Control", "max-age=800");
-#endif
       request->send(response);
     } else {
       request->send(404, text_plain, "404: Not Found");
@@ -1587,9 +1648,7 @@ static int root_get_handler(httpd_req_t *req) {
 #endif
 char *buildFormPostButton(const char ip[], const char name[]) {
   static char buffer[256];
-  snprintf(buffer, sizeof(buffer),
-           "<form method=POST action='http://%s/update' enctype='multipart/form-data'><input type=file accept='.bin,.signed' name=%s><input type=submit value='Update %s'></form><br>",
-           ip, name, name);
+  snprintf(buffer, sizeof(buffer),"<form method=POST action='http://%s/update' enctype='multipart/form-data'><input type=file accept='.bin,.signed' name=%s><input type=submit value='Update %s'></form><br>", ip, name, name);
   return buffer;
 }
 
@@ -2279,139 +2338,66 @@ void blinky(uint16_t timer, uint16_t duration, uint8_t threaded) {
 //=============
 // NVRAM CONFIG
 //=============
-String NVRAM(uint8_t from, uint8_t to, uint8_t *maskValues) {
-
-  String out = "{\n\t\"nvram\": [\"";
-#ifdef ESP8266
-  out += ESP.getCoreVersion();  //ESP.getFullVersion();
-  out += " esp8266";
-#else
-  out += ESP_ARDUINO_VERSION_MAJOR;
-  out += ".";
-  out += ESP_ARDUINO_VERSION_MINOR;
-  out += ".";
-  out += ESP_ARDUINO_VERSION_PATCH;
-  out += " esp32 ";
-#if (ASYNC_TCP_SSL_ENABLED)
-  out += MBEDTLS_VERSION_NUMBER;
-#endif
-#endif
-  out += "|";
-  out += ESP.getSdkVersion();
-  out += "|";
-#ifdef ESP8266
-  out += LFS_VERSION;
-#else
-  out += "0.0.0";
-#endif
-  out += "|";
-  out += _VERSION;
-  out += "|";
-  {
-#if (ESP8266 && ARDUINO_ESP8266_MAJOR >= 3)
-    HeapSelectIram ephemeral;
-#endif
-    out += ESP.getFreeHeap();  //esp_himem_get_free_size()
-#if DEBUG
-    Serial.printf("IRAM free: %6d bytes\r\n", ESP.getFreeHeap());
-#endif
-  }
-  out += "|";
-  {
-#ifdef ESP8266
-#if (ARDUINO_ESP8266_MAJOR >= 3)
-    HeapSelectDram ephemeral;
-#endif
-    out += ESP.getFreeHeap();
-#else
-    out += ESP.getFreePsram();
-#endif
-#if DEBUG
-    Serial.printf("DRAM free: %6d bytes\r\n", ESP.getFreeHeap());
-#endif
-  }
-  out += "\",";
-
-  for (uint8_t i = from; i <= to; i++) {
-    bool masked = false;
-    for (uint8_t m = 0; m <= sizeof(maskValues); m++) {
-      if (maskValues[m] == i) {
-        masked = true;
-        break;
-      }
-    }
-    if (masked) {
-      if (DEMO_PASSWORD == "") {
-        out += "\"\",";
-      } else {
-#if DEBUG
-        Serial.printf("NVRAM Mask: %u\n", i);
-#endif
-        out += "\"*****\",";
-      }
-    } else {
-      String escaped = NVRAM_Read(i);
-      out += "\"";
-      out += escaped;
-      out += "\",";
-    }
-  }
-
-  out = out.substring(0, (out.length() - 1));
-  out += "]\n}";
-
-  return out;
-}
-
 void NVRAM_Erase() {
   for (uint32_t i = 0; i < EEPROM.length(); i++) {
-    EEPROM.write(i, 255);
+    EEPROM.write(i, 0xFF);
   }
   EEPROM.commit();
 }
 
-uint8_t NVRAM_Offset(uint8_t index) {
-  uint8_t offset = 0;
-  for (uint8_t i = 0; i < index; i++) {
-    offset += NVRAM_Map[i];  // + 1;
-  }
-  return offset;
-}
-
 void NVRAM_Write(uint8_t address, String txt) {
-
-  char arrayToStore[32];
-  memset(arrayToStore, 0, sizeof(arrayToStore));
-  txt.toCharArray(arrayToStore, sizeof(arrayToStore));  // Convert string to array.
-  EEPROM.put(address * sizeof(arrayToStore), arrayToStore);
-
-  //#if DEBUG
-  //Serial.printf("arrayToStore: %u > %u Offset: %u\n", address, NVRAM_Map[address], NVRAM_Offset(address));
-  //#endif
-  //char *arrayToStore = new char[NVRAM_Map[address]+1];
-  //memset(arrayToStore, 0, sizeof(arrayToStore));
-  //txt.toCharArray(arrayToStore, sizeof(arrayToStore));  // Convert string to array.
-  //EEPROM.put(NVRAM_Offset(address), arrayToStore);
-
-  //EEPROM.write(0, 0xde);
-
+  /*
+  int EEPROM_SIZE = 32;
+  char buffer[EEPROM_SIZE];
+  memset(buffer, 0, EEPROM_SIZE);
+  txt.toCharArray(buffer, EEPROM_SIZE);
+  EEPROM.put(address * EEPROM_SIZE, buffer);
+  free(buffer);
+  */
+  const int EEPROM_SIZE = (NVRAM_Map[(address + 1)] - NVRAM_Map[address]);
+  //const int EEPROM_SIZE = 32;
+#if DEBUG
+  Serial.printf("NVRAM_Write: %u > %u:%u\n", address, NVRAM_Map[address], EEPROM_SIZE);
+#endif
+  int len = txt.length();
+  for (int i = 0; i < EEPROM_SIZE; i++) {
+    if (i < len) {
+      EEPROM.write(NVRAM_Map[address] + i, txt[i]);
+      //EEPROM.write(address * EEPROM_SIZE + i, txt[i]);
+    } else {
+      EEPROM.write(NVRAM_Map[address] + i, 0xFF);
+      //EEPROM.write(address * EEPROM_SIZE + i, 0xFF);
+      break;
+    }
+  }
   EEPROM.commit();
 }
 
 String NVRAM_Read(uint8_t address) {
+  /*
+  int EEPROM_SIZE = 32;
+  char buffer[EEPROM_SIZE];
+  EEPROM.get(address * EEPROM_SIZE, buffer);
+  */
+  String buffer = "";
+  const int EEPROM_SIZE = (NVRAM_Map[(address + 1)] - NVRAM_Map[address]);
+  //const int EEPROM_SIZE = 32;
+  for (int i = 0; i < EEPROM_SIZE; i++) {
+    char byte = EEPROM.read(NVRAM_Map[address] + i);
+    //char byte = EEPROM.read(address * EEPROM_SIZE + i);
+    if (byte == 0xFF) {
+      break;
+    }
+    buffer += byte;
+  }
+#if DEBUG
+  Serial.printf("NVRAM_Read: %u > %u:%u\n", address, NVRAM_Map[address], EEPROM_SIZE);
+  for (int i = 0; i < EEPROM_SIZE; i++) {
+    Serial.printf("%02X ", (uint8_t)buffer[i]);  // 2-digit uppercase hex with leading zero
+  }
+#endif
 
-  char arrayToRead[32];
-  EEPROM.get(address * sizeof(arrayToRead), arrayToRead);
-
-  //#if DEBUG
-  //Serial.printf("arrayToRead: %u > %u Offset: %u\n", address, NVRAM_Map[address], NVRAM_Offset(address));
-  //#endif
-  //char *arrayToRead = new char[NVRAM_Map[address]+1];
-  //EEPROM.get(NVRAM_Offset(address), arrayToRead);
-
-  //EEPROM.read(0);
-
-  return String(arrayToRead);
+  return buffer;
 }
 
 void NVRAM_Read_Config() {
