@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <title>tiny plant - mobile</title>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <link rel="stylesheet" type="text/css" href="../css/tailwind.css">
+        <link rel="stylesheet" type="text/css" href="css/rslider.css">
+        <script src="js/rslider.js"></script>
+        <script defer src="../js/common.js"></script>
+        <script>
+        var pnpslider, adcslider;
+        document.addEventListener('DOMContentLoaded', function(event)
+        {
+            var nvram = new XMLHttpRequest();
+            nvram.responseType = 'json';
+            nvram.open('GET', '/nvram.json', true);
+            nvram.send();
+            nvram.onload = function(e) {
+                if(nvram.response != undefined) {
+                        
+                    if(nvram.response['nvram'][0].indexOf('esp32') != -1) {
+                        ESP32 = true;
+                    }
+
+                    var pnp_adc = nvram.response['nvram'][PNP_ADC] + '000';
+                    var bool_value = pnp_adc.charAt(2) == '1' ? true : false;
+                    document.getElementById('WaterLevelCheckbox').checked = bool_value;
+                
+                    pnpslider = new rSlider({
+                        target: '#enable-pnp',
+                        values:  ['PNP', 'NPN'],
+                        range: false,
+                        tooltip: false,
+                        scale: true,
+                        labels: true,
+                        step: 1,
+                        set: [0],
+                        onChange: function (v) {
+                            savePNPADC();
+                        }
+                    });
+                    adcslider = new rSlider({
+                        target: '#adc-sensitivity',
+                        values: Array.from({ length: 10 }, (_, i) => i),
+                        range: false,
+                        tooltip: true,
+                        scale: false,
+                        labels: false,
+                        step: 1,
+                        set: [1],
+                        onChange: function (v) {
+                            savePNPADC();
+                        }
+                    });
+          
+                    if(nvram.response['nvram'][DEMO_PASSWORD] != '')
+                    {
+                        DEMOLOCK = true;
+                    }
+                }
+            }
+            document.getElementById('browseLittleFS').addEventListener('click', function() {
+                if (DEMOLOCK) {
+                    PlantLogin();
+                } else {
+                    document.getElementById('fileLittleFS').click();
+                }
+            });
+
+            document.getElementById('browseFirmware').addEventListener('click', function() {
+                if (DEMOLOCK) {
+                    PlantLogin();
+                } else {
+                    document.getElementById('fileFirmware').click();
+                }
+            });
+
+            document.getElementById('fileLittleFS').addEventListener('change', function() {
+                document.getElementById('formLittleFS').setAttribute('action', 'http://' + window.location.hostname + '/update'); // force HTTP
+                progressTimer(80, 0);
+                document.getElementById('formLittleFS').submit();
+            });
+
+            document.getElementById('fileFirmware').addEventListener('change', function() {
+                document.getElementById('formFirmware').setAttribute('action', 'http://' + window.location.hostname + '/update'); // force HTTP
+                progressTimer(20, 0);
+                document.getElementById('formFirmware').submit();
+            });
+        });
+
+        function savePNPADC() {
+            var waterlevel = 0;
+            if(document.getElementById('WaterLevelCheckbox').checked) {
+                waterlevel = 1;
+            }
+            var pnpsliderValue = 0;
+            if(pnpslider.getValue() == 'NPN')
+                pnpsliderValue = 1;
+            saveSetting(PNP_ADC, pnpsliderValue + '' + adcslider.getValue() + '' + waterlevel, function(lock) {
+                if (lock != 'Locked' && waterlevel == 1) {
+                    notify('','Check Water Sensor and Water is Full', 'info')
+                }
+            });
+        }
+        </script>
+    </head>
+    <body class="bg-gray-100">
+        <div class="fixed top-0 right-0 p-3 z-[2000]" id="notify"></div>
+        <div class="fixed inset-0 bg-black opacity-50 hidden" id="modal-backdrop"></div>
+        <div class="items-center justify-center p-4">
+            <div class="grid grid-cols-1 lg:grid-cols-4 gap-4 m-4">
+                <button type="button" class="bg-gray-400 hover:bg-gray-500 text-white rounded w-full py-2" onclick="window.location.href='index.html'"><<</button>
+                <button type="button" class="bg-gray-400 hover:bg-gray-500 text-white rounded w-full py-2" onclick="window.location.href='wifi.html'">WiFi</button>
+                <button type="button" class="bg-gray-400 hover:bg-gray-500 text-white rounded w-full py-2" onclick="window.location.href='test.html'">Test</button>
+                <button type="button" class="bg-gray-500 hover:bg-gray-500 text-white rounded w-full py-2" onclick="window.location.href='firmware.html'">Firmware</button>
+            </div>
+            <div class="bg-white border border-gray-300 rounded-[5px] mt-4 mb-4">
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 m-4">
+                    <div>
+                        <form method="POST" action="/update" enctype="multipart/form-data" id="formLittleFS">
+                            <input type="file" accept=".bin,.signed" name="filesystem" id="fileLittleFS" class="hidden">
+                            <input type="submit" class="hidden">
+                        </form>
+                        <button class="py-2 bg-blue-500 hover:bg-blue-600 text-white w-full rounded" type="button" id="browseLittleFS">Flash LittleFS</button>
+                    </div>
+                    <div>
+                        <form method="POST" action="/update" enctype="multipart/form-data" id="formFirmware">
+                            <input type="file" accept=".bin,.signed" name="firmware" id="fileFirmware" class="hidden">
+                            <input type="submit" class="hidden">
+                        </form>
+                        <button class="py-2 bg-blue-500 hover:bg-blue-600 text-white w-full rounded" type="button" id="browseFirmware">Flash Firmware</button>
+                    </div>
+                </div>
+            </div>
+            <div class="bg-white border border-gray-300 rounded-[5px] mt-4">
+                <div class="progress border rounded-sm m-4">
+                    <div class="progress-bar bg-blue-500 h-2 rounded-sm" style="width:0%"></div>
+                </div>
+            </div>
+            <div class="bg-white border border-gray-300 rounded-[5px] mt-4">
+                <div class="p-4">PNP/NPN Transistor</div>
+                <div class="p-6"><input type="text" id="enable-pnp" name="enable-pnp" class="slider"></div>
+            </div>
+            <div class="bg-white border border-gray-300 rounded-[5px] mt-4">
+                <div class="p-4">Moisture Sensor Sensitivity</div>
+                <div class="p-6"><input type="text" id="adc-sensitivity" name="adc-sensitivity" class="slider"></div>
+                <div class="p-4">
+                    <input type="checkbox" id="WaterLevelCheckbox" class="form-checkbox w-5 h-5 text-blue-500" onclick="savePNPADC()">
+                    <label for="WaterLevelCheckbox" class="">Water Level Sensor</label>
+                </div>
+            </div>
+            <div class="bg-white border border-gray-300 rounded-[5px] mt-4">
+                <div class="flex justify-center items-center m-4">
+                    <button class="bg-red-500 text-white w-full py-2 rounded hover:bg-red-600" type="button" onclick="resetFlash()">Default Reset</button>
+                </div>
+            </div>
+        </div>
+        <div class="fixed inset-0 flex items-center justify-center hidden modal" id="demo-lock">
+            <div class="bg-white dark:bg-gray-800 p-4 rounded-lg w-full max-w-md mx-auto border border-gray-600 dark:border-gray-300">
+                <div class="flex modal-header justify-between items-center border-b border-gray-600 dark:border-gray-300">
+                    <h5 class="text-lg font-semibold text-gray-800 dark:text-white">Login</h5>
+                    <button id="close-modal" class="text-gray-500 hover:text-gray-800 dark:text-gray-400 dark:hover:text-gray-300 focus:outline-none text-2xl" onclick="hideModal(this)">&times;</button>
+                </div>
+                <form method="POST" action="/login" id="demo-lock-form">
+                    <input type="password" id="DemoPassword" name="password" class="border border-gray-300 dark:border-gray-600 focus:ring focus:ring-green-500 rounded-md p-2 w-full" placeholder="Password" required>
+                    <button type="submit" class="bg-green-500 hover:bg-green-600 text-white rounded w-full px-4 py-2 mt-4" id="demo-lock-ok">Login</button>
+                </form>
+            </div>
+        </div>
+    </body>
+</html>

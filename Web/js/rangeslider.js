@@ -1,131 +1,189 @@
-class RangeSlider {
-    constructor(element) {
-        this.element = element;
-        this.min = parseFloat(element.dataset.min) || 0;
-        this.max = parseFloat(element.dataset.max) || 100;
-        this.step = parseFloat(element.dataset.step) || 1;
-        this.defaultValue = parseFloat(element.dataset.default) || this.min;
-        this.id = element.dataset.id;
-        this.showMarks = element.dataset.marks === 'true';
-        this.isDragging = false;
-        this.handleWidth = 24; // Handle width in pixels (w-6 = 24px in Tailwind)
-        this.currentValue = this.defaultValue;
-
-        this.init();
-    }
-
-    init() {
-        // Create slider components
-        this.element.innerHTML = `
-            <div class="relative">
-                <div class="h-2 bg-gray-300 rounded-full relative">
-                    <div class="h-full bg-blue-500 rounded-full slider-progress" style="width: 0%"></div>
-                    <div class="slider-marks"></div>
-                </div>
-                <div class="absolute w-6 h-6 bg-blue-500 rounded-full -top-2 cursor-pointer shadow-md slider-handle border border-gray-500" style="left: 0%"></div>
-            </div>
-        `;
-
-        this.handle = this.element.querySelector('.slider-handle');
-        this.progress = this.element.querySelector('.slider-progress');
-        this.marksContainer = this.element.querySelector('.slider-marks');
-        this.track = this.handle.parentElement;
-        this.valueDisplay = this.element.parentElement.querySelector('.slider-value');
-
-        // Add marks if enabled
-        if (this.showMarks) {
-            this.addMarks();
+/**
+     * rslider - Simple horizontal slider library
+     * @param {string|HTMLElement} container - CSS selector or DOM element
+     * @param {Object} options - Configuration options
+     * @returns {Object} - Slider instance with methods
+     */
+    function rslider(container, options = {}) {
+      const el = typeof container === 'string' 
+        ? document.querySelector(container) 
+        : container;
+      
+      if (!el) {
+        console.error('rslider: Container not found');
+        return null;
+      }
+      
+      // Default options
+      const config = {
+        min: options.min || 0,
+        max: options.max || 100,
+        value: options.value || 50,
+        color: options.color || '#4CAF50',
+        dashes: options.dashes || false,
+        onChange: options.onChange || null,
+        onInput: options.onInput || null
+      };
+      
+      // Create slider elements
+      el.className = 'relative w-full flex items-center my-5';
+      
+      let dashesHTML = '';
+      if (config.dashes) {
+        const numDashes = typeof config.dashes === 'number' ? config.dashes : 5;
+        dashesHTML = '<div class="absolute w-full h-full flex justify-between items-center">';
+        for (let i = 0; i < numDashes; i++) {
+          dashesHTML += '<div class="w-0.5 h-2.5 bg-gray-400 rounded-sm"></div>';
         }
-
-        // Set initial value
-        this.setValue(this.defaultValue);
-        this.addEventListeners();
-    }
-
-    addMarks() {
-        // Calculate mark interval (e.g., every 10 units or 10% of range)
-        const range = this.max - this.min;
-        const markInterval = Math.max(this.step, Math.round(range / 10)); // At least step size, roughly 10 marks
-
-        // Generate marks
-        for (let value = this.min; value <= this.max; value += markInterval) {
-            const position = (value - this.min) / range * 100;
-            const mark = document.createElement('div');
-            mark.className = 'absolute w-[1px] h-[6px] bg-gray-500 -bottom-3'; // 2px gap below track
-            mark.style.left = `${position}%`;
-            this.marksContainer.appendChild(mark);
+        dashesHTML += '</div>';
+      }
+      
+      el.innerHTML = `
+        <div class="absolute w-full h-1.5 bg-gray-200 rounded-full"></div>
+        ${dashesHTML}
+        <div class="rslider-fill absolute h-1.5 rounded-full transition-all duration-75 ease-out"></div>
+        <div class="rslider-handle absolute w-6 h-6 border-4 border-white rounded-full cursor-grab shadow-md transition-transform duration-100 ease-out hover:scale-110 active:scale-115 z-10"></div>
+      `;
+      
+      const handle = el.querySelector('.rslider-handle');
+      const fill = el.querySelector('.rslider-fill');
+      
+      // Apply custom color
+      handle.style.background = config.color;
+      fill.style.background = config.color;
+      
+      let isDragging = false;
+      let currentValue = config.value;
+      
+      function valueToPercentage(val) {
+        const range = config.max - config.min;
+        if (range === 0) return 0;
+        return ((val - config.min) / range) * 100;
+      }
+      
+      function percentageToValue(pct) {
+        return config.min + (pct / 100) * (config.max - config.min);
+      }
+      
+      function updateSlider(clientX, triggerChange = false) {
+        const rect = el.getBoundingClientRect();
+        const handleWidth = handle.offsetWidth;
+        const x = clientX - rect.left;
+        const percentage = Math.max(0, Math.min(100, (x / rect.width) * 100));
+        
+        currentValue = Math.round(percentageToValue(percentage));
+        
+        // Calculate position with handle centered on the percentage point
+        const centerPosition = (percentage / 100) * rect.width;
+        const position = Math.max(handleWidth / 2, Math.min(rect.width - handleWidth / 2, centerPosition));
+        
+        handle.style.left = `${position - handleWidth / 2}px`;
+        fill.style.width = `${position}px`;
+        
+        if (config.onInput) {
+          config.onInput(currentValue);
         }
-    }
-
-    getTrackBounds() {
-        const rect = this.track.getBoundingClientRect();
-        return { left: rect.left, width: rect.width };
-    }
-
-    setValue(value) {
-        // Ensure value is within bounds and aligns with step
-        value = Math.max(this.min, Math.min(this.max, value));
-        value = Math.round(value / this.step) * this.step;
-        this.currentValue = value;
         
-        // Calculate position (0 to 1)
-        const position = (value - this.min) / (this.max - this.min);
+        if (triggerChange && config.onChange) {
+          config.onChange(currentValue);
+        }
+      }
+      
+      function onMouseDown(e) {
+        isDragging = true;
+        document.body.classList.add('rslider-dragging');
+        updateSlider(e.clientX);
+      }
+      
+      function onMouseMove(e) {
+        if (!isDragging) return;
+        e.preventDefault();
+        updateSlider(e.clientX);
+      }
+      
+      function onMouseUp(e) {
+        if (isDragging) {
+          updateSlider(e.clientX, true);
+          document.body.classList.remove('rslider-dragging');
+        }
+        isDragging = false;
+      }
+      
+      // Mouse events
+      handle.addEventListener('mousedown', onMouseDown);
+      document.addEventListener('mousemove', onMouseMove);
+      document.addEventListener('mouseup', onMouseUp);
+      
+      // Touch events
+      handle.addEventListener('touchstart', (e) => {
+        isDragging = true;
+        document.body.classList.add('rslider-dragging');
+        updateSlider(e.touches[0].clientX);
+      });
+      
+      document.addEventListener('touchmove', (e) => {
+        if (!isDragging) return;
+        e.preventDefault();
+        updateSlider(e.touches[0].clientX);
+      });
+      
+      document.addEventListener('touchend', (e) => {
+        if (isDragging && e.changedTouches.length > 0) {
+          updateSlider(e.changedTouches[0].clientX, true);
+          document.body.classList.remove('rslider-dragging');
+        }
+        isDragging = false;
+      });
+      
+      // Initialize slider position with proper dimension checking
+      function initializePosition() {
+        // Check if element has dimensions
+        if (el.offsetWidth === 0) {
+          // If no width yet, wait a bit longer or observe for resize
+          requestAnimationFrame(initializePosition);
+          return;
+        }
         
-        // Adjust handle position to keep circle within track bounds
-        const trackWidth = this.getTrackBounds().width;
-        const maxPositionPercentage = ((trackWidth - this.handleWidth) / trackWidth) * 100;
-        const adjustedPercentage = position * maxPositionPercentage;
+        const initialPercentage = valueToPercentage(currentValue);
+        const handleWidth = handle.offsetWidth;
+        const trackWidth = el.offsetWidth;
         
-        // Adjust progress to extend to handle's center
-        const handleCenterOffset = (this.handleWidth / 2) / trackWidth * 100;
-        this.handle.style.left = `${adjustedPercentage}%`;
-        this.progress.style.width = `calc(${adjustedPercentage}% + ${handleCenterOffset}px)`;
-        this.valueDisplay.textContent = value.toFixed(this.step % 1 === 0 ? 0 : 2);
+        // Calculate center position based on percentage
+        const centerPosition = (initialPercentage / 100) * trackWidth;
+        const position = Math.max(handleWidth / 2, Math.min(trackWidth - handleWidth / 2, centerPosition));
+        
+        handle.style.left = `${position - handleWidth / 2}px`;
+        fill.style.width = `${position}px`;
+      }
+      
+      // Start initialization
+      setTimeout(initializePosition, 0);
+      
+      // Public API
+      return {
+        getValue: () => currentValue,
+        setValue: (val) => {
+          currentValue = Math.max(config.min, Math.min(config.max, val));
+          const percentage = valueToPercentage(currentValue);
+          const handleWidth = handle.offsetWidth;
+          const trackWidth = el.offsetWidth;
+          
+          // Calculate center position based on percentage
+          const centerPosition = (percentage / 100) * trackWidth;
+          const position = Math.max(handleWidth / 2, Math.min(trackWidth - handleWidth / 2, centerPosition));
+          
+          handle.style.left = `${position - handleWidth / 2}px`;
+          fill.style.width = `${position}px`;
+        },
+        refresh: () => {
+          // Recalculate and redraw slider position
+          initializePosition();
+        },
+        destroy: () => {
+          handle.removeEventListener('mousedown', onMouseDown);
+          document.removeEventListener('mousemove', onMouseMove);
+          document.removeEventListener('mouseup', onMouseUp);
+          el.innerHTML = '';
+        }
+      };
     }
-
-    getValue() {
-        return this.currentValue;
-    }
-
-    updateSlider(clientX) {
-        const { left, width } = this.getTrackBounds();
-        let position = (clientX - left) / width;
-        position = Math.max(0, Math.min(1, position));
-
-        // Calculate scaled value
-        const value = this.min + position * (this.max - this.min);
-        this.setValue(value);
-    }
-
-    addEventListeners() {
-        // Mouse Events
-        this.handle.addEventListener('mousedown', () => {
-            this.isDragging = true;
-        });
-
-        document.addEventListener('mousemove', (e) => {
-            if (this.isDragging) {
-                this.updateSlider(e.clientX);
-            }
-        });
-
-        document.addEventListener('mouseup', () => {
-            this.isDragging = false;
-        });
-
-        // Touch Events
-        this.handle.addEventListener('touchstart', () => {
-            this.isDragging = true;
-        });
-
-        document.addEventListener('touchmove', (e) => {
-            if (this.isDragging) {
-                this.updateSlider(e.touches[0].clientX);
-            }
-        });
-
-        document.addEventListener('touchend', () => {
-            this.isDragging = false;
-        });
-    }
-}

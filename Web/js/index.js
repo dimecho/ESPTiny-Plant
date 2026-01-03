@@ -1,5 +1,4 @@
-var pnpslider, adcslider, avslider;
-
+var pnp_adc = "000";
 document.addEventListener('DOMContentLoaded', function(event)
 {
 	if(document.cookie != '') {
@@ -94,6 +93,8 @@ document.addEventListener('DOMContentLoaded', function(event)
 	    	document.getElementById('demo-SettingsForm').submit();
 		}
 	};
+
+
 });
 
 function svgwaterLevelAdjust(v) {
@@ -197,12 +198,7 @@ function loadSVG(svgfile) {
 			            if(nvram.response != undefined) {
 			                NVRAMtoSVG(nvram.response);
 
-			                var pnp_adc = nvram.response['nvram'][PNP_ADC] + '000';
-	                    	pnpslider = new RangeSlider(document.getElementById('EnablePNP'));
-							adcslider = new RangeSlider(document.getElementById('ADCSensitivity'));
-							pnpslider.setValue(pnp_adc.charAt(0));
-							adcslider.setValue(pnp_adc.charAt(1));
-
+			                pnp_adc = nvram.response['nvram'][PNP_ADC] + '000';
 							var bool_value = pnp_adc.charAt(2) == '1' ? true : false;
 		                    document.getElementById('WaterLevel').value = pnp_adc.charAt(2);
 							document.getElementById('WaterLevelCheckbox').checked = bool_value;
@@ -305,7 +301,7 @@ function loadSVG(svgfile) {
 							    min: 0, max: 1, value: document.getElementById('WaterLevel').getAttribute('value'),
 							    color: '#4facfe', colorEnd: '#00f2fe',
 							    onComplete: function(v) {
-							    	saveSetting(PNP_ADC, pnpslider.currentValue + '' + adcslider.currentValue + '' + v, function(lock) {
+							    	saveSetting(PNP_ADC, pnp_adc.charAt(0) + '' + pnp_adc.charAt(1) + '' + v, function(lock) {
 								    	if (lock != 'Locked') {
 								    		var bool_value = v == '1' ? true : false;
 								    		document.getElementById('WaterLevel').value = v;
@@ -521,9 +517,6 @@ function loadSVG(svgfile) {
 				                    document.getElementById('iram').textContent = 'IRAM: ' + Math.round(v[4]/1024) + ' KB (' + v[4] + ')';
 									document.getElementById('dram').textContent = 'DRAM: ' + Math.round(v[5]/1024) + ' KB (' + v[5] + ')';
 
-				                    var bool_value = data['nvram'][WIFI_HIDE] == '1' ? true : false;
-									document.getElementById('WiFiHidden').value = data['nvram'][WIFI_HIDE];
-									document.getElementById('WiFiHiddenCheckbox').checked = bool_value;
 									if(ESP32) {
 									    const select = document.getElementById("WiFiPhyMode");
 									    const newOption = document.createElement("option");
@@ -538,6 +531,10 @@ function loadSVG(svgfile) {
 				                    	optionObject[19].setAttribute('hidden','true');
 				                    	optionObject[20].setAttribute('hidden','true');
 				                    }
+				                    var bool_value = data['nvram'][WIFI_HIDE] == '1' ? true : false;
+									document.getElementById('WiFiHidden').value = data['nvram'][WIFI_HIDE];
+									document.getElementById('WiFiHiddenCheckbox').checked = bool_value;
+
 				                    setWiFiChannels(data['nvram'][WIFI_PHY_MODE]);
 				                    document.getElementById('WiFiPhyMode').addEventListener("change", function () {
 								    	setWiFiChannels(this.value);
@@ -552,30 +549,35 @@ function loadSVG(svgfile) {
 									document.getElementById('EnableLogCheckbox').checked = bool_value;
 
 									document.getElementById('EnableLogInterval').value = data['nvram'][LOG_INTERVAL];
-									var slider_log = new RangeSlider(document.getElementById('silder-log-interval'));
-									slider_log.setValue(data['nvram'][LOG_INTERVAL]);
-									document.getElementById('silder-log-interval').addEventListener('mouseup', function() {
-									    if (slider_log.currentValue < 10) {
-									      	notify('', 'Flash memory will fill up fast!', 'danger');
+									document.getElementById('log-interval-text').textContent = data['nvram'][LOG_INTERVAL];
+									rslider('#log-interval', {
+						            	min: 2,
+      									max: 200,
+      									dashes: 10,
+								      	value: data['nvram'][LOG_INTERVAL],
+								      	onInput: (v) => {
+								        	document.getElementById('log-interval-text').textContent = v;
+									    },
+									    onChange: (v) => {
+									    	if (v < 10) {
+									      		notify('', 'Flash memory will fill up fast!', 'danger');
+									    	}
+									    	document.getElementById('EnableLogInterval').value = v;
 									    }
-									    document.getElementById('EnableLogInterval').value = slider_log.currentValue;
-									});
+								    });
 
 				                    bool_value = data['nvram'][NETWORK_DHCP] == '1' ? true : false;
 				                    document.getElementById('WiFiDHCP').value = data['nvram'][NETWORK_DHCP];
 									document.getElementById('WiFiDHCPCheckbox').checked = bool_value;
-				                    //if(bool_value == true) {
-										document.getElementById('WiFiIP').disabled = bool_value;
-										document.getElementById('WiFiSubnet').disabled = bool_value;
-										document.getElementById('WiFiGateway').disabled = bool_value;
-										document.getElementById('WiFiDNS').disabled = bool_value;
-				                    //}
+									document.getElementById('WiFiIP').disabled = bool_value;
+									document.getElementById('WiFiSubnet').disabled = bool_value;
+									document.getElementById('WiFiGateway').disabled = bool_value;
+									document.getElementById('WiFiDNS').disabled = bool_value;
 									document.getElementById('WiFiIP').value = data['nvram'][NETWORK_IP];
 									document.getElementById('WiFiSubnet').value = data['nvram'][NETWORK_SUBNET];
 									document.getElementById('WiFiGateway').value = data['nvram'][NETWORK_GATEWAY];
 									document.getElementById('WiFiDNS').value = data['nvram'][NETWORK_DNS];
-
-				                    document.getElementsByName('WiFiMode')[data['nvram'][WIFI_MODE]].checked = true;
+				                    document.getElementsByName('Mode')[data['nvram'][WIFI_MODE]].checked = true;
 				                    SetWiFiMode();
 
 				                   	document.getElementById('AlertEmail').value = data['nvram'][EMAIL_ALERT];
@@ -589,21 +591,7 @@ function loadSVG(svgfile) {
 										}
 									}
 									document.getElementById('AlertPlantName').value = data['nvram'][PLANT_NAME];
-									document.getElementById('Timezone').value = data['nvram'][TIMEZONE_OFFSET];
-
-						            document.getElementById('EnablePNP').addEventListener('mouseup', function() {
-									    const waterLevel = document.getElementById('WaterLevel').getAttribute('value');
-									    if (pnpslider.currentValue == 1) {
-									        notify('', 'PNP Transistor! Controlled with LOW (Negative)', 'danger');
-									        notify('', 'If you get this WRONG, Pump will run Non-Stop!', 'warning');
-									    }
-									    saveSetting(PNP_ADC, pnpslider.currentValue + '' + adcslider.currentValue + '' + waterLevel);
-									});
-
-						            document.getElementById('ADCSensitivity').addEventListener('mouseup', function() {
-									    const waterLevel = document.getElementById('WaterLevel').getAttribute('value');
-									    saveSetting(PNP_ADC, pnpslider.currentValue + '' + adcslider.currentValue + '' + waterLevel);
-									});
+									document.getElementById('DemoTimezone').value = data['nvram'][TIMEZONE_OFFSET];
 
 									document.getElementById('fileLayout').addEventListener('change', function() {
 									    if (DEMOLOCK) {
@@ -676,34 +664,43 @@ function loadSVG(svgfile) {
 					            			}
 							            }
 						            });
-						            /*
-								    pnpslider = {
-								        target: '#EnablePNP',
-								        values: ['NPN', 'PNP'],
-								        range: false,
-								        tooltip: false,
-								        scale: false,
-								        labels: false,
-								        step: 1,
-								        set: [pnp_adc.charAt(0)],
-								        onChange: function (e) {
-										    document.getElementById('EnablePNP').value = e;
-								        }
-								    };
-								    adcslider = {
-								    	target: '#ADCSensitivity',
-								        values: Array.from({ length: 9 }, (_, i) => i),
-								        range: false,
-								        tooltip: false,
-								        scale: true,
-								        labels: true,
-								        step: 1,
-								        set: [pnp_adc.charAt(1)],
-								        onChange: function (e) {
-										    document.getElementById('ADCSensitivity').value = e;
-								        }
-								    };
-								    */
+
+						            rslider('#enable-pnp', {
+						            	min: 0,
+      									max: 1,
+								      	value: pnp_adc.charAt(0),
+								      	color: '#FF5722',
+									    onChange: (v) => {
+									        document.getElementById('enable-pnp').value = v;
+											const waterLevel = document.getElementById('WaterLevel').value;
+										    if (v == 1) {
+										        notify('', 'PNP Transistor! Controlled with LOW (Negative)', 'danger');
+										        notify('', 'If you get this WRONG, Pump will run Non-Stop!', 'warning');
+										    }
+										    pnp_adc = v + '' + document.getElementById('adc-sensitivity').value  + '' + waterLevel;
+										    saveSetting(PNP_ADC,  pnp_adc.charAt(0) + '' + pnp_adc.charAt(1)  + '' + waterLevel);
+									    }
+								    });
+						            rslider('#adc-sensitivity', {
+						            	min: 0,
+      									max: 9,
+      									dashes: 10,
+								      	value: pnp_adc.charAt(1),
+								      	color: '#2196F3',
+								      	onInput: (v) => {
+								        	document.getElementById('adc-sensitivity-text').textContent = v;
+									    },
+									    onChange: (v) => {
+									        document.getElementById('adc-sensitivity').value = v;
+										   	const waterLevel = document.getElementById('WaterLevel').getAttribute('value');
+										   	pnp_adc = document.getElementById('enable-pnp').value  + '' + v + '' + waterLevel;
+									    	saveSetting(PNP_ADC, pnp_adc.charAt(0) + '' + pnp_adc.charAt(1) + '' + waterLevel);
+									    }
+								    });
+								    document.getElementById('enable-pnp').value = pnp_adc.charAt(0);
+								    document.getElementById('adc-sensitivity').value = pnp_adc.charAt(1);
+								    document.getElementById('adc-sensitivity-text').textContent = pnp_adc.charAt(1);
+
 								    const times = Array.from({ length: 25 }, (_, i) => {
 									  const hour = (6 + i) % 24;
 									  const period = hour < 12 ? 'am' : 'pm';
@@ -711,6 +708,7 @@ function loadSVG(svgfile) {
 									  return `${formattedHour}:00${period}`;
 									});
 									//console.log(times);
+									/*
 								    avslider = {
 								        target: '#availability-slider',
 								        values: times,
@@ -724,7 +722,7 @@ function loadSVG(svgfile) {
 										    //document.getElementById('ADCSensitivity').value = e;
 								        }
 								    };
-
+								    */
 									/*
 						            $('#Availability-Slider').roundSlider({
 						                svgMode: true,
@@ -842,83 +840,7 @@ function setWiFiChannels(mode) {
 	select.value = value;
 }
 
-function saveSetting(offset, value, callback) {
-
-	if(DEMOLOCK) {
-		PlantLogin();
-	}else{
-	    var xhr = new XMLHttpRequest();
-	    xhr.onload = function() {
-	    	if (xhr.responseText == 'Locked') {
-				DEMOLOCK = true;
-				PlantLogin();
-	    	}else{
-	    		DEMOLOCK = false;
-	    	}
-	    	if (callback) callback(xhr.responseText);
-	    };
-	   	xhr.open('GET', 'nvram.json?offset=' + offset + '&value=' + value, true);
-	    xhr.send();
-	}
-}
-
-const _timerScroll = function (event) {
-	var value = document.querySelector('.roundslider-text').textContent;
-	document.getElementById('timer-text').textContent = value;
-
-    saveSetting(PLANT_MANUAL_TIMER, value, function(lock) {
-    	if (lock != 'Locked') {
-    		if (value == 0) {
-                document.getElementById('timer-enabled').classList.add('hidden');
-                document.getElementById('timer-disabled').classList.remove('hidden');
-
-                document.getElementById('power-text').textContent = 4;
-                if (document.getElementById('EnableLogCheckbox').checked === false) {
-                	saveSetting(DEEP_SLEEP, 4);
-                }
-            }else{
-                document.getElementById('timer-enabled').classList.remove('hidden');
-                document.getElementById('timer-disabled').classList.add('hidden');
-
-                //document.getElementById('power-text').textContent = 30;
-                //if($('#EnableLogCheckbox').prop('checked') == false)
-                //	saveSetting(DEEP_SLEEP, 30);
-                notify('', 'Timer disables Soil Sensor', 'danger');
-                if(value < 8) //less than 8 hours
-                	notify('', 'Timer is Low! No Overwater protection', 'warning');
-                notify('', 'Enable when issues with Sensor', 'info');
-            }
-        }
-    });
-};
-
-function hideModal(button) {
-    let modal = button.closest('.flex');
-    while (modal && !modal.classList.contains('modal')) {
-        modal = modal.parentElement;
-    }
-    if (modal) {
-    	const backdrop = document.getElementById('modal-backdrop');
-    	backdrop.classList.add('hidden');
-        modal.classList.add('hidden');
-    }
-}
-
-function hideAllModals() {
-	const backdrop = document.getElementById('modal-backdrop');
-    const modals = document.querySelectorAll('.modal');
-    modals.forEach(modal => {
-        modal.classList.add('hidden');
-    });
-    backdrop.classList.add('hidden');
-}
-
-function PlantLogin() {
-	hideAllModals();
-	document.getElementById('demo-Lock').classList.remove('hidden');
-}
-
- function changeTab(event, tabId) {
+function changeTab(event, tabId) {
 
     const tabLinks = document.querySelectorAll('.tab-link');
     tabLinks.forEach(link => {
@@ -945,14 +867,6 @@ function HiddenInput(id, value) {
     }
 }
 
-function RequireInput(id, value) {
-    if(value == true) {
-        document.getElementById(id).setAttribute('required', '');
-    }else{
-        document.getElementById(id).removeAttribute('required');
-    }
-}
-
 function AvailabilityWeek(availability) {
 
 	var week = document.querySelectorAll('#DemoAvailabilityWeek input[type="checkbox"]');
@@ -964,7 +878,7 @@ function AvailabilityWeek(availability) {
     	}
     }
     var availabilityText = availability.join('');
-    var slider = $('#Availability-Slider').data('roundSlider').getValue().split(',')
+    var slider = document.getElementById("availability-slider").value.split(',');
     if(slider[0] < 10) {
     	availabilityText += '0' + slider[0];
     }else{
@@ -1001,7 +915,7 @@ function AlertSet(alerts) {
 function SetWiFiMode() {
 	document.getElementById('AlertInfo').classList.add('d-none');
 
-	var mode = document.getElementsByName('WiFiMode');
+	var mode = document.getElementsByName('Mode');
     if(mode[0].checked) {
         document.getElementById('WiFiModeAP').checked = true;
        	document.getElementById('AlertWiFiPower').classList.add('d-none');
@@ -1061,7 +975,7 @@ function HiddenCheck(id, element) {
 
         if(element.checked){
         	SetWiFiMode();
-            var wifi_mode = document.getElementsByName('WiFiMode');
+            var wifi_mode = document.getElementsByName('Mode');
             console.log(wifi_mode[0].checked);
             if(wifi_mode[0].checked) {
                 notify('','DHCP works only in WiFi Client mode', 'warning');
@@ -1108,11 +1022,6 @@ function NVRAMtoSVG(data)
     document.getElementById('soil-type-text').textContent = soil_type_labels[data['nvram'][PLANT_SOIL_TYPE]];
     if(document.getElementById('soil-text'))
     	document.getElementById('soil-text').style.fill = soil_type_color[data['nvram'][PLANT_SOIL_TYPE]];
-}
-
-function resetFlash()
-{
-	window.open('api?reset=1');
 }
 
 function testPump()
@@ -1332,7 +1241,7 @@ function testEmpty(loop, flood)
 
 function autoWiFiPower()
 {
-	var mode = document.getElementsByName('WiFiMode');
+	var mode = document.getElementsByName('Mode');
     if(mode[0].checked) {
 		notify('', 'Auto Tune only in WiFi Client Mode', 'danger');
     }else{
@@ -1513,7 +1422,7 @@ function flushWater()
 	    xhr.onload = function() {
 	        if (xhr.status == 200) {
 	        	clearInterval(timer);
-	        	notify('', 'Flush Stopped', 'success');
+	        	notify('', 'Flush Stopped', 'danger');
 	        }
 	    }
 	}
@@ -1667,20 +1576,6 @@ function checkFirmwareUpdates(v)
     */
 }
 
-function progressTimer(speed, bar, callback)
-{
-	timerUploadCounter = 0;
-
-    var timer = setInterval(function() {
-    	timerUploadCounter++;
-    	if(timerUploadCounter == 100) {
-	        clearInterval(timer);
-	        if(callback) callback(timerUploadCounter);
-	    }
-	    document.getElementsByClassName('progress-bar')[bar].style.width = timerUploadCounter + '%';
-    }, speed);
-}
-
 function deleteCookies()
 {
 	var result = document.cookie;
@@ -1695,7 +1590,7 @@ function generateWiFiQR()
 {
 	var enc = 'WPA'; //WPA, WEP, nopass
     var ssid = document.getElementById('WiFiSSID').getAttribute('value');
-    var mode = document.getElementsByName('WiFiMode');
+    var mode = document.getElementsByName('Mode');
     var hidden = document.getElementById('WiFiHiddenCheckbox').checked;
     var user = document.getElementById('WiFiUsername').getAttribute('value');
     var pass = document.getElementById('WiFiPassword').getAttribute('value');

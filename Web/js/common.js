@@ -58,3 +58,112 @@ var DEMOLOCK = false;
 var ESP32 = false;
 //==========
 var redirectURL = location.protocol + '//' + location.host + '.nip.io' + location.pathname;
+
+function notify(messageHeader, messageBody, bg, id) {
+    if(bg == 'danger') {
+        bg = 'bg-red-500';
+    }else if(bg == 'warning') {
+        bg = 'bg-yellow-500';
+    }else{
+        bg = 'bg-green-500';
+    }
+    var toast = document.createElement('div');
+    toast.className = 'px-4 py-1 rounded text-white ' + bg;
+
+    if (messageHeader != '') {
+        var toastHeader = document.createElement('div');
+        toastHeader.className = 'flex border-b ' + bg;
+        toastHeader.textContent = messageHeader;
+        
+        var btnClose = document.createElement('button');
+        btnClose.className = 'flex ml-auto';
+        btnClose.textContent = 'X';
+        toastHeader.appendChild(btnClose);
+        toast.appendChild(toastHeader);
+    }
+
+    if (messageBody != '') {
+        var toastBody = document.createElement('div');
+        toastBody.className = 'toast-body';
+        toastBody.textContent = messageBody;
+        toast.appendChild(toastBody);
+    }
+    document.getElementById('notify').appendChild(toast);
+
+    setTimeout(function(toast) {
+        document.getElementById('notify').removeChild(toast);
+    }, 3600, toast);
+}
+
+function saveSetting(offset, value, callback) {
+
+	if(DEMOLOCK) {
+		PlantLogin();
+	}else{
+	    var xhr = new XMLHttpRequest();
+	    xhr.onload = function() {
+	    	if (xhr.responseText == 'Locked') {
+				DEMOLOCK = true;
+				PlantLogin();
+	    	}else{
+	    		DEMOLOCK = false;
+	    	}
+	    	if (callback) callback(xhr.responseText);
+	    };
+	   	xhr.open('GET', '/nvram.json?offset=' + offset + '&value=' + value, true);
+	    xhr.send();
+	}
+}
+
+function PlantLogin() {
+	hideAllModals();
+	document.getElementById('demo-lock').classList.remove('hidden');
+}
+
+function hideModal(button) {
+    let modal = button.closest('.flex');
+    while (modal && !modal.classList.contains('modal')) {
+        modal = modal.parentElement;
+    }
+    if (modal) {
+    	const backdrop = document.getElementById('modal-backdrop');
+    	backdrop.classList.add('hidden');
+        modal.classList.add('hidden');
+    }
+}
+
+function hideAllModals() {
+	const backdrop = document.getElementById('modal-backdrop');
+    const modals = document.querySelectorAll('.modal');
+    modals.forEach(modal => {
+        modal.classList.add('hidden');
+    });
+    backdrop.classList.add('hidden');
+}
+
+function RequireInput(id, value) {
+    if(value == true) {
+        document.getElementById(id).setAttribute('required', '');
+    }else{
+        document.getElementById(id).removeAttribute('required');
+    }
+}
+
+function resetFlash()
+{
+    window.open('/api?reset=1');
+}
+
+function progressTimer(speed, bar, callback)
+{
+    timerUploadCounter = 0;
+
+    var timer = setInterval(function() {
+        timerUploadCounter++;
+        if(timerUploadCounter == 100) {
+            clearInterval(timer);
+            if(callback) callback(timerUploadCounter);
+        }
+        document.getElementsByClassName('progress-bar')[bar].style.width = timerUploadCounter + '%';
+    }, speed);
+}

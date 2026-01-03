@@ -75,29 +75,29 @@
 	                </ul>
 	                <div class="tab-content mt-4">
 	                    <div class="tab-pane" id="tabWireless">
-							<form method="POST" action="/nvram?wireless" id="wireless-SettingsForm" class="text-gray-800 dark:text-gray-300">
+							<form method="POST" action="/nvram?wifi" id="wireless-SettingsForm" class="text-gray-800 dark:text-gray-300">
 							    <div class="grid grid-cols-1 md:grid-cols-2">
-							        <div>
-							            <fieldset class="mb-4">
-							                <legend class="text-gray-800 dark:text-gray-300">WiFi Mode</legend>
-							                <div class="flex items-center mb-2">
-							                    <input type="radio" class="form-radio text-blue-500" id="WiFiModeAP" name="WiFiMode" value="0" onclick="RequireInput('WiFiUsername',false); SetWiFiMode()">
+							        <div class="mb-2">
+							            <fieldset>
+							                <legend class="block mb-2">WiFi Mode</legend>
+							                <div class="flex items-center">
+							                    <input type="radio" class="form-radio text-blue-500" id="WiFiModeAP" name="Mode" value="0" onclick="RequireInput('WiFiUsername',false); SetWiFiMode()">
 							                    <label for="WiFiModeAP" class="ml-2 text-gray-800 dark:text-gray-300">WiFi Access Point</label>
 							                </div>
-							                <div class="flex items-center mb-2">
-							                    <input type="radio" class="form-radio text-blue-500" id="WiFiModeClient" name="WiFiMode" value="1" onclick="RequireInput('WiFiUsername',false); SetWiFiMode()">
+							                <div class="flex items-center">
+							                    <input type="radio" class="form-radio text-blue-500" id="WiFiModeClient" name="Mode" value="1" onclick="RequireInput('WiFiUsername',false); SetWiFiMode()">
 							                    <label for="WiFiModeClient" class="ml-2 text-gray-800 dark:text-gray-300">WiFi Client (WPA2 Personal)</label>
 							                </div>
-							                <div class="flex items-center mb-2">
-							                    <input type="radio" class="form-radio text-blue-500" id="WiFiModeClientEnt" name="WiFiMode" value="2" onclick="RequireInput('WiFiUsername',true); SetWiFiMode()">
+							                <div class="flex items-center">
+							                    <input type="radio" class="form-radio text-blue-500" id="WiFiModeClientEnt" name="Mode" value="2" onclick="RequireInput('WiFiUsername',true); SetWiFiMode()">
 							                    <label for="WiFiModeClientEnt" class="ml-2 text-gray-800 dark:text-gray-300">WiFi Client (WPA2 Enterprise)</label>
 							                </div>
-							                <div class="flex items-center mb-2">
-							                    <input type="radio" class="form-radio text-blue-500" id="WiFiModeClientWEP" name="WiFiMode" value="3" onclick="RequireInput('WiFiUsername',false); SetWiFiMode()">
+							                <div class="flex items-center">
+							                    <input type="radio" class="form-radio text-blue-500" id="WiFiModeClientWEP" name="Mode" value="3" onclick="RequireInput('WiFiUsername',false); SetWiFiMode()">
 							                    <label for="WiFiModeClientWEP" class="ml-2 text-gray-800 dark:text-gray-300">WiFi Client (WEP Key)</label>
 							                </div>
-							                <div class="flex items-center mb-2">
-							                    <input type="hidden" id="WiFiHidden" name="WiFiHidden" value="0">
+							                <div class="flex items-center">
+							                    <input type="hidden" id="WiFiHidden" name="Hidden" value="0">
 							                    <input type="checkbox" id="WiFiHiddenCheckbox" class="form-checkbox text-blue-500" onclick="HiddenCheck('WiFiHidden',this)">
 							                    <label for="WiFiHiddenCheckbox" class="ml-2 text-gray-800 dark:text-gray-300">Hidden SSID</label>
 							                </div>
@@ -105,22 +105,22 @@
 							        </div>
 							        <div class="flex justify-center dark:invert" id="qrcode"></div>
 							    </div>
-							    <div>
+							    <div class="mb-2">
 							        <div class="bg-yellow-500 text-white mb-4 hidden" id="AlertWiFiPower">WiFi power may not reach AP</div>
 							        <div class="bg-yellow-500 text-white mb-4 hidden" id="AlertWiFiDHCP">Don't forget to enable DHCP</div>
 							    </div>
-							    <div>
-							        <label class="text-gray-800 dark:text-gray-300">Antenna</label>
-							        <select id="WiFiPhyMode" class="mt-1 block w-full p-2 border rounded dark:bg-gray-700" name="WiFiPhyMode">
+							    <div class="mb-4">
+							        <label class="block">Antenna</label>
+							        <select id="WiFiPhyMode" class="mt-1 block w-full p-2 border rounded dark:bg-gray-700" name="PhyMode">
 							            <option value="1">802.11 b</option>
 							            <option value="2">802.11 g</option>
 							            <option value="3">802.11 n</option>
 							        </select>
 							    </div>
-							    <div>
-							        <label class="text-gray-800 dark:text-gray-300">Power</label>
+							    <div class="mb-4">
+							        <label class="block">Power</label>
 							        <div class="flex justify-center">
-							            <select id="WiFiPower" class="mt-1 block w-full p-2 border rounded dark:bg-gray-700" name="WiFiPower" onchange="SetWiFiMode()">
+							            <select id="WiFiPower" class="mt-1 block w-full p-2 border rounded dark:bg-gray-700" name="Power" onchange="SetWiFiMode()">
 							                <option value="1">1 dBm (1mW)</option>
 							                <option value="2">2 dBm (1mW)</option>
 							                <option value="3">3 dBm (1mW)</option>
@@ -147,66 +147,64 @@
 							        </div>
 							    </div>
 							    <div class="mb-4">
-							        <label class="block text-gray-800 dark:text-gray-300">Channel</label>
-							        <select id="WiFiChannel" class="mt-1 block w-full p-2 border rounded dark:bg-gray-700" name="WiFiChannel"></select>
+							        <label class="block">Channel</label>
+							        <select id="WiFiChannel" class="mt-1 block w-full p-2 border rounded dark:bg-gray-700" name="Channel"></select>
 							    </div>
 							    <div class="mb-4">
-							        <label class="block text-gray-800 dark:text-gray-300">Network</label>
-							        <input type="text" id="WiFiSSID" name="WiFiSSID" class="mt-1 block w-full p-2 border rounded dark:bg-gray-700" placeholder="SSID" oninput="generateWiFiQR()" required>
+							        <label class="block">Network</label>
+							        <input type="text" id="WiFiSSID" name="SSID" class="mt-1 block w-full p-2 border rounded dark:bg-gray-700" placeholder="SSID" oninput="generateWiFiQR()" required>
 							    </div>
 							    <div class="mb-4">
-							        <label class="block text-gray-800 dark:text-gray-300">Username (WPA2 Enterprise)</label>
-							        <input type="text" id="WiFiUsername" name="WiFiUsername" class="mt-1 block w-full p-2 border rounded dark:bg-gray-700" placeholder="Username" oninput="inputValidate(this)">
+							        <label class="block">Username (WPA2 Enterprise)</label>
+							        <input type="text" id="WiFiUsername" name="Username" class="mt-1 block w-full p-2 border rounded dark:bg-gray-700" placeholder="Username" oninput="inputValidate(this)">
 							    </div>
 							    <div class="mb-4">
-							        <label class="block text-gray-800 dark:text-gray-300">Password</label>
+							        <label class="block">Password</label>
 							        <div class="flex items-center">
-							            <input type="password" id="WiFiPassword" name="WiFiPassword" class="mt-1 block w-full p-2 border rounded dark:bg-gray-700" placeholder="Password" oninput="generateWiFiQR()">
+							            <input type="password" id="WiFiPassword" name="Password" class="mt-1 block w-full p-2 border rounded dark:bg-gray-700" placeholder="Password" oninput="generateWiFiQR()">
 							            <img class="mx-2 dark:invert cursor-pointer" data-target="WiFiPassword" src="img/eye-slash.svg">
 							        </div>
 							    </div>
 							    <div class="mb-4">
 							        <fieldset class="mb-4">
 							            <div class="flex items-center">
-							                <input type="hidden" id="EnableLog" name="EnableLog" value="0">
+							                <input type="hidden" id="EnableLog" name="Log" value="0">
 							                <input type="checkbox" id="EnableLogCheckbox" class="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded dark:bg-gray-700 dark:border-gray-600 focus:ring-blue-500 dark:focus:ring-blue-600" onclick="HiddenCheck('EnableLog',this)">
 							                <label for="EnableLogCheckbox" class="ml-2 text-gray-800 dark:text-gray-300">Enable Data Log</label>
 							            </div>
 							        </fieldset>
-							        <input type="hidden" id="EnableLogInterval" name="EnableLogInterval" value="1">
+							        <input type="hidden" id="EnableLogInterval" name="LogInterval" value="1">
 							        <div>
-								        <div class="slider" data-min="2" data-max="200" data-step="1" data-default="0" data-id="slider-log" data-marks="true" id="silder-log-interval"></div>
+								        <div id="log-interval"></div>
 								        <div class="mt-4 text-lg text-center text-gray-800 dark:text-gray-300">
 								            <span>Log Interval: </span>
-								            <span class="slider-value" id="log-interval">2</span>
+								            <span class="slider-value" id="log-interval-text">2</span>
 								            <span> seconds</span>
 								        </div>
 								    </div>
 							    </div>
 							    <div class="mb-4">
-							        <fieldset class="mb-4">
-							            <div class="flex items-center">
-							                <input type="hidden" id="WiFiDHCP" name="WiFiDHCP" value="0">
-							                <input type="checkbox" id="WiFiDHCPCheckbox" class="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded dark:bg-gray-700 dark:border-gray-600 focus:ring-blue-500 dark:focus:ring-blue-600" onclick="HiddenCheck('WiFiDHCP',this)">
-							                <label for="WiFiDHCPCheckbox" class="ml-2 text-gray-800 dark:text-gray-300">Enable DHCP</label>
-							            </div>
-							        </fieldset>
+						            <div class="flex items-center">
+						                <input type="hidden" id="WiFiDHCP" name="DHCP" value="0">
+						                <input type="checkbox" id="WiFiDHCPCheckbox" class="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded dark:bg-gray-700 dark:border-gray-600 focus:ring-blue-500 dark:focus:ring-blue-600" onclick="HiddenCheck('WiFiDHCP',this)">
+						                <label for="WiFiDHCPCheckbox" class="ml-2 text-gray-800 dark:text-gray-300">Enable DHCP</label>
+						            </div>
 							    </div>
 							    <div class="mb-4">
 							        <label class="block text-gray-800 dark:text-gray-300">IPv4 Address</label>
-							        <input type="text" id="WiFiIP" name="WiFiIP" class="mt-1 block w-full p-2 border rounded dark:bg-gray-700" placeholder="IPv4 Address (192.168.0.2)" required>
+							        <input type="text" id="WiFiIP" name="IP" class="mt-1 block w-full p-2 border rounded dark:bg-gray-700" placeholder="IPv4 Address (192.168.0.2)" required>
 							    </div>
 							    <div class="mb-4">
 							        <label class="block text-gray-800 dark:text-gray-300">Subnet Mask</label>
-							        <input type="text" id="WiFiSubnet" name="WiFiSubnet" class="mt-1 block w-full p-2 border rounded dark:bg-gray-700" placeholder="Subnet Mask (255.255.255.0)" required>
+							        <input type="text" id="WiFiSubnet" name="Subnet" class="mt-1 block w-full p-2 border rounded dark:bg-gray-700" placeholder="Subnet Mask (255.255.255.0)" required>
 							    </div>
 							    <div class="mb-4">
 							        <label class="block text-gray-800 dark:text-gray-300">Gateway Address</label>
-							        <input type="text" id="WiFiGateway" name="WiFiGateway" class="mt-1 block w-full p-2 border rounded dark:bg-gray-700" placeholder="Gateway Address (192.168.0.1)" required>
+							        <input type="text" id="WiFiGateway" name="Gateway" class="mt-1 block w-full p-2 border rounded dark:bg-gray-700" placeholder="Gateway Address (192.168.0.1)" required>
 							    </div>
 							    <div class="mb-4">
 							        <label class="block text-gray-800 dark:text-gray-300">DNS Address</label>
-							        <input type="text" id="WiFiDNS" name="WiFiDNS" class="mt-1 block w-full p-2 border rounded dark:bg-gray-700" placeholder="DNS Address (8.8.8.8)" required>
+							        <input type="text" id="WiFiDNS" name="DNS" class="mt-1 block w-full p-2 border rounded dark:bg-gray-700" placeholder="DNS Address (8.8.8.8)" required>
 							    </div>
 							    <div class="flex justify-between mt-4">
 							        <button type="button" class="px-4 py-2 bg-red-500 hover:bg-red-600 text-white rounded" onclick="hideModal(this)">Cancel</button>
@@ -215,31 +213,31 @@
 							</form>
 	                    </div>
 	                    <div class="tab-pane hidden" id="tabAlerts">
-							<form method="POST" action="/nvram?alerts" id="alert-SettingsForm" class="space-y-4">
+							<form method="POST" action="/nvram?alert" id="alert-SettingsForm" class="space-y-4 text-gray-800 dark:text-gray-300">
 							    <div class="m-2 space-y-4">
 							        <div class="bg-red-500 text-white p-2 rounded mb-4 hidden" id="AlertInfo">Wireless Client must be enabled!</div>
 							        <div class="bg-red-500 text-white p-2 rounded mb-4 hidden" id="AlertEncryptionInfo">No TLS Encryption, Add port (Example: smtp.server.com:587)</div>
 							        <div class="bg-yellow-500 text-white p-2 rounded mb-4 hidden" id="AlertGmailInfo">Do not use Gmail password, create an <a href="https://support.google.com/accounts/answer/185833" target="_blank" class="underline">App Password</a>.</div>
 							        <div class="bg-green-500 text-white p-2 rounded mb-4 hidden" id="AlertOAuthInfo">Try modern OAuth2.0 Token instead of a password.</div>
 							    </div>
-							    <div class="space-y-4 text-gray-800 dark:text-gray-300">
-							        <div>
+							    <div class="space-y-4">
+							    	<div>
 							            <label class="block">Email Server</label>
-							            <input type="text" id="AlertEmail" name="AlertEmail" class="mt-2 w-full p-2 border rounded dark:bg-gray-700 dark:text-white" placeholder="Recipient Email" oninput="inputValidate(this)" required>
-							            <input type="text" id="AlertSMTPServer" name="AlertSMTPServer" class="mt-2 w-full p-2 border rounded dark:bg-gray-700 dark:text-white" placeholder="SMTP Server" oninput="inputValidate(this)" required>
-							            <input type="text" id="AlertSMTPUsername" name="AlertSMTPUsername" class="mt-2 w-full p-2 border rounded dark:bg-gray-700 dark:text-white" placeholder="SMTP Username" oninput="inputValidate(this)">
+							            <input type="text" id="AlertEmail" name="Email" class="mt-2 w-full p-2 border rounded dark:bg-gray-700 dark:text-white" placeholder="Recipient Email" oninput="inputValidate(this)" required>
+							            <input type="text" id="AlertSMTPServer" name="SMTPServer" class="mt-2 w-full p-2 border rounded dark:bg-gray-700 dark:text-white" placeholder="SMTP Server" oninput="inputValidate(this)" required>
+							            <input type="text" id="AlertSMTPUsername" name="SMTPUsername" class="mt-2 w-full p-2 border rounded dark:bg-gray-700 dark:text-white" placeholder="SMTP Username" oninput="inputValidate(this)">
 							            <div class="relative mt-2">
-							                <input type="password" id="AlertSMTPPassword" name="AlertSMTPPassword" class="w-full p-2 border rounded dark:bg-gray-700 dark:text-white" placeholder="SMTP Password">
+							                <input type="password" id="AlertSMTPPassword" name="SMTPPassword" class="w-full p-2 border rounded dark:bg-gray-700 dark:text-white" placeholder="SMTP Password">
 							                <img class="absolute right-3 top-3 cursor-pointer dark:invert" data-target="AlertSMTPPassword" src="img/eye-slash.svg">
 							            </div>
 							            <div class="flex justify-center mt-2">
-							                <input type="password" id="AlertSMTPToken" name="AlertSMTPToken" class="p-2 w-[80%] border rounded dark:bg-gray-700 dark:text-white" placeholder="OAuth2.0 Access Token">
+							                <input type="password" id="AlertSMTPToken" name="SMTPToken" class="p-2 w-[80%] border rounded dark:bg-gray-700 dark:text-white" placeholder="OAuth2.0 Access Token">
 							                <button type="button" class="ml-2 px-2 py-1 w-[20%] bg-gray-300 hover:bg-gray-500 text-gray-800 rounded" onclick="getOAuthToken()">Generate Token</button>
 							            </div>
 							        </div>
 							        <div>
 							            <label class="block">Identity</label>
-							            <input type="text" id="AlertPlantName" name="AlertPlantName" class="mt-2 w-full p-2 border rounded dark:bg-gray-700 dark:text-white" placeholder="Plant Name">
+							            <input type="text" id="AlertPlantName" name="PlantName" class="mt-2 w-full p-2 border rounded dark:bg-gray-700 dark:text-white" placeholder="Plant Name">
 							        </div>
 							        <div class="m-4">
 							            <input type="hidden" id="Alerts" name="Alerts" value="">
@@ -296,13 +294,13 @@
 							        <div>
 							            <label class="block">Security</label>
 							            <div class="relative mt-1">
-							                <input type="password" id="DemoPassword" name="DemoPassword" class="w-full p-2 border rounded dark:bg-gray-700" placeholder="Settings Password">
+							                <input type="password" id="DemoPassword" name="Password" class="w-full p-2 border rounded dark:bg-gray-700" placeholder="Settings Password">
 							                <img class="absolute right-3 top-2.5 cursor-pointer dark:invert" data-target="DemoPassword" src="img/eye-slash.svg">
 							            </div>
 							        </div>
 							        <div>
 							            <label class="block">Timezone</label>
-							            <select id="Timezone" name="Timezone" class="mt-1 block w-full p-2 border rounded dark:bg-gray-700">
+							            <select id="DemoTimezone" name="Timezone" class="mt-1 block w-full p-2 border rounded dark:bg-gray-700">
 							                <option value="-28800" selected="selected">(GMT -8:00) Pacific Time (US & Canada)</option>
 							                <option value="-25200">(GMT -7:00) Mountain Time (US & Canada)</option>
 							                <option value="-21600">(GMT -6:00) Central Time (US & Canada)</option>
@@ -312,7 +310,7 @@
 							            </select>
 							        </div>
 							    </div>
-							    <input type="hidden" id="DemoAvailability" name="DemoAvailability" value="">
+							    <input type="hidden" id="DemoAvailability" name="Availability" value="">
 							    <label class="block">WiFi Availability:</label>
 							    <div class="flex">
 							        <div class="flex-1">
@@ -348,7 +346,7 @@
 							            </div>
 							        </div>
 							        <div class="flex-1">
-							            <input type="text" id="availability-slider" name="availability-slider">
+							            <input type="text" id="availability-slider" value="09,17">
 							        </div>
 							    </div>
 							    <div class="flex justify-between mt-4">
@@ -450,7 +448,9 @@
 							                    <button class="py-2 bg-gray-500 hover:bg-gray-600 w-full rounded" type="button" id="browseFirmware">Flash Firmware</button>
 							                </div>
 							            </div>
-							            <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-2 text-gray-800 dark:text-gray-300">
+							            <div class="mt-4">
+							            	<div id="enable-pnp"></div>
+							            	<div class="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-2 text-gray-800 dark:text-gray-300">
 							                <div class="text-left">
 							                	<span class="text-lg">NPN</span>
 							                </div>
@@ -458,17 +458,12 @@
 							              		<span class="text-lg">PNP</span>
 							                </div>
 							            </div>
-							            <div class="mt-4">
-						            		<div class="slider" data-min="0" data-max="1" data-step="1" data-default="0" data-id="slider-pnp" id="EnablePNP"></div>
-						            		<span class="slider-value hidden" id="adc-sensitivity">0</span>
-									    </div>
-									    <div class="p-4">
 									    </div>
 									    <div class="mt-4">
-							            	<div class="slider" data-min="0" data-max="9" data-step="1" data-default="0" data-id="slider-adc-sensitivity" data-marks="true" id="ADCSensitivity"></div>
 									        <div class="mt-4 text-center text-gray-800 dark:text-gray-300">
+									        	<div id="adc-sensitivity"></div>
 									            <span class="text-lg font-semibold">Moisture Sensor Sensitivity </span>
-									            <span class="slider-value text-lg" id="adc-sensitivity">0</span>
+									            <span class="slider-value text-lg" id="adc-sensitivity-text">0</span>
 									        </div>
 								    	</div>
 							        </div>
@@ -552,13 +547,13 @@
 		        </div>
 		    </div>
 		</div>
-		<div class="fixed inset-0 flex items-center justify-center hidden modal" id="demo-Lock">
+		<div class="fixed inset-0 flex items-center justify-center hidden modal" id="demo-lock">
 		    <div class="bg-white dark:bg-gray-800 p-4 rounded-lg w-full max-w-md mx-auto border border-gray-600 dark:border-gray-300">
 		        <div class="flex modal-header justify-between items-center border-b border-gray-600 dark:border-gray-300">
 		        	<h5 class="text-lg font-semibold text-gray-800 dark:text-white">Login</h5>
 		            <button id="close-modal" class="text-gray-500 hover:text-gray-800 dark:text-gray-400 dark:hover:text-gray-300 focus:outline-none text-2xl" onclick="hideModal(this)">&times;</button>
 		        </div>
-		        <form method="POST" action="login" id="demo-LockForm">
+		        <form method="POST" action="login" id="demo-lock-form">
 		            <input type="password" id="DemoPassword" name="password" class="border border-gray-300 dark:border-gray-600 focus:ring focus:ring-green-500 rounded-md p-2 w-full" placeholder="Password" required>
 		        	<button type="submit" class="bg-green-500 hover:bg-green-600 text-white rounded w-full px-4 py-2 mt-4" id="demo-lock-ok">Login</button>
 		        </form>

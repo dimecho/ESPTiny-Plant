@@ -1,0 +1,366 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <title>tiny plant - mobile</title>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <link rel="stylesheet" type="text/css" href="../css/tailwind.css">
+        <link rel="stylesheet" type="text/css" href="css/rslider.css">
+        <script src="js/rslider.js"></script>
+        <script defer src="../js/common.js"></script>
+        <script>
+        document.addEventListener('DOMContentLoaded', function(event)
+        {
+            var nvram = new XMLHttpRequest();
+            nvram.responseType = 'json';
+            nvram.open('GET', '/nvram.json', true);
+            nvram.send();
+            nvram.onload = function(e) {
+                if(nvram.response != undefined) {   
+                    if(nvram.response['nvram'][0].indexOf('esp32') != -1) {
+                        ESP32 = true;
+                        const select = document.getElementById("WiFiPhyMode");
+                        const newOption = document.createElement("option");
+                        newOption.value = "4";
+                        newOption.text = "802.11 ax";
+                        select.appendChild(newOption);
+                    }
+                    if(nvram.response['nvram'][WIFI_PHY_MODE] == 3) {
+                        var optionObject = document.getElementById('WiFiPower').options;
+                        optionObject[17].setAttribute('hidden','true');
+                        optionObject[18].setAttribute('hidden','true');
+                        optionObject[19].setAttribute('hidden','true');
+                        optionObject[20].setAttribute('hidden','true');
+                    }
+                    var bool_value = nvram.response['nvram'][WIFI_HIDE] == '1' ? true : false;
+                    document.getElementById('WiFiHidden').value = nvram.response['nvram'][WIFI_HIDE];
+                    document.getElementById('WiFiHiddenCheckbox').checked = bool_value;
+
+                    setWiFiChannels(nvram.response['nvram'][WIFI_PHY_MODE]);
+                    document.getElementById('WiFiPhyMode').addEventListener("change", function () {
+                        setWiFiChannels(this.value);
+                    });
+                    document.getElementById('WiFiPhyMode').value = nvram.response['nvram'][WIFI_PHY_MODE];
+                    document.getElementById('WiFiPower').value = nvram.response['nvram'][WIFI_PHY_POWER];
+                    document.getElementById('WiFiChannel').value = nvram.response['nvram'][WIFI_CHANNEL];
+                    document.getElementById('WiFiSSID').value = nvram.response['nvram'][WIFI_SSID];
+                    document.getElementById('WiFiUsername').value = nvram.response['nvram'][WIFI_USERNAME];
+                    bool_value = nvram.response['nvram'][LOG_ENABLE] == '1' ? true : false;
+                    document.getElementById('EnableLog').value = nvram.response['nvram'][LOG_ENABLE];
+                    document.getElementById('EnableLogCheckbox').checked = bool_value;
+
+                    new rSlider({
+                        target: '#EnableLogInterval',
+                        values: Array.from({ length: 61 }, (_, i) => i),
+                        range: false,
+                        tooltip: true,
+                        scale: false,
+                        labels: false,
+                        step: 1,
+                        set: [nvram.response['nvram'][LOG_INTERVAL]],
+                        onChange: function (v) {
+                            document.getElementById('EnableLogInterval').value = v;
+                        }
+                    });
+
+                    bool_value = nvram.response['nvram'][NETWORK_DHCP] == '1' ? true : false;
+                    document.getElementById('WiFiDHCP').value = nvram.response['nvram'][NETWORK_DHCP];
+                    document.getElementById('WiFiDHCPCheckbox').checked = bool_value;
+                    document.getElementById('WiFiIP').disabled = bool_value;
+                    document.getElementById('WiFiSubnet').disabled = bool_value;
+                    document.getElementById('WiFiGateway').disabled = bool_value;
+                    document.getElementById('WiFiDNS').disabled = bool_value;
+                    document.getElementById('WiFiIP').value = nvram.response['nvram'][NETWORK_IP];
+                    document.getElementById('WiFiSubnet').value = nvram.response['nvram'][NETWORK_SUBNET];
+                    document.getElementById('WiFiGateway').value = nvram.response['nvram'][NETWORK_GATEWAY];
+                    document.getElementById('WiFiDNS').value = nvram.response['nvram'][NETWORK_DNS];
+
+                    document.getElementsByName('Mode')[nvram.response['nvram'][WIFI_MODE]].checked = true;
+                    SetWiFiMode();
+                    
+                    if(nvram.response['nvram'][DEMO_PASSWORD] != '')
+                    {
+                        DEMOLOCK = true;
+                    }
+                }
+            }
+            document.getElementById('wireless-settings-ok').onclick = function() {
+                if(DEMOLOCK) {
+                    PlantLogin();
+                }else{
+                    if(document.getElementById('EnableLogCheckbox').checked === true) {
+                        var loginterval = document.getElementById('EnableLogInterval').value;
+                        var deepsleep = document.getElementById('power-text').textContent;
+
+                        //console.log(loginterval  + ' < ' + deepsleep);
+                        if(loginterval < (deepsleep * 60)) {
+                            saveSetting(DEEP_SLEEP, 1); //in minutes
+                            notify('','Deep Sleep is longer than Log Interval', 'danger');
+                            notify('', 'Wireless Always On', 'success');
+                        }
+                    }
+                    document.getElementById('wireless-SettingsForm').submit();
+                }
+            }
+        });
+
+        function setWiFiChannels(mode) {
+            var channels = [
+              1, 2, 3, 4,
+              5, 6, 7, 8,
+              9, 10, 11
+            ];
+            const select = document.getElementById("WiFiChannel");
+            const value = select.value;
+            if(mode == 4) {
+                channels = [
+                  36, 40, 44, 48,
+                  52, 56, 60, 64,
+                  100, 104, 108, 112, 116,
+                  120, 124, 128, 132, 136, 140, 144,
+                  149, 153, 157, 161, 165
+                ];
+            }
+            select.innerHTML = "";
+            channels.forEach(channel => {
+                const option = document.createElement("option");
+                option.value = channel;
+                option.textContent = channel;
+                select.appendChild(option);
+            });
+            select.value = value;
+        }
+
+        function generateWiFiQR()
+        {
+            var enc = 'WPA'; //WPA, WEP, nopass
+            var ssid = document.getElementById('WiFiSSID').getAttribute('value');
+            var mode = document.getElementsByName('Mode');
+            var hidden = document.getElementById('WiFiHiddenCheckbox').checked;
+            var user = document.getElementById('WiFiUsername').getAttribute('value');
+            var pass = document.getElementById('WiFiPassword').getAttribute('value');
+            if(mode[2].checked) {
+                //WIFI:T:WPA2-EAP;S:[network SSID];E:[EAP method];PH2:[Phase 2 method];A:[anonymous identity];I:[username];P:[password];;
+                enc = 'WPA2-EAP;E:PEAP;PH2:MS-CHAPv2;I:' + escape(user);
+            }
+            var qrstring = 'WIFI:S:' + escape(ssid) + ';T:' + enc + ';P:' + escape(pass) + ';';
+            if (hidden) {
+                qrstring += 'H:true';
+            }
+            qrstring += ';';
+            //console.log(qrstring);
+
+            var qroptions = {
+                msg   :  qrstring
+                ,dim   :   256
+                ,ecl   :  'M'
+            };
+
+            var a = document.getElementById('qrcode');
+            a.innerHTML = '';
+            
+            if (typeof QRCode !== 'function') {
+                var script = document.createElement('script');
+                script.onload = function() { var qrcode = new QRCode(qroptions); a.appendChild(qrcode) };
+                script.src = '../js/qrcode.js';
+                document.head.appendChild(script);
+            }else{
+                var qrcode = new QRCode(qroptions);
+                a.appendChild(qrcode);
+            }
+        }
+        function SetWiFiMode() {
+
+            var mode = document.getElementsByName('Mode');
+            if(mode[0].checked) {
+                document.getElementById('WiFiModeAP').checked = true;
+                document.getElementById('AlertWiFiPower').classList.add('d-none');
+                document.getElementById('AlertWiFiDHCP').classList.add('d-none');
+            }else if(mode[1].checked) {
+                document.getElementById('WiFiModeClient').checked = true;
+                WarningWiFiMode();
+            }else if(mode[2].checked) {
+                document.getElementById('WiFiModeClientEnt').checked = true;
+                RequireInput('WiFiUsername',true);
+                WarningWiFiMode();
+            }else if(mode[3].checked) {
+                document.getElementById('WiFiModeClientWEP').checked = true;
+                WarningWiFiMode();
+            }
+        }
+
+        function WarningWiFiMode() {
+            document.getElementById('AlertWiFiPower').classList.add('d-none');
+            document.getElementById('AlertWiFiDHCP').classList.add('d-none');
+
+            if(document.getElementById('WiFiPower').value < 20) {
+                document.getElementById('AlertWiFiPower').classList.remove('d-none');
+            }
+            if(document.getElementById('WiFiDHCP').value == 0) {
+                document.getElementById('AlertWiFiDHCP').classList.remove('d-none');
+            }
+        }
+        </script>
+    </head>
+    <body class="bg-gray-100">
+        <div class="fixed top-0 right-0 p-3 z-[2000]" id="notify"></div>
+        <div class="fixed inset-0 bg-black opacity-50 hidden" id="modal-backdrop"></div>
+        <div class="items-center justify-center p-4">
+            <div class="grid grid-cols-1 lg:grid-cols-4 gap-4 m-4">
+                <button type="button" class="bg-gray-400 hover:bg-gray-500 text-white rounded w-full py-2" onclick="window.location.href='index.html'"><<</button>
+                <button type="button" class="bg-gray-500 hover:bg-gray-500 text-white rounded w-full py-2" onclick="window.location.href='wifi.html'">WiFi</button>
+                <button type="button" class="bg-gray-400 hover:bg-gray-500 text-white rounded w-full py-2" onclick="window.location.href='test.html'">Test</button>
+                <button type="button" class="bg-gray-400 hover:bg-gray-500 text-white rounded w-full py-2" onclick="window.location.href='firmware.html'">Firmware</button>
+            </div>
+            <div class="bg-white border border-gray-300 rounded-[5px] mt-4">
+                <div class="p-4">
+                <form method="POST" action="/nvram?wifi" id="wireless-SettingsForm">
+                    <div class="grid grid-cols-1 md:grid-cols-2">
+                        <div>
+                            <fieldset class="mb-4">
+                                <legend>WiFi Mode</legend>
+                                <div class="mb-2">
+                                    <input type="radio" class="form-radio w-5 h-5 text-blue-500" id="WiFiModeAP" name="Mode" value="0" onclick="RequireInput('WiFiUsername',false); SetWiFiMode()">
+                                    <label for="WiFiModeAP" class="ml-2">WiFi Access Point</label>
+                                </div>
+                                <div class="mb-2">
+                                    <input type="radio" class="form-radio w-5 h-5 text-blue-500" id="WiFiModeClient" name="Mode" value="1" onclick="RequireInput('WiFiUsername',false); SetWiFiMode()">
+                                    <label for="WiFiModeClient" class="ml-2">WiFi Client (WPA2 Personal)</label>
+                                </div>
+                                <div class="mb-2">
+                                    <input type="radio" class="form-radio w-5 h-5 text-blue-500" id="WiFiModeClientEnt" name="Mode" value="2" onclick="RequireInput('WiFiUsername',true); SetWiFiMode()">
+                                    <label for="WiFiModeClientEnt" class="ml-2">WiFi Client (WPA2 Enterprise)</label>
+                                </div>
+                                <div class="mb-2">
+                                    <input type="radio" class="form-radio w-5 h-5 text-blue-500" id="WiFiModeClientWEP" name="Mode" value="3" onclick="RequireInput('WiFiUsername',false); SetWiFiMode()">
+                                    <label for="WiFiModeClientWEP" class="ml-2">WiFi Client (WEP Key)</label>
+                                </div>
+                                <div class="mb-2">
+                                    <input type="hidden" id="WiFiHidden" name="Hidden" value="0">
+                                    <input type="checkbox" id="WiFiHiddenCheckbox" class="form-checkbox w-5 h-5 text-blue-500" onclick="HiddenCheck('WiFiHidden',this)">
+                                    <label for="WiFiHiddenCheckbox" class="ml-2">Hidden SSID</label>
+                                </div>
+                            </fieldset>
+                        </div>
+                        <div class="flex justify-center" id="qrcode"></div>
+                    </div>
+                    <div>
+                        <div class="bg-yellow-500 mb-4 hidden" id="AlertWiFiPower">WiFi power may not reach AP</div>
+                        <div class="bg-yellow-500 mb-4 hidden" id="AlertWiFiDHCP">Don't forget to enable DHCP</div>
+                    </div>
+                    <div class="mb-4">
+                        <label>Antenna</label>
+                        <select id="WiFiPhyMode" class="mt-1 block w-full p-2 border rounded" name="PhyMode">
+                            <option value="1">802.11 b</option>
+                            <option value="2">802.11 g</option>
+                            <option value="3">802.11 n</option>
+                        </select>
+                    </div>
+                    <div class="mb-4">
+                        <label>Power</label>
+                        <div class="flex justify-center">
+                            <select id="WiFiPower" class="mt-1 block w-full p-2 border rounded" name="Power" onchange="SetWiFiMode()">
+                                <option value="1">1 dBm (1mW)</option>
+                                <option value="2">2 dBm (1mW)</option>
+                                <option value="3">3 dBm (1mW)</option>
+                                <option value="4">4 dBm (2mW)</option>
+                                <option value="5">5 dBm (3mW)</option>
+                                <option value="6">6 dBm (3mW)</option>
+                                <option value="7">7 dBm (5mW)</option>
+                                <option value="8">8 dBm (6mW)</option>
+                                <option value="9">9 dBm (7mW)</option>
+                                <option value="10">10 dBm (10mW)</option>
+                                <option value="11">11 dBm (12mW)</option>
+                                <option value="12">12 dBm (15mW)</option>
+                                <option value="13">13 dBm (19mW)</option>
+                                <option value="14">14 dBm (25mW)</option>
+                                <option value="15">15 dBm (31mW)</option>
+                                <option value="16">16 dBm (39mW)</option>
+                                <option value="17">17 dBm (50mW)</option>
+                                <option value="18">18 dBm (63mW)</option>
+                                <option value="19">19 dBm (79mW)</option>
+                                <option value="20">20 dBm (100mW)</option>
+                                <option value="21">20.5 dBm (112mW)</option>
+                            </select>
+                            <button type="button" class="ml-2 px-2 py-1 w-[20%] bg-gray-300 hover:bg-gray-500 rounded" onclick="autoWiFiPower()">Auto Tune</button>
+                        </div>
+                    </div>
+                    <div class="mb-4">
+                        <label>Channel</label>
+                        <select id="WiFiChannel" class="mt-1 block w-full p-2 border rounded" name="Channel"></select>
+                    </div>
+                    <div class="mb-4">
+                        <label>Network</label>
+                        <input type="text" id="WiFiSSID" name="SSID" class="mt-1 block w-full p-2 border rounded" placeholder="SSID" oninput="generateWiFiQR()" required>
+                    </div>
+                    <div class="mb-4">
+                        <label class="block">Username (WPA2 Enterprise)</label>
+                        <input type="text" id="WiFiUsername" name="Username" class="mt-1 block w-full p-2 border rounded" placeholder="Username" oninput="inputValidate(this)">
+                    </div>
+                    <div class="mb-4">
+                        <label class="block">Password</label>
+                        <div class="flex items-center">
+                            <input type="password" id="WiFiPassword" name="Password" class="mt-1 block w-full p-2 border rounded" placeholder="Password" oninput="generateWiFiQR()">
+                            <img class="mx-2 w-5 h-5 cursor-pointer" data-target="WiFiPassword" src="../img/eye-slash.svg">
+                        </div>
+                    </div>
+                    <div class="mb-4">
+                        <fieldset class="mb-4">
+                            <div class="flex items-center">
+                                <input type="hidden" id="EnableLog" name="Log" value="0">
+                                <input type="checkbox" id="EnableLogCheckbox" class="form-checkbox w-5 h-5 text-blue-500" onclick="HiddenCheck('EnableLog',this)">
+                                <label for="EnableLogCheckbox" class="ml-2">Enable Data Log</label>
+                            </div>
+                        </fieldset>
+                        <div class="bg-white border border-gray-300 rounded-[5px] mt-4">
+                            <div class="p-4">Log Interval (seconds)</div>
+                            <div class="p-6"><input type="text" id="EnableLogInterval" name="LogInterval" class="slider"></div>
+                        </div>
+                    </div>
+                    <div class="mb-4">
+                        <fieldset class="mb-4">
+                            <div class="flex items-center">
+                                <input type="hidden" id="WiFiDHCP" name="DHCP" value="0">
+                                <input type="checkbox" id="WiFiDHCPCheckbox" class="form-checkbox w-5 h-5 text-blue-500" onclick="HiddenCheck('WiFiDHCP',this)">
+                                <label for="WiFiDHCPCheckbox" class="ml-2">Enable DHCP</label>
+                            </div>
+                        </fieldset>
+                    </div>
+                    <div class="mb-4">
+                        <label>IPv4 Address</label>
+                        <input type="text" id="WiFiIP" name="IP" class="mt-1 block w-full p-2 border rounded" placeholder="IPv4 Address (192.168.0.2)" required>
+                    </div>
+                    <div class="mb-4">
+                        <label>Subnet Mask</label>
+                        <input type="text" id="WiFiSubnet" name="Subnet" class="mt-1 block w-full p-2 border rounded" placeholder="Subnet Mask (255.255.255.0)" required>
+                    </div>
+                    <div class="mb-4">
+                        <label>Gateway Address</label>
+                        <input type="text" id="WiFiGateway" name="Gateway" class="mt-1 block w-full p-2 border rounded" placeholder="Gateway Address (192.168.0.1)" required>
+                    </div>
+                    <div class="mb-4">
+                        <label>DNS Address</label>
+                        <input type="text" id="WiFiDNS" name="DNS" class="mt-1 block w-full p-2 border rounded" placeholder="DNS Address (8.8.8.8)" required>
+                    </div>
+                    <div class="flex justify-between mt-8">
+                        <button type="button" class="px-4 py-2 bg-red-500 hover:bg-red-600 text-white w-full mr-4 rounded" onclick="location.reload(true)">Cancel</button>
+                        <button type="button" class="px-4 py-2 bg-green-500 hover:bg-green-600 text-white w-full rounded" id="wireless-settings-ok">Save</button>
+                    </div>
+                </form>
+                </div>
+            </div>
+        </div>
+        <div class="fixed inset-0 flex items-center justify-center hidden modal" id="demo-lock">
+            <div class="bg-white dark:bg-gray-800 p-4 rounded-lg w-full max-w-md mx-auto border border-gray-600 dark:border-gray-300">
+                <div class="flex modal-header justify-between items-center border-b border-gray-600 dark:border-gray-300">
+                    <h5 class="text-lg font-semibold text-gray-800 dark:text-white">Login</h5>
+                    <button id="close-modal" class="text-gray-500 hover:text-gray-800 dark:text-gray-400 dark:hover:text-gray-300 focus:outline-none text-2xl" onclick="hideModal(this)">&times;</button>
+                </div>
+                <form method="POST" action="/login" id="demo-lock-form">
+                    <input type="password" id="DemoPassword" name="password" class="border border-gray-300 dark:border-gray-600 focus:ring focus:ring-green-500 rounded-md p-2 w-full" placeholder="Password" required>
+                    <button type="submit" class="bg-green-500 hover:bg-green-600 text-white rounded w-full px-4 py-2 mt-4" id="demo-lock-ok">Login</button>
+                </form>
+            </div>
+        </div>
+    </body>
+</html>

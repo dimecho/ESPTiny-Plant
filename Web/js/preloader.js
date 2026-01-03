@@ -155,39 +155,3 @@ function ready(callback) {
 ready(function() {
     Preloader.init();
 });
-
-function notify(messageHeader, messageBody, bg, id) {
-    if(bg == 'danger') {
-        bg = 'bg-red-500';
-    }else if(bg == 'warning') {
-        bg = 'bg-yellow-500';
-    }else{
-        bg = 'bg-green-500';
-    }
-    var toast = document.createElement('div');
-    toast.className = 'px-4 py-1 rounded text-white ' + bg;
-
-    if (messageHeader != '') {
-        var toastHeader = document.createElement('div');
-        toastHeader.className = 'flex border-b ' + bg;
-        toastHeader.textContent = messageHeader;
-        
-        var btnClose = document.createElement('button');
-        btnClose.className = 'flex ml-auto';
-        btnClose.textContent = 'X';
-        toastHeader.appendChild(btnClose);
-        toast.appendChild(toastHeader);
-    }
-
-    if (messageBody != '') {
-        var toastBody = document.createElement('div');
-        toastBody.className = 'toast-body';
-        toastBody.textContent = messageBody;
-        toast.appendChild(toastBody);
-    }
-    document.getElementById('notify').appendChild(toast);
-
-    setTimeout(function(toast) {
-        document.getElementById('notify').removeChild(toast);
-    }, 3500, toast);
-}

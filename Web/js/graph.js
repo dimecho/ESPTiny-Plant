@@ -133,27 +133,37 @@ document.addEventListener("DOMContentLoaded", function(event)
         return n;
     };
 
-    timeSlider = new RangeSlider(document.getElementById('chart-slider'));
-    document.getElementById('chart-slider').onclick = function() {
-        if(timeSlider.getValue() == 0) { // Real-time
-            refreshSpeed = 1000;
-            dataStream = true;
-            //xhr.open('GET', 'log?end=1', true);
-            //xhr.send();
-        }else{
-            refreshSpeed = timeSlider.getValue();
-            refreshSpeed *= (1000 * 60);
-            //xhr.open('GET', 'nvram.json?offset=' + LOG_INTERVAL + '&value=10', true);
-            //xhr.send();
+    rslider('#chart-time', {
+        min: 0,
+        max: 20,
+        value: 1,
+        dashes: 20,
+        color: '#2196F3',
+        onInput: (v) => {
+            document.getElementById('chart-time-text').textContent = v;
+        },
+        onChange: (v) => {
+            if(v == 0) { // Real-time
+                refreshSpeed = 1000;
+                dataStream = true;
+                //xhr.open('GET', 'log?end=1', true);
+                //xhr.send();
+            }else{
+                refreshSpeed = v;
+                refreshSpeed *= (1000 * 60);
+                //xhr.open('GET', 'nvram.json?offset=' + LOG_INTERVAL + '&value=10', true);
+                //xhr.send();
 
-            //TODO: Retrive a page once in a while to prevent WiFi sleep
-        }
+                //TODO: Retrive a page once in a while to prevent WiFi sleep
+            }
 
-        if(refreshTimer != null) {
-            clearTimeout(refreshTimer);
-            updateChart();
+            if(refreshTimer != null) {
+                clearTimeout(refreshTimer);
+                updateChart();
+            }
         }
-    }
+    });
+    document.getElementById('chart-time-text').textContent = "1";
 
     const modals = document.querySelectorAll('.modal');
     modals.forEach(modal => {
