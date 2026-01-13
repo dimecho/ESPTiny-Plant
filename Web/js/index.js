@@ -93,8 +93,6 @@ document.addEventListener('DOMContentLoaded', function(event)
 	    	document.getElementById('demo-SettingsForm').submit();
 		}
 	};
-
-
 });
 
 function svgwaterLevelAdjust(v) {
@@ -151,9 +149,8 @@ function loadSVG(svgfile) {
 	    		if(nvram.response['nvram'][0].indexOf('esp32') != -1) {
 	    			ESP32 = true;
 	    		}
-
- 				//var index = new XMLHttpRequest();
-				index.open('GET', 'svg/', true);
+ 				//index.open('GET', '/svg', true);
+				index.open('GET', 'api?svg=1', true);
 				index.send();
 				index.onload = function(e) {
 					svgfile = 'bonsai.svg';
@@ -280,7 +277,7 @@ function loadSVG(svgfile) {
 							}
 							var slider = new RoundSlider(container, {
 							    radius: dynamicRadius,
-							    min: 2, max: 40, value: document.getElementById('pot-size-text').textContent,
+							    min: 2, max: 120, value: document.getElementById('pot-size-text').textContent,
 							    color: slider_color, colorEnd: slider_color,
 							    onComplete: function(v) { document.getElementById('pot-size-text').textContent = v; saveSetting(PLANT_POT_SIZE, v) }
 							});
@@ -514,8 +511,8 @@ function loadSVG(svgfile) {
 				                    document.getElementById('sdkVersion').textContent = 'SDK Version: ' + v[1];
 				                    document.getElementById('fsVersion').textContent = 'LittleFS Version: ' + (0xffff & (v[2] >> 16)) + '.' + (0xffff & (v[2] >> 0)) + '.' + (0xffff & (v[2] >> 20));
 				                    document.getElementById('firmwareVersion').textContent = 'Firmware Version: ' + v[3];
-				                    document.getElementById('iram').textContent = 'IRAM: ' + Math.round(v[4]/1024) + ' KB (' + v[4] + ')';
-									document.getElementById('dram').textContent = 'DRAM: ' + Math.round(v[5]/1024) + ' KB (' + v[5] + ')';
+				                    document.getElementById('fsram').textContent = 'Flash: ' + Math.round(v[4]/1024) + ' KB (' + v[4] + ')';
+									document.getElementById('dram').textContent = 'Memory: ' + Math.round(v[5]/1024) + ' KB (' + v[5] + ')';
 
 									if(ESP32) {
 									    const select = document.getElementById("WiFiPhyMode");
@@ -697,9 +694,69 @@ function loadSVG(svgfile) {
 									    	saveSetting(PNP_ADC, pnp_adc.charAt(0) + '' + pnp_adc.charAt(1) + '' + waterLevel);
 									    }
 								    });
+								    
 								    document.getElementById('enable-pnp').value = pnp_adc.charAt(0);
 								    document.getElementById('adc-sensitivity').value = pnp_adc.charAt(1);
 								    document.getElementById('adc-sensitivity-text').textContent = pnp_adc.charAt(1);
+
+								    if (window.isSecureContext)
+								    {
+								    	document.getElementById('createPasskey').classList.remove('hidden');
+								        document.getElementById('createPasskey').addEventListener('click', async () => {
+								    	
+									    if (!window.PublicKeyCredential) {
+									        notify('', 'Web Authentication API is not supported.', 'danger');
+									        return;
+									    }
+									      const isPlatformAvailable = await PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable();
+									      if (!isPlatformAvailable) {
+									        notify('', 'Biometrics/PIN is not available.', 'danger');
+									        return;
+									      }
+									      
+									      try {
+									        const rpId = window.location.hostname === '192.168.8.8' || window.location.hostname === '127.0.0.1' ? 'localhost' : window.location.hostname;
+
+									        // In production: fetch these options from backend
+									        const publicKeyCredentialCreationOptions = {
+									          challenge: crypto.getRandomValues(new Uint8Array(32)), // Better: use server-generated challenge
+									          rp: {
+									            name: "tinyplant",
+									            id: rpId, // Explicit and correct RP ID
+									          },
+									          user: {
+									            id: crypto.getRandomValues(new Uint8Array(16)), // Random unique user ID
+									            name: "tinyplant",
+									            displayName: "Tiny Plant",
+									          },
+									          pubKeyCredParams: [
+									            { alg: -7, type: "public-key" }, // ES256 (preferred by Apple)
+									            { alg: -257, type: "public-key" } // RS256 fallback
+									          ],
+									          authenticatorSelection: {
+									            authenticatorAttachment: "platform",     // Use Face ID / Touch ID
+									            residentKey: "required",                 // Discoverable credential (usernameless login)
+									            userVerification: "required"
+									          },
+									          timeout: 60000,
+									          attestation: "none" // "direct" or "indirect" if you need attestation
+									        };
+
+									        const credential = await navigator.credentials.create({
+									          publicKey: publicKeyCredentialCreationOptions
+									        });
+
+									        console.log(credential);
+									        notify('', 'Passkey created!', 'success');
+
+									        // Send credential.response (AttestationResponse) to backend for verification/storage
+											// Example: fetch('/register', { method: 'POST', body: JSON.stringify(credential) });
+									      } catch (err) {
+									        console.error('Error creating passkey:', err);
+									        notify('', 'Failed to create passkey: ' + err.message, 'danger');
+									      }
+									    });
+								    }
 
 								    const times = Array.from({ length: 25 }, (_, i) => {
 									  const hour = (6 + i) % 24;
@@ -1030,15 +1087,29 @@ function testPump()
 	document.getElementById('test-Pump').classList.remove('hidden');
 	document.getElementById('modal-backdrop').classList.remove('hidden');
 
-	var slider_test_pump_delay = new RangeSlider(document.getElementById('test-pump-delay'));
+	var test_pump_delay = rslider('#test-pump-delay', {
+		min: 1,
+		max: 200,
+		dashes: 10,
+      	value: 1,
+      	onInput: (v) => {
+        	document.getElementById('test-pump-delay-timer').textContent = v;
+	    }
+    });
+
 	document.getElementById('test-pump-start').onclick = function() {
-		var t = slider_test_pump_delay.getValue()-1;
+		var t = test_pump_delay.getValue()-1;
     	var x = setInterval(function() {
 			if (t == 0) {
 			    clearInterval(x);
-			    document.getElementById('test-pump-delay-timer').innerHTML = slider_test_pump_delay.getValue();
+			    document.getElementById('test-pump-delay-timer').innerHTML = test_pump_delay.getValue();
+
+			    var checkwithlog = 'api?adc=1';
+			    if(document.getElementById('EnableLog').value == 0){
+			    	checkwithlog = 'log?start=1';
+			    }
 			    var log = new XMLHttpRequest();
-				log.open('GET', 'log?start=1', true);
+				log.open('GET', checkwithlog, true);
 			    log.send();
 			    log.onload = function() {
 			        if (log.status == 200) {

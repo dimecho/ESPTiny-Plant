@@ -41,6 +41,7 @@ mkdir data/img
 cp -rf Web/img/cert.svg data/img
 cp -rf Web/img/eye-slash.svg data/img
 cp -rf Web/img/eye-slash-fill.svg data/img
+cp -rf Web/img/fingerprint.svg data/img
 purgecss --css data/roundslider.css --content data/*.html --whitelist --output data/css/roundslider.css
 purgecss --css data/rangeslider.css --content data/*.html --whitelist --output data/css/rangeslider.css
 

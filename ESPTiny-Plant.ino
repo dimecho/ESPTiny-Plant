@@ -319,11 +319,16 @@ uint32_t get_adc() {
 
 #define UART_BAUDRATE 115200
 
-#if THREADED
 #include <Ticker.h>
-void blinkThread();  //void ICACHE_RAM_ATTR
-volatile uint16_t blinkDuration = 0;
-Ticker blinkTick;
+void runPumpThread(const uint8_t *pattern);
+volatile uint16_t runPumpThreadDuration = 0;  //ISR-safe
+#if EMAILCLIENT_SMTP
+void smtpSend(const char *subject, const char *body, uint8_t now);
+#endif
+Ticker thread;
+#if THREADED
+void blinkThread();
+volatile uint16_t blinkDuration = 0;  //ISR-safe
 struct _blink {
   uint8_t toggle;
   uint16_t timer;
@@ -340,7 +345,7 @@ bool blinkEmpty = false;
 #define locked_html "Locked"
 #define refresh_http "Refresh"
 #define content_length "Content-Length"
-
+static char logbuffer[64];
 /*
 ----------------
 Integer Maximums
@@ -358,18 +363,20 @@ then it will be retrieved by eboot on boot. That means that user data present th
 RTC offset: 128 / 4 = 32
 */
 #ifdef ESP32
+//ESP32, RTC memory is only retained across deep sleep.
 RTC_DATA_ATTR struct {
-  volatile uint64_t runTime;      //shedule tracking wifi on/off
-  volatile uint8_t ntpWeek;       //NTP day of week
-  volatile uint8_t ntpHour;       //NTP hour
-  volatile uint8_t emptyBottle;   //empty tracking
-  volatile uint16_t drySoilTime;  //dry soil tracking timeout
-  volatile uint16_t waterTime;    //pump tracking
-  volatile uint16_t moistureLog;  //moisture average tracking
-  volatile uint16_t alertTime;    //prevent email spam
+  uint64_t runTime;      //shedule tracking wifi on/off
+  uint8_t ntpWeek;       //NTP day of week
+  uint8_t ntpHour;       //NTP hour
+  uint8_t emptyBottle;   //empty tracking
+  uint16_t drySoilTime;  //dry soil tracking timeout
+  uint16_t waterTime;    //pump tracking
+  uint16_t moistureLog;  //moisture average tracking
+  uint16_t alertTime;    //prevent email spam
 } rtcData;
 uint64_t loopTimer = 0;  //loop() slow down
 #else
+//ESP8266, the RTC user memory is retained across deep sleep and soft reset.
 struct {
   uint32_t runTime;      //shedule tracking wifi on/off
   uint8_t ntpWeek;       //NTP day of week
@@ -384,8 +391,6 @@ uint32_t loopTimer = 0;              //loop() slow down
 #endif
 
 uint32_t webTimer = 0;  //track last webpage access
-uint8_t testPump = 0;   //0 = stop, 1= run (timed), 2 = run (continues)
-byte testSMTP = 0;
 
 #define _EEPROM_ID 0
 #define _WIRELESS_MODE 1
@@ -421,39 +426,39 @@ byte testSMTP = 0;
 #define _PNP_ADC 31
 
 const int NVRAM_Map[] = {
-  0,   //_EEPROM_ID 16
-  16,  //_WIRELESS_MODE 8
-  24,  //_WIRELESS_HIDE 8
-  32,  //_WIRELESS_PHY_MODE 8
-  40,  //_WIRELESS_PHY_POWER 8
-  48,  //_WIRELESS_CHANNEL 8
-  64,  //_WIRELESS_SSID 16
-  160, //_WIRELESS_USERNAME 96
-  192, //_WIRELESS_PASSWORD 32
-  200, //_LOG_ENABLE 8
-  232, //_LOG_INTERVAL 32
-  240, //_NETWORK_DHCP 8
-  304, //_NETWORK_IP 64
-  368, //_NETWORK_SUBNET 64
-  432, //_NETWORK_GATEWAY 64
-  496, //_NETWORK_DNS 64
-  512, //_PLANT_POT_SIZE 16
-  528, //_PLANT_SOIL_MOISTURE 16
-  560, //_PLANT_MANUAL_TIMER 32
-  576, //_PLANT_SOIL_TYPE 16
-  592, //_PLANT_TYPE 16
-  624, //_DEEP_SLEEP 32
-  688, //_EMAIL_ALERT 64
-  752, //_SMTP_SERVER 64
-  848, //_SMTP_USERNAME 96
-  880, //_SMTP_PASSWORD 32
-  912, //_PLANT_NAME 32
-  928, //_ALERTS 16
-  960, //_DEMO_PASSWORD 32
-  976, //_TIMEZONE_OFFSET 16
-  992, //_DEMO_AVAILABILITY 16
-  1008,//_PNP_ADC 16
-  1024 //+1
+  0,     //_EEPROM_ID 16
+  16,    //_WIRELESS_MODE 8
+  24,    //_WIRELESS_HIDE 8
+  32,    //_WIRELESS_PHY_MODE 8
+  40,    //_WIRELESS_PHY_POWER 8
+  48,    //_WIRELESS_CHANNEL 8
+  64,    //_WIRELESS_SSID 16
+  160,   //_WIRELESS_USERNAME 96
+  192,   //_WIRELESS_PASSWORD 32
+  200,   //_LOG_ENABLE 8
+  232,   //_LOG_INTERVAL 32
+  240,   //_NETWORK_DHCP 8
+  304,   //_NETWORK_IP 64
+  368,   //_NETWORK_SUBNET 64
+  432,   //_NETWORK_GATEWAY 64
+  496,   //_NETWORK_DNS 64
+  512,   //_PLANT_POT_SIZE 16
+  528,   //_PLANT_SOIL_MOISTURE 16
+  560,   //_PLANT_MANUAL_TIMER 32
+  576,   //_PLANT_SOIL_TYPE 16
+  592,   //_PLANT_TYPE 16
+  624,   //_DEEP_SLEEP 32
+  688,   //_EMAIL_ALERT 64
+  752,   //_SMTP_SERVER 64
+  848,   //_SMTP_USERNAME 96
+  880,   //_SMTP_PASSWORD 32
+  912,   //_PLANT_NAME 32
+  928,   //_ALERTS 16
+  960,   //_DEMO_PASSWORD 32
+  976,   //_TIMEZONE_OFFSET 16
+  992,   //_DEMO_AVAILABILITY 16
+  1008,  //_PNP_ADC 16
+  1024   //+1
 };
 
 uint8_t WIRELESS_MODE = 0;  //WIRELESS_AP = 0, WIRELESS_STA(WPA2) = 1, WIRELESS_STA(WPA2 ENT) = 2, WIRELESS_STA(WEP) = 3
@@ -504,6 +509,10 @@ uint16_t DEEP_SLEEP_S = 0;                //seconds
 uint32_t DEEP_SLEEP_MS = 0;               //milliseconds
 char PNP_ADC[] = "010";                   //0=NPN|1=PNP, ADC sensitivity, Water Level Sensor 0=Disable|1=Enable
 //uint8_t ADC_ERROR_OFFSET = 64;           //WAKE_RF_DISABLED offset
+static const uint8_t sand[] = { 1, 1, 0, 0 };
+static const uint8_t loam[] = { 1, 1, 0, 1 };
+static const uint8_t moss[] = { 1, 0, 1, 0 };
+static const uint8_t dirt[] = { 1, 1, 1, 1 };
 #if TIMECLIENT_NTP
 WiFiUDP ntpUDP;
 NTPClient timeClient(ntpUDP);
@@ -521,7 +530,6 @@ temperature_sensor_config_t temp_sensor = {
 void setup() {
   pinMode(analogDigitalPin, INPUT);
   pinMode(pumpPin, INPUT_PULLUP);  //Float the pin until set NPN or PNP
-
   //digitalWrite(sensorPin, LOW);
   //pinMode(sensorPin, OUTPUT);
 
@@ -562,7 +570,7 @@ void setup() {
   Serial.setDebugOutput(true);
   //ESP8266 SDK 2.2.2 Deep Sleep is 32bit about 2,147,483,647 = 35 min
   //ESP8266 SDK 2.4.1 Deep Sleep is 64bit about 12,731,80,9786 = 3h 30min
-  Serial.println("deepSleepMax: " + uint64ToString(ESP.deepSleepMax()));
+  //Serial.println("deepSleepMax: %lu", ESP.deepSleepMax());
   //printMemory();
 #endif
 
@@ -570,7 +578,7 @@ void setup() {
   //NVRAM type of Settings
   //======================
   EEPROM.begin(1024);
-  long eid = NVRAM_Read(_EEPROM_ID).toInt();
+  long eid = NVRAMRead(_EEPROM_ID).toInt();
 #if DEBUG
   Serial.print("EEPROM CRC Stored: 0x");
   Serial.println(eid, HEX);
@@ -603,56 +611,57 @@ void setup() {
     LittleFS.format();
 
     NVRAM_Erase();
-    NVRAM_Write(_EEPROM_ID, String(EEPROM_ID));
-    NVRAM_Write(_WIRELESS_MODE, String(WIRELESS_MODE));
-    NVRAM_Write(_WIRELESS_HIDE, "0");
-    NVRAM_Write(_WIRELESS_PHY_MODE, String(WIRELESS_PHY_MODE));
-    NVRAM_Write(_WIRELESS_PHY_POWER, String(WIRELESS_PHY_POWER));
-    NVRAM_Write(_WIRELESS_CHANNEL, String(WIRELESS_CHANNEL));
-    NVRAM_Write(_WIRELESS_SSID, WIRELESS_SSID);
-    NVRAM_Write(_WIRELESS_USERNAME, "");
-    NVRAM_Write(_WIRELESS_PASSWORD, "");
-    NVRAM_Write(_LOG_ENABLE, String(LOG_ENABLE));
-    NVRAM_Write(_LOG_INTERVAL, String(LOG_INTERVAL));
+    NVRAMWrite(_EEPROM_ID, String(EEPROM_ID));
+    NVRAMWrite(_WIRELESS_MODE, String(WIRELESS_MODE));
+    NVRAMWrite(_WIRELESS_HIDE, "0");
+    NVRAMWrite(_WIRELESS_PHY_MODE, String(WIRELESS_PHY_MODE));
+    NVRAMWrite(_WIRELESS_PHY_POWER, String(WIRELESS_PHY_POWER));
+    NVRAMWrite(_WIRELESS_CHANNEL, String(WIRELESS_CHANNEL));
+    NVRAMWrite(_WIRELESS_SSID, WIRELESS_SSID);
+    NVRAMWrite(_WIRELESS_USERNAME, "");
+    NVRAMWrite(_WIRELESS_PASSWORD, "");
+    NVRAMWrite(_LOG_ENABLE, String(LOG_ENABLE));
+    NVRAMWrite(_LOG_INTERVAL, String(LOG_INTERVAL));
     //==========
-    NVRAM_Write(_NETWORK_DHCP, "0");
-    NVRAM_Write(_NETWORK_IP, NETWORK_IP);
-    NVRAM_Write(_NETWORK_SUBNET, "255.255.255.0");
-    NVRAM_Write(_NETWORK_GATEWAY, NETWORK_IP);
-    NVRAM_Write(_NETWORK_DNS, NETWORK_IP);
+    NVRAMWrite(_NETWORK_DHCP, "0");
+    NVRAMWrite(_NETWORK_IP, NETWORK_IP);
+    NVRAMWrite(_NETWORK_SUBNET, "255.255.255.0");
+    NVRAMWrite(_NETWORK_GATEWAY, NETWORK_IP);
+    NVRAMWrite(_NETWORK_DNS, NETWORK_IP);
     //==========
-    NVRAM_Write(_PLANT_POT_SIZE, String(PLANT_POT_SIZE));
-    NVRAM_Write(_PLANT_SOIL_MOISTURE, String(PLANT_SOIL_MOISTURE));
-    NVRAM_Write(_PLANT_MANUAL_TIMER, String(PLANT_MANUAL_TIMER));
-    NVRAM_Write(_PLANT_SOIL_TYPE, String(PLANT_SOIL_TYPE));
-    NVRAM_Write(_PLANT_TYPE, String(PLANT_TYPE));
-    NVRAM_Write(_DEEP_SLEEP, String(DEEP_SLEEP));
+    NVRAMWrite(_PLANT_POT_SIZE, String(PLANT_POT_SIZE));
+    NVRAMWrite(_PLANT_SOIL_MOISTURE, String(PLANT_SOIL_MOISTURE));
+    NVRAMWrite(_PLANT_MANUAL_TIMER, String(PLANT_MANUAL_TIMER));
+    NVRAMWrite(_PLANT_SOIL_TYPE, String(PLANT_SOIL_TYPE));
+    NVRAMWrite(_PLANT_TYPE, String(PLANT_TYPE));
+    NVRAMWrite(_DEEP_SLEEP, String(DEEP_SLEEP));
     //==========
-    NVRAM_Write(_ALERTS, ALERTS);
-    NVRAM_Write(_EMAIL_ALERT, "");
-    NVRAM_Write(_SMTP_SERVER, "");
-    NVRAM_Write(_SMTP_USERNAME, "");
-    NVRAM_Write(_SMTP_PASSWORD, "");
-    NVRAM_Write(_PLANT_NAME, WIRELESS_SSID);
+    NVRAMWrite(_ALERTS, ALERTS);
+    NVRAMWrite(_EMAIL_ALERT, "");
+    NVRAMWrite(_SMTP_SERVER, "");
+    NVRAMWrite(_SMTP_USERNAME, "");
+    NVRAMWrite(_SMTP_PASSWORD, "");
+    NVRAMWrite(_PLANT_NAME, WIRELESS_SSID);
     //==========
-    NVRAM_Write(_DEMO_PASSWORD, DEMO_PASSWORD);
-    NVRAM_Write(_TIMEZONE_OFFSET, "-28800");
-    NVRAM_Write(_DEMO_AVAILABILITY, DEMO_AVAILABILITY);
+    NVRAMWrite(_DEMO_PASSWORD, DEMO_PASSWORD);
+    NVRAMWrite(_TIMEZONE_OFFSET, "-28800");
+    NVRAMWrite(_DEMO_AVAILABILITY, DEMO_AVAILABILITY);
     //==========
-    NVRAM_Write(_PNP_ADC, PNP_ADC);        //TODO: based in flash ID
+    NVRAMWrite(_PNP_ADC, PNP_ADC);         //TODO: based in flash ID
     memset(&rtcData, 0, sizeof(rtcData));  //reset RTC memory
   } else {
-    NVRAM_Read_Config();
-    String nvram = NVRAM_Read(_ALERTS);
+
+    NVRAMRead_Config();
+    String nvram = NVRAMRead(_ALERTS);
     nvram.toCharArray(ALERTS, sizeof(nvram));
-    nvram = NVRAM_Read(_DEMO_AVAILABILITY);
+    nvram = NVRAMRead(_DEMO_AVAILABILITY);
     nvram.toCharArray(DEMO_AVAILABILITY, sizeof(nvram));
 #ifdef ESP8266
     ESP.rtcUserMemoryRead(32, (uint32_t *)&rtcData, sizeof(rtcData));
-    ADCMODE = get_adc();
-    if (ADCMODE == ADC_VCC) {                                               //Measure VCC this runtime
-      ESP.rtcUserMemoryWrite(100, (uint32_t *)ADC_TOUT, sizeof(ADC_TOUT));  //Next time measure ADC sensor
-    }
+    //ADCMODE = get_adc();
+    //if (ADCMODE == ADC_VCC) {                                               //Measure VCC this runtime
+    //  ESP.rtcUserMemoryWrite(100, (uint32_t *)ADC_TOUT, sizeof(ADC_TOUT));  //Next time measure ADC sensor
+    //}
 //#else
 //printf("Opening Non-Volatile Storage (NVS) ... ");
 //nvs_handle_t rtcData;
@@ -664,7 +673,8 @@ void setup() {
 
   ON_TIME = String(DEMO_AVAILABILITY).substring(7, 9).toInt();
   OFF_TIME = String(DEMO_AVAILABILITY).substring(9, 11).toInt();
-  PLANT_NAME = NVRAM_Read(_PLANT_NAME);
+  PLANT_NAME = NVRAMRead(_PLANT_NAME);
+
 #ifdef ESP32
   uint8_t wakeupReason = esp_reset_reason();  // ESP.getResetReason();
 #if (CONFIG_IDF_TARGET_ESP32S2 && ARDUINO_ESP32_MAJOR >= 3)
@@ -689,14 +699,16 @@ void setup() {
   } else {
     //Emergency Recover (RST to GND)
 #ifdef ESP32
-    if (wakeupReason == 2) {  //ESP_RST_EXT (2)
+    if (wakeupReason == 2) {  //ESP_RST_EXT (2) ESP_RST_SW (3)
 #else
     if (wakeupReason == 6) {  //REASON_EXT_SYS_RST (6)
 #endif
-      LOG_INTERVAL = 600;                    //prevent WiFi from sleeping 5 minutes
-      ALERTS[0] = '1';                       //email DHCP IP
-      ALERTS[1] = '0';                       //low voltage
+      LOG_INTERVAL = 600;  //prevent WiFi from sleeping 5 minutes
+      ALERTS[0] = '1';     //email DHCP IP
+      ALERTS[1] = '0';     //low voltage
+#ifdef ESP8266
       memset(&rtcData, 0, sizeof(rtcData));  //reset RTC memory (set all zero)
+#endif
       setupWiFi(22);
       blinky(2000, 1, 0);
       //ArduinoOTA.begin();
@@ -717,10 +729,10 @@ void setupWiFi(uint8_t timeout) {
 
   blinky(200, 3, 0);  //Alive blink
 
-  WIRELESS_MODE = NVRAM_Read(_WIRELESS_MODE).toInt();
-  WIRELESS_CHANNEL = NVRAM_Read(_WIRELESS_CHANNEL).toInt();
-  WIRELESS_PHY_MODE = NVRAM_Read(_WIRELESS_PHY_MODE).toInt();
-  WIRELESS_PHY_POWER = NVRAM_Read(_WIRELESS_PHY_POWER).toInt();
+  WIRELESS_MODE = NVRAMRead(_WIRELESS_MODE).toInt();
+  WIRELESS_CHANNEL = NVRAMRead(_WIRELESS_CHANNEL).toInt();
+  WIRELESS_PHY_MODE = NVRAMRead(_WIRELESS_PHY_MODE).toInt();
+  WIRELESS_PHY_POWER = NVRAMRead(_WIRELESS_PHY_POWER).toInt();
 
   //Forcefull Wakeup
   //-------------------
@@ -729,10 +741,10 @@ void setupWiFi(uint8_t timeout) {
   //WiFi.forceSleepWake();
   //-------------------
   IPAddress ip, gateway, subnet, dns;
-  ip.fromString(NVRAM_Read(_NETWORK_IP));
-  subnet.fromString(NVRAM_Read(_NETWORK_SUBNET));
-  gateway.fromString(NVRAM_Read(_NETWORK_GATEWAY));
-  dns.fromString(NVRAM_Read(_NETWORK_DNS));
+  ip.fromString(NVRAMRead(_NETWORK_IP));
+  subnet.fromString(NVRAMRead(_NETWORK_SUBNET));
+  gateway.fromString(NVRAMRead(_NETWORK_GATEWAY));
+  dns.fromString(NVRAMRead(_NETWORK_DNS));
   //-------------------
 
   WiFi.persistent(false);  //Do not write settings to memory
@@ -745,14 +757,14 @@ void setupWiFi(uint8_t timeout) {
   WiFi.setTxPower((wifi_power_t)WIRELESS_PHY_POWER);
 #endif
 
-  const String WIRELESS_SSID = NVRAM_Read(_WIRELESS_SSID);
-  const String WIRELESS_PASSWORD = NVRAM_Read(_WIRELESS_PASSWORD);
+  const String WIRELESS_SSID = NVRAMRead(_WIRELESS_SSID);
+  const String WIRELESS_PASSWORD = NVRAMRead(_WIRELESS_PASSWORD);
 
   if (WIRELESS_MODE == 0) {
     //=====================
     //WiFi Access Point Mode
     //=====================
-    uint8_t WIRELESS_HIDE = NVRAM_Read(_WIRELESS_HIDE).toInt();
+    uint8_t WIRELESS_HIDE = NVRAMRead(_WIRELESS_HIDE).toInt();
 
     //WiFi.enableSTA(false);
     //WiFi.enableAP(true);
@@ -821,7 +833,7 @@ void setupWiFi(uint8_t timeout) {
 #endif
     WiFi.disconnect();
 
-    uint8_t NETWORK_DHCP = NVRAM_Read(_NETWORK_DHCP).toInt();
+    uint8_t NETWORK_DHCP = NVRAMRead(_NETWORK_DHCP).toInt();
     if (NETWORK_DHCP == 0) {
       WiFi.config(ip, gateway, subnet, dns);
     }
@@ -859,7 +871,7 @@ void setupWiFi(uint8_t timeout) {
       //Connecting to WPA2-ENTERPRISE AP needs more than 26 KB memory
       //HeapSelectDram ephemeral;
       //if (ESP.getFreeHeap() > 26624) { //ensure enough space
-      const String WIRELESS_USERNAME = NVRAM_Read(_WIRELESS_USERNAME);
+      const String WIRELESS_USERNAME = NVRAMRead(_WIRELESS_USERNAME);
       //Must have @<domain.com> otherwise default anonymous@espressif.com is used
       wifi_station_set_enterprise_identity((u8 *)WIRELESS_USERNAME.c_str(), WIRELESS_USERNAME.length());
       //wifi_station_set_enterprise_identity((u8*)"esptest@domain.com", strlen("esptest@domain.com"));
@@ -929,7 +941,7 @@ void setupWiFi(uint8_t timeout) {
 
 #if WPA2ENTERPRISE
     if (WIRELESS_MODE == 2) {  // WPA2-Enterprise
-      const String WIRELESS_USERNAME = NVRAM_Read(_WIRELESS_USERNAME);
+      const String WIRELESS_USERNAME = NVRAMRead(_WIRELESS_USERNAME);
       String root_ca = "";
       if (LittleFS.exists("/radius.cer")) {
         File file = LittleFS.open("/radius.cer", "r");
@@ -974,13 +986,13 @@ void setupWiFi(uint8_t timeout) {
 #endif
         //If client mode fails ESP8266 will not be accessible
         //Set Emergency AP SSID for re-configuration
-        //NVRAM_Write(_EEPROM_ID, "0");
-        NVRAM_Write(_WIRELESS_MODE, "0");
-        NVRAM_Write(_WIRELESS_HIDE, "0");
-        NVRAM_Write(_WIRELESS_SSID, PLANT_NAME);
-        NVRAM_Write(_WIRELESS_PASSWORD, "");
-        NVRAM_Write(_LOG_INTERVAL, "60");
-        NVRAM_Write(_NETWORK_DHCP, "0");
+        //NVRAMWrite(_EEPROM_ID, "0");
+        NVRAMWrite(_WIRELESS_MODE, "0");
+        NVRAMWrite(_WIRELESS_HIDE, "0");
+        NVRAMWrite(_WIRELESS_SSID, PLANT_NAME);
+        NVRAMWrite(_WIRELESS_PASSWORD, "");
+        NVRAMWrite(_LOG_INTERVAL, "60");
+        NVRAMWrite(_NETWORK_DHCP, "0");
         //delay(100);
         ESP.restart();
       }
@@ -988,7 +1000,7 @@ void setupWiFi(uint8_t timeout) {
       setupWiFi(timeout++);
       return;
     }
-    NVRAM_Write(_WIRELESS_PHY_POWER, String(WIRELESS_PHY_POWER));  //save auto tuned wifi power
+    NVRAMWrite(_WIRELESS_PHY_POWER, String(WIRELESS_PHY_POWER));  //save auto tuned wifi power
 
     WiFi.setAutoReconnect(true);
 
@@ -996,13 +1008,11 @@ void setupWiFi(uint8_t timeout) {
 #if TIMECLIENT_NTP
     timeClient.begin();
     timeClient.update();
-    timeClient.setTimeOffset(NVRAM_Read(_TIMEZONE_OFFSET).toInt());
+    timeClient.setTimeOffset(NVRAMRead(_TIMEZONE_OFFSET).toInt());
     //Offset runtime as current minutes (more accurate availability count)
     rtcData.runTime = timeClient.getMinutes() * 60;
     rtcData.ntpWeek = timeClient.getDay();
     rtcData.ntpHour = timeClient.getHours();
-#endif
-
 #if DEBUG
     Serial.print(timeClient.getDay());
     Serial.print("|");
@@ -1012,7 +1022,7 @@ void setupWiFi(uint8_t timeout) {
     Serial.print("\n");
     //Serial.println(timeClient.getFormattedTime());
 #endif
-
+#endif
     NETWORK_IP = WiFi.localIP().toString();
 #if EMAILCLIENT_SMTP
     if (ALERTS[0] == '1')
@@ -1030,13 +1040,6 @@ void setupWebServer() {
 #ifdef ESP32
   if (!LittleFS.begin(true)) {
 #else
-  if (!LittleFS.begin()) {
-#endif
-#if DEBUG
-    Serial.println("LittleFS Mount Failed");
-#endif
-    //return;
-  }
 #if DEBUG
   FSInfo info;
   LittleFS.info(info);
@@ -1048,21 +1051,26 @@ void setupWebServer() {
                 info.maxOpenFiles,
                 info.maxPathLength);
 #endif
-  DEMO_PASSWORD = NVRAM_Read(_DEMO_PASSWORD);
+  if (!LittleFS.begin()) {
+#endif
+#if DEBUG
+    Serial.println("LittleFS Mount Failed");
+#endif
+    //return;
+  }
+  DEMO_PASSWORD = NVRAMRead(_DEMO_PASSWORD);
   //==============================================
   //Async Web Server HTTP_GET, HTTP_POST, HTTP_ANY
   //==============================================
   server.on("/api", HTTP_GET, [](AsyncWebServerRequest *request) {
+    AsyncResponseStream *response = request->beginResponseStream(text_plain);
     webTimer = millis();
-    String replyText = "";
     if (request->hasParam("adc")) {
       uint8_t adc = request->getParam("adc")->value().toInt();
       if (adc == 1) {
-        replyText = sensorRead(sensorPin);
-        replyText += "|";
-        replyText += rtcData.runTime;
+        response->printf("%u|%u", sensorRead(sensorPin), rtcData.runTime);
       } else {
-        replyText = waterLevelRead(adc);
+        response->printf("%u", waterLevelRead(adc));
       }
 #ifdef ESP32
     } else if (request->hasParam("temp")) {
@@ -1072,17 +1080,16 @@ void setupWebServer() {
       temperature_sensor_get_celsius(temp_handle, &tempC);
       temperature_sensor_disable(temp_handle);
 #endif
-      replyText = tempC;
+      //snprintf(reply, 12, "%.2f", tempC);
+      response->printf("%.2f", tempC);
 #endif
     } else if (request->hasParam("stream")) {
       uint8_t stream = request->getParam("stream")->value().toInt();
-      AsyncResponseStream *response = request->beginResponseStream(text_plain);
       for (uint16_t i = 0; i < stream; i++) {
-        response->printf("%d:%d\n", waterLevelRead(2), sensorRead(sensorPin));
+        response->printf("%u:%u\n", waterLevelRead(2), sensorRead(sensorPin));
       }
-      request->send(response);
-      return;
-
+      //request->send(response);
+      //return;
     } else if (request->hasParam("ntp")) {
       rtcData.ntpWeek = request->getParam("week")->value().toInt();
       rtcData.ntpHour = request->getParam("hour")->value().toInt();
@@ -1092,69 +1099,86 @@ void setupWebServer() {
       Serial.printf("NTP Hour: %u\n", rtcData.ntpHour);
       Serial.printf("NTP Seconds: %u\n", rtcData.runTime);
 #endif
-      replyText = DEEP_SLEEP;
-      //request->send(200, text_plain, String(DEEP_SLEEP));
+      //snprintf(reply, 12, "%d", DEEP_SLEEP);
+      response->printf("%d", DEEP_SLEEP);
+    } else if (request->hasParam("svg")) {
+      //response = request->beginResponseStream(text_plain);
+#ifdef ESP8266
+      Dir files = LittleFS.openDir("/svg");
+      while (files.next()) {
+        if (files.fileName().endsWith("vg")) {
+          response->printf("%s\n", files.fileName().c_str());
+        }
+      }
+#else
+        File root = LittleFS.open("/svg");
+        File file = root.openNextFile();
+        while (file) {
+          //if (!file.isDirectory()) {
+          const char *name = file.name();
+          if (strstr(name, "vg")) {
+            response->printf("%s\n", name);
+          }
+          //}
+          file = root.openNextFile();
+        }
+#endif
     } else if (DEMO_PASSWORD == "") {
       blinkDuration = 0;
       if (request->hasParam("reset")) {
         NVRAM_Erase();
-        AsyncWebServerResponse *response = request->beginResponse(text_html, 3, [](uint8_t *buffer, size_t maxLen, size_t index) -> size_t {
-          if (index) {
-            //delay(100);
-            NVRAM_Write(_PNP_ADC, PNP_ADC);
-            ESP.restart();
-            //return 0;
-          }
-          return snprintf((char *)buffer, maxLen, ".....");  //must be +2 characters over length for restart to trigger
+        NVRAMWrite(_PNP_ADC, PNP_ADC);
+        thread.attach(2, []() {
+          ESP.restart();
         });
-        response->addHeader(content_length, "3");
-        request->send(response);
-        return;
-        //request->send(200, text_plain, "...");
+        response->print("...");
       } else if (request->hasParam("smtp")) {
-        testSMTP = 1;
-        replyText = "OK";
-        //Cannot do inline with webserver, not enough ESP.getFreeHeap()
-      } else if (request->hasParam("pump")) {
-        testPump = request->getParam("pump")->value().toInt();
-        replyText = PLANT_POT_SIZE;
-        //request->send(200, text_plain, String(PLANT_POT_SIZE));
-        /*
-        AsyncWebServerResponse *response = request->beginResponse(text_html, 3, [](uint8_t *buffer, size_t maxLen, size_t index) -> size_t {
-          if (index) {
-            runPump(); //Cannot delay() here, Fatal exception 9(LoadStoreAlignmentCause)
-            return 0;
-          }
-          return snprintf((char *)buffer, maxLen, ".....");
+#if EMAILCLIENT_SMTP
+        thread.once(1, []() {
+          smtpSend("Test", "OK", 1);
         });
-        response->addHeader(content_length, "3");
-        request->send(response);
+        response->print("...");
+#else
+          response->print("No SMTP in Firmware");
+#endif
+      } else if (request->hasParam("pump")) {
+        const char *s = request->getParam("pump")->value().c_str();  //.toInt();
+        const uint8_t testPump = s[0] - '0';
+        /*
+#ifdef ESP32
+        snprintf(logbuffer, sizeof(logbuffer), "P:%llu", rtcData.runTime);
+#else
+        snprintf(logbuffer, sizeof(logbuffer), "P:%lu", rtcData.runTime);
+#endif
+        dataLog(logbuffer);
         */
+        //0 = stop, 1= run (timed), 2 = run (continues)
+        if (testPump == 1) {
+          runPumpThreadDuration = PLANT_POT_SIZE;
+          runPump(true);
+        }else if (testPump == 2) {
+          thread.attach(1, []() {
+            runPumpThreadDuration = UINT16_MAX;
+            runPumpThread(dirt);
+          });
+        }else{
+          thread.detach();
+          runPumpFinish();
+          //runPumpThreadDuration = 0;
+        }
+        response->print("...");
       } else if (request->hasParam("empty")) {
         uint8_t water = request->getParam("empty")->value().toInt();
         rtcData.emptyBottle = water;
         if (water > 3) {
           rtcData.waterTime = delayBetweenOverfloodReset + 1;
         }
-        replyText = rtcData.waterTime;
-        //request->send(200, text_plain, String(rtcData.waterTime));
+        response->printf("%u", rtcData.waterTime);
       }
     } else {
-      replyText = locked_html;
-      //request->send(200, text_html, locked_html);
+      response->printf("%s", locked_html);
     }
-    request->send(200, text_plain, replyText);
-  });
-  server.on("/svg", HTTP_GET, [](AsyncWebServerRequest *request) {
-    String file = request->url();
-    if (file.endsWith("vg") || file.endsWith("ss")) {
-      AsyncWebServerResponse *response = request->beginResponse(LittleFS, file, getContentType(file));
-      response->addHeader("Content-Encoding", "gzip");
-      request->send(response);
-    } else {
-      String out = indexSVG("/svg");
-      request->send(200, text_plain, out);
-    }
+    request->send(response);
   });
   /*
   server.on("/adc2", HTTP_GET, [](AsyncWebServerRequest *request) {
@@ -1167,7 +1191,7 @@ void setupWebServer() {
     if (request->params() > 0) {
       int8_t i = request->getParam(0)->value().toInt();
       ADC_ERROR_OFFSET = i;
-      NVRAM_Write(_ADC_ERROR_OFFSET, String(ADC_ERROR_OFFSET));
+      NVRAMWrite(_ADC_ERROR_OFFSET, String(ADC_ERROR_OFFSET));
     }
     request->send(200, text_plain, String(ADC_ERROR_OFFSET));
   });
@@ -1176,11 +1200,11 @@ void setupWebServer() {
     if (request->hasParam("end")) {
       LOG_ENABLE = 0;
       LittleFS.remove("/l");
-      //NVRAM_Write(_LOG_ENABLE, "0");
+      //NVRAMWrite(_LOG_ENABLE, "0");
     } else if (request->hasParam("start")) {
       LOG_ENABLE = 1;
       dataLog("l");
-      //NVRAM_Write(_LOG_ENABLE, "1");
+      //NVRAMWrite(_LOG_ENABLE, "1");
     } else if (LittleFS.exists("/l")) {
       AsyncWebServerResponse *response = request->beginResponse(LittleFS, "/l", text_plain);
       request->send(response);
@@ -1188,23 +1212,6 @@ void setupWebServer() {
     }
     request->send(200, text_plain, "...");
   });
-  /*
-  server.on("/find", HTTP_GET, [](AsyncWebServerRequest *request) {
-    File fileFS = LittleFS.open("/find.html", "r");
-    size_t fileSize = fileFS.size() + 1;
-    AsyncWebServerResponse *response = request->beginResponse(text_html, fileSize, [fileFS](uint8_t *buffer, size_t maxLen, size_t index) -> size_t {
-      if (index) {
-        return 0;
-      }
-      auto localHandle = fileFS;
-      return localHandle.read(buffer, maxLen);
-    });
-    //response->addHeader("Connection", "close");
-    response->addHeader("Access-Control-Allow-Origin", "*");  // Allow all origins
-    response->addHeader("Content-Encoding", "gzip");
-    request->send(response);
-  });
-  */
   server.on("/login", HTTP_POST, [](AsyncWebServerRequest *request) {
     if (request->getParam("password", true)->value() == DEMO_PASSWORD) {
       DEMO_PASSWORD[0] = 0;  //reset
@@ -1213,9 +1220,12 @@ void setupWebServer() {
   });
   server.on("/reboot", HTTP_GET, [](AsyncWebServerRequest *request) {
     if (DEMO_PASSWORD != "") {
-      request->send(200, text_html, locked_html);
+      request->send(200, text_plain, locked_html);
     } else {
-      ESP.restart();
+      thread.attach(1, []() {
+        ESP.restart();
+      });
+      request->send(200, text_plain, "...");
     }
   });
   server.on("/nvram.json", HTTP_GET, [](AsyncWebServerRequest *request) {
@@ -1224,77 +1234,50 @@ void setupWebServer() {
         uint8_t i = request->getParam("offset")->value().toInt();
         if (request->hasParam("alert")) {
           ALERTS[i] = request->getParam("alert")->value().toInt();
-          NVRAM_Write(_ALERTS, ALERTS);
+          NVRAMWrite(_ALERTS, ALERTS);
         } else {
-          NVRAM_Write(i, request->getParam("value")->value());
-          NVRAM_Read_Config();
+          NVRAMWrite(i, request->getParam("value")->value());
+          NVRAMRead_Config();
         }
         offsetTiming();
         request->send(200, text_plain, request->getParam("value")->value());
       } else {
-        request->send(200, text_html, locked_html);
+        request->send(200, text_plain, locked_html);
       }
     } else {
-      char json[512];
-      size_t len = snprintf(json, sizeof(json), "{\n\t\"nvram\": [\"");
+      AsyncResponseStream *response = request->beginResponseStream(text_json);
+      response->printf("{\"nvram\": [\"");
 #ifdef ESP8266
-      len += snprintf(json + len, sizeof(json) - len, "%s ESP8266 ", ESP.getCoreVersion().c_str());
+      response->printf("%s ESP8266", ESP.getCoreVersion());
 #else
         //esp_chip_info_t chip_info;
         //esp_chip_info(&chip_info);
-        len += snprintf(json + len, sizeof(json) - len, "%d.%d.%d %s ", ESP_ARDUINO_VERSION_MAJOR, ESP_ARDUINO_VERSION_MINOR, ESP_ARDUINO_VERSION_PATCH, ESP.getChipModel());
+        response->printf("%d.%d.%d %s", ESP_ARDUINO_VERSION_MAJOR, ESP_ARDUINO_VERSION_MINOR, ESP_ARDUINO_VERSION_PATCH, ESP.getChipModel());
 #if (ASYNC_TCP_SSL_ENABLED)
-        len += snprintf(json + len, sizeof(json) - len, MBEDTLS_VERSION_NUMBER);
+        response->print(MBEDTLS_VERSION_NUMBER);
 #endif
 #endif
-      len += snprintf(json + len, sizeof(json) - len, "|%s|", ESP.getSdkVersion());
       //uint16_t major = (LFS_VERSION >> 16) & 0xFFFF; // 0x0002
       //uint16_t minor = LFS_VERSION & 0xFFFF;         // 0x0005
-      //len += snprintf(json + len, sizeof(json) - len, "%u.%u", major, minor);
-      len += snprintf(json + len, sizeof(json) - len, "%u", LFS_VERSION);
-      len += snprintf(json + len, sizeof(json) - len, "|%s|", _VERSION);
-      {
-    #if (ESP8266 && ARDUINO_ESP8266_MAJOR >= 3)
-        HeapSelectIram ephemeral;
-    #endif
-        len += snprintf(json + len, sizeof(json) - len, "%d", ESP.getFreeHeap());  //esp_himem_get_free_size()
-    #if DEBUG
-        Serial.printf("IRAM free: %6d bytes\r\n", ESP.getFreeHeap());
-    #endif
-      }
-      len += snprintf(json + len, sizeof(json) - len, "|");
-      {
-    #ifdef ESP8266
-    #if (ARDUINO_ESP8266_MAJOR >= 3)
-        HeapSelectDram ephemeral;
-    #endif
-        len += snprintf(json + len, sizeof(json) - len, "%d", ESP.getFreeHeap());
-    #else
-        len += snprintf(json + len, sizeof(json) - len, "%d", ESP.getFreePsram());
-    #endif
-    #if DEBUG
-        Serial.printf("DRAM free: %6d bytes\r\n", ESP.getFreeHeap());
-    #endif
-      }
-      len += snprintf(json + len, sizeof(json) - len, "\",");
-
+      //response->printf("%u.%u", major, minor);
+      response->printf("|%s|%u|%s|%u|%u\"", ESP.getSdkVersion(), LFS_VERSION, _VERSION, ESP.getFreeSketchSpace(), ESP.getFreeHeap());  //esp_himem_get_free_size()
+#if DEBUG
+      Serial.printf("Flash free: %6d bytes\r\n", ESP.getFreeSketchSpace());
+      Serial.printf("DRAM free: %6d bytes\r\n", ESP.getFreeHeap());
+#endif
       for (uint8_t i = 1; i <= 31; i++) {
         if (i == 8 || i == 25 || i == 28) {
           if (DEMO_PASSWORD == "") {
-            len += snprintf(json + len, sizeof(json) - len, "\"\",");
+            response->print(",\"\"");
           } else {
-    #if DEBUG
-            Serial.printf("NVRAM Mask: %u\n", i);
-    #endif
-            len += snprintf(json + len, sizeof(json) - len, "\"*****\",");
+            response->print(",\"****\"");
           }
         } else {
-          len += snprintf(json + len, sizeof(json) - len, "\"%s\",", NVRAM_Read(i));
+          response->printf(",\"%s\"", NVRAMRead(i).c_str());
         }
       }
-      json[len - 1] = '\0'; len--; // remove last character
-      snprintf(json + len, sizeof(json) - len, "]\n}");
-      request->send(200, text_json, json);
+      response->print("]}");
+      request->send(response);
     }
   });
   /*
@@ -1308,48 +1291,55 @@ void setupWebServer() {
   });
   */
   server.on("/nvram", HTTP_POST, [](AsyncWebServerRequest *request) {
+    AsyncResponseStream *response = request->beginResponseStream(text_plain);
     if (DEMO_PASSWORD != "") {
-      request->send(200, text_html, locked_html);
+      response->printf("%s", locked_html);
     } else {
+      const AsyncWebParameter *param0 = request->getParam(0);
+      if (!param0) return;
 
-      char out[512];
-      char refreshURL[32];
+      char buf[64];
       size_t len = 0;
       uint8_t n = 1, skip = 32;
 
-      len = snprintf(refreshURL, sizeof(refreshURL), "4;url=/");
-
-      if (request->getParam(0)->name() == "wifi") {
-        if (request->getParam("Mode", true)->value().toInt() == 0) {
-          len += snprintf(refreshURL + len, sizeof(refreshURL) - len, "update?boot=1");
-        } else if (request->getParam("DHCP", true)->value().toInt() == 1) {
-            len += snprintf(refreshURL + len, sizeof(refreshURL) - len, "find.html");
-          //} else {
-          //  len += snprintf(RefreshURL + len, sizeof(RefreshURL) - len, "http://%s", request->getParam("WiFiIP", true)->value().c_str());
+      len = snprintf(buf, sizeof(buf), "6;url=/");
+      if (param0->name() == "wifi") {
+        const AsyncWebParameter *modeParam = request->getParam("Mode", true);
+        const AsyncWebParameter *dhcpParam = request->getParam("DHCP", true);
+        if (modeParam->value() == "0") {
+          //len += snprintf(buf + len, sizeof(buf) - len, "update?boot=1");
+          thread.attach(2, []() {
+            ESP.restart();
+          });
+        } else if (dhcpParam->value() == "1") {
+          len += snprintf(buf + len, sizeof(buf) - len, "find.html");
+        } else {
+          const AsyncWebParameter *ipParam = request->getParam("WiFiIP", true);
+          if (ipParam) {
+            len--;  // remove last character
+            len += snprintf(buf + len, sizeof(buf) - len, "http://%s", ipParam->value());
+          }
         }
-      }else if (request->getParam(0)->name() == "alert") {
+      } else if (param0->name() == "alert") {
         n = 22;
         skip = 5;
-      } else if (request->getParam(0)->name() == "demo") {
+      } else if (param0->name() == "demo") {
         n = 28;
-        //skip = 1;
       }
+      response->addHeader(refresh_http, buf);
 
-      len = 0;
       for (size_t i = 1; i < request->params(); i++) {
         if (i != skip) {
-          NVRAM_Write(n, request->getParam(i)->value().c_str());
-          len += snprintf(out + len, sizeof(out) - len, "[%d] %s:%s\n", n, request->getParam(i)->name().c_str(), NVRAM_Read(n));
+          NVRAMWrite(n, request->getParam(i)->value().c_str());
+          response->printf("[%d] %s:%s\n", n, request->getParam(i)->name().c_str(), NVRAMRead(n).c_str());
           n++;
         }
       }
-      AsyncWebServerResponse *response = request->beginResponse(200, text_plain, out);
 #if DEBUG
       Serial.println("NVRAM Forcig Restart");
 #endif
-      response->addHeader(refresh_http, refreshURL);
-      request->send(response);
     }
+    request->send(response);
   });
 #if (ASYNC_TCP_SSL_ENABLED)
   httpserver.on(
@@ -1363,16 +1353,25 @@ void setupWebServer() {
         if (!request->authenticate("", DEMO_PASSWORD.c_str()))
           return request->requestAuthentication();
 #endif
-      char updateHTML[512];
-      size_t len = snprintf(updateHTML, sizeof(updateHTML), "<!DOCTYPE html><html><body>");
-      if (request->hasParam("boot")) {
-        len += snprintf(updateHTML + len, sizeof(updateHTML) - len, "<script>fetch('reboot').then((async()=>{for(;;){if((await fetch('update')).ok){location='/'}await new Promise(r=>setTimeout(r,999))}})())</script>...");
-      } else {
-        len += snprintf(updateHTML + len, sizeof(updateHTML) - len, buildFormPostButton(NETWORK_IP.c_str(), "Firmware"));
-        len += snprintf(updateHTML + len, sizeof(updateHTML) - len, buildFormPostButton(NETWORK_IP.c_str(), "Filesystem"));
+      AsyncResponseStream *response = request->beginResponseStream(text_html);
+      response->print("<!DOCTYPE html><html><body>");
+      //if (request->hasParam("boot")) {
+      //  response->print("<script>fetch('reboot').then((async()=>{for(;;){if((await fetch('update')).ok){location='/'}await new Promise(r=>setTimeout(r,999))}})())</script>...");
+      //} else {
+        const char *labels[] = { "Firmware", "Filesystem" };
+        for (uint8_t i = 0; i < 2; i++) {
+          response->print("<form action=http://");
+          response->print(NETWORK_IP);
+          response->print(request->url());
+          response->print(" method=post enctype='multipart/form-data'><input type=file accept='.bin,.signed' name=");
+          response->print(labels[i]);
+          response->print("><input type=submit value='Update ");
+          response->print(labels[i]);
+          response->print("'></form><br>");
+        //}
       }
-      snprintf(updateHTML + len, sizeof(updateHTML) - len, "</body></html>");
-      request->send(200, text_html, updateHTML);
+      response->printf("</body></html>");
+      request->send(response);
     });
   /*
     server.on("/format", HTTP_GET, [](AsyncWebServerRequest *request) {
@@ -1395,28 +1394,23 @@ void setupWebServer() {
         if (!request->authenticate("", DEMO_PASSWORD.c_str()))
           return request->requestAuthentication();
 #endif
-      String out = "Update Success!";
+      AsyncResponseStream *response = request->beginResponseStream(text_html);
+
       if (Update.hasError()) {
 #if (ARDUINO_ESP8266_MAJOR >= 3 && ARDUINO_ESP8266_MINOR >= 1)
-        out = Update.getErrorString().c_str();  //3.1.x
+        response->print(Update.getErrorString());  //3.1.x
 #else
         StreamString str;
         Update.printError(str);
-        out = str.c_str();
+        response->print(str);
 #endif
+      } else {
+        response->print("Update Success! ...");
       }
-      /*
-      AsyncWebServerResponse *response = request->beginResponse(text_html, out.length()+1, [out](uint8_t *buffer, size_t maxLen, size_t index) -> size_t {
-        if (index) {
-          //ESP.restart();
-          return 0;
-        }
-        return snprintf((char *)buffer, maxLen, out.c_str());
+      response->addHeader(refresh_http, "6;url=/");
+      thread.attach(2, []() {
+        ESP.restart();
       });
-      response->addHeader(content_length, out.length());
-      */
-      AsyncWebServerResponse *response = request->beginResponse(200, text_html, out);
-      response->addHeader(refresh_http, "4;url=?boot=1");
       request->send(response);
     },
     WebUpload);
@@ -1444,12 +1438,12 @@ void setupWebServer() {
       }
       if (isPhone) {
         request->redirect("/mobile/index.html");
-      }else{
+      } else {
         request->redirect("/index.html");
       }
     } else {
       AsyncWebServerResponse *response = request->beginResponse(200, text_html, "File System Not Found ...");
-      response->addHeader(refresh_http, "4; url=/update");
+      response->addHeader(refresh_http, "4;url=/update");
       request->send(response);
     }
   });
@@ -1478,25 +1472,24 @@ void setupWebServer() {
 #endif
 
   server.onNotFound([](AsyncWebServerRequest *request) {
-    //Serial.println((request->method() == HTTP_GET) ? "GET" : "POST");
+  //Serial.println((request->method() == HTTP_GET) ? "GET" : "POST");
 
-    String file = request->url();
 #if DEBUG
-    Serial.println("Request:" + file);
+    Serial.printf("\nRequest: %s\n", request->url().c_str());
 #endif
-
+    const char *file = request->url().c_str();
 #if !ASYNCWEBSERVER_REGEX
-    if (file.endsWith("detect.html") || file.endsWith("generate_204")) {  // || file.endsWith("test.txt")) {
+    if (strstr(file, "detect") != 0 || strstr(file, "generate_204") != 0) {  //|| strstr(file, "test") != 0) {
       //if (!LittleFS.exists("/index.html")) {
       request->send(200, text_html, "<center><h1>http://" + NETWORK_IP + "</h1></center>");
       //}
-    } else if (file.endsWith("redirect") || file.endsWith("portal")) {
+    } else if (strstr(file, "redirect") != 0 || strstr(file, "portal") != 0) {
       request->redirect("http://" + NETWORK_IP);
     } else
 #endif
       if (LittleFS.exists(file)) {
       AsyncWebServerResponse *response = request->beginResponse(LittleFS, file, getContentType(file));
-      if (file.endsWith("find.html")) {
+      if (strstr(file, "find") != 0) {
         response->addHeader("Access-Control-Allow-Origin", "*");  // Allow all origins
       }
       response->addHeader("Content-Encoding", "gzip");
@@ -1646,11 +1639,6 @@ static int root_get_handler(httpd_req_t *req) {
 }
 #endif
 #endif
-char *buildFormPostButton(const char ip[], const char name[]) {
-  static char buffer[256];
-  snprintf(buffer, sizeof(buffer),"<form method=POST action='http://%s/update' enctype='multipart/form-data'><input type=file accept='.bin,.signed' name=%s><input type=submit value='Update %s'></form><br>", ip, name, name);
-  return buffer;
-}
 
 void loop() {
 //delay(1);  //enable Modem-Sleep
@@ -1659,19 +1647,6 @@ void loop() {
 #if (SYNC_TCP_SSL_ENABLE && ESP8266)
   secureServer.handleClient();
 #endif
-
-  if (testPump > 0) {  //0 = stop, 1= run (timed), 2 = run (continues)
-    if (testPump == 1) {
-      testPump = 0;
-      dataLog("P:" + String(rtcData.runTime));
-    }
-    runPump();
-#if EMAILCLIENT_SMTP
-  } else if (testSMTP > 0) {
-    testSMTP = 0;
-    smtpSend("Test", "OK", 1);
-#endif
-  }
 
   if (millis() - loopTimer < LOG_INTERVAL) return;
   rtcData.runTime += LOG_INTERVAL_S;  //track time since NTP sync (as seconds)
@@ -1684,12 +1659,12 @@ void loop() {
     } else {
       //A0 pin needs to be free, not connected to anything in order for the internal measurement to work properly
       //A0 pin in NodeMCU is connected to (resistor/capacitor) and needs to be floating in order to use ADC_MODE(ADC_VCC)
-      int vcc = ESP.getVcc();
-      double dvcc = (float)vcc / 1024;
+      float dvcc = ESP.getVcc() / 1024.0f;
 #if DEBUG
-      Serial.println("Voltage: " + String(dvcc, 3) + "v");
+      Serial.println("Voltage: " + String(dvcc) + "v");
 #endif
-      dataLog("v:" + String(dvcc, 3));
+      snprintf(logbuffer, sizeof(logbuffer), "v:%.2f", dvcc);
+      dataLog(logbuffer);
       //TODO: only send below 2.8 volt?
       //{
 #if EMAILCLIENT_SMTP
@@ -1716,13 +1691,13 @@ void loop() {
 
   if (ALERTS[8] == '1') {
 #if THREADED
-    blinkTick.once(1, blinkMorse, moisture);
+    thread.once(1, blinkMorse, moisture);
 #else
     blinkMorse(moisture);
 #endif
   }
-
-  dataLog(String(moisture));
+  snprintf(logbuffer, sizeof(logbuffer), "%u", moisture);
+  dataLog(logbuffer);
 
   if (rtcData.emptyBottle >= 3) {  //Low Water LED
 #if DEBUG
@@ -1748,7 +1723,8 @@ void loop() {
 #if DEBUG
       Serial.printf("Empty Detection: %u\n", rtcData.emptyBottle);
 #endif
-      dataLog("e:" + String(rtcData.emptyBottle));
+      snprintf(logbuffer, sizeof(logbuffer), "e:%u", rtcData.emptyBottle);
+      dataLog(logbuffer);
 #if EMAILCLIENT_SMTP
       if (ALERTS[5] == '1')
         smtpSend("Water Empty", String(rtcData.emptyBottle), 0);
@@ -1806,7 +1782,7 @@ void loop() {
 #if DEBUG
         Serial.println("WiFi ON");
 #endif
-        LOG_INTERVAL = NVRAM_Read(_LOG_INTERVAL).toInt();
+        LOG_INTERVAL = NVRAMRead(_LOG_INTERVAL).toInt();
         DEEP_SLEEP = 0;
         offsetTiming();
 
@@ -1817,7 +1793,7 @@ void loop() {
 #if DEBUG
       Serial.println("WiFi OFF");
 #endif
-      DEEP_SLEEP = NVRAM_Read(_DEEP_SLEEP).toInt() * 60;
+      DEEP_SLEEP = NVRAMRead(_DEEP_SLEEP).toInt() * 60;
       offsetTiming();
     }
     //----------------------------------------
@@ -1834,7 +1810,7 @@ void loop() {
           if (rtcData.emptyBottle >= 2) {
             rtcData.drySoilTime = 0;
             rtcData.emptyBottle = 0;
-            runPump();
+            runPump(false);
           } else {
             rtcData.emptyBottle++;  //Prevent false-positive low moisture sensor readings
           }
@@ -1849,7 +1825,7 @@ void loop() {
         if (rtcData.emptyBottle < 3 && rtcData.drySoilTime > delayBetweenDrySoilReset) {
           rtcData.drySoilTime = 0;
           rtcData.moistureLog += moisture;
-          runPump();
+          runPump(false);
         } else {
           uint16_t mm = rtcData.moistureLog / 3;  //Average 3
           if (mm > (moisture - 10) && mm < (moisture + 10)) {
@@ -1872,7 +1848,8 @@ void loop() {
       }
       rtcData.drySoilTime++;  //Wait for soil to absorb moisture
     } else {
-      dataLog("t:" + String(rtcData.waterTime));
+      snprintf(logbuffer, sizeof(logbuffer), "t:%u", rtcData.waterTime);
+      dataLog(logbuffer);
 #if DEBUG
       Serial.printf("Water Timer: %u\n", rtcData.waterTime);
 #endif
@@ -1880,7 +1857,7 @@ void loop() {
       if (rtcData.waterTime >= PLANT_MANUAL_TIMER) {
         rtcData.emptyBottle = 0;  //assume no sensor with manual timer
         rtcData.waterTime = 0;
-        runPump();
+        runPump(false);
       }
       rtcData.waterTime++;
     }
@@ -1959,45 +1936,20 @@ void readySleep() {
   }
 */
 
-String indexSVG(String dir) {
-  String out = "";
-#ifdef ESP8266
-  Dir files = LittleFS.openDir(dir);
-  while (files.next()) {
-    if (files.fileName().endsWith("vg")) {
-      out += files.fileName() + "\n";
-    }
-  }
-#else
-  File root = LittleFS.open(dir);
-  File file = root.openNextFile();
-  while (file) {
-    String fileName = file.name();
-    if (!file.isDirectory() && fileName.endsWith("vg")) {
-      out += fileName;
-      out += "\n";
-    }
-    file = root.openNextFile();
-  }
-#endif
-  out = out.substring(0, (out.length() - 1));
-  return out;
-}
-
-void dataLog(String text) {
+void dataLog(const char *text) {
   if (LOG_ENABLE == 1) {
 #ifdef ESP8266
     FSInfo fs_info;
     LittleFS.info(fs_info);
-    uint32_t flashsize = fs_info.totalBytes - fs_info.usedBytes - text.length();
+    size_t flashsize = fs_info.totalBytes - fs_info.usedBytes - strlen(text);
 #else
-    uint32_t flashsize = LittleFS.totalBytes() - LittleFS.usedBytes() - text.length();
+    size_t flashsize = LittleFS.totalBytes() - LittleFS.usedBytes() - strlen(text);
 #endif
     if (flashsize > 1) {
       File file = LittleFS.open("/l", "a");
       if (file) {
-        file.print(text);
-        file.print('\n');
+        file.println(text);
+        //file.print('\n');
         file.close();
       }
     } else {
@@ -2006,78 +1958,76 @@ void dataLog(String text) {
   }
 }
 
-void runPump() {
-#if DEBUG
-  Serial.println("MOISTURE LIMIT:" + String(PLANT_SOIL_MOISTURE));
-  Serial.println("TIMER:" + String(PLANT_MANUAL_TIMER));
-#endif
-
-  uint32_t duration = PLANT_POT_SIZE;
-
-  //Watering Map -  Different soils takes different time to soak the water
-  //===================
-  uint8_t moss[] = { 1, 0, 1, 0 };
-  uint8_t loam[] = { 1, 1, 0, 1 };
-  uint8_t sand[] = { 1, 1, 0, 0 };
-  uint8_t pulse[duration];
-  uint8_t arraymap = 0;
-
-  for (uint8_t x = 0; x <= sizeof(pulse); x++) {
-    if (arraymap == 4) {
-      arraymap = 0;
-    }
-    if (PLANT_SOIL_TYPE == 0) {
-      pulse[x] = moss[arraymap];
-    } else if (PLANT_SOIL_TYPE == 1) {
-      pulse[x] = loam[arraymap];
-    } else if (PLANT_SOIL_TYPE > 3) {
-      pulse[x] = sand[arraymap];
-    } else {
-      pulse[x] = 1;
-    }
-    arraymap++;
+void runPumpThread(const uint8_t *pattern) {
+  //static uint16_t duration = size;
+  if (runPumpThreadDuration == 0) {
+    thread.detach();
+    runPumpFinish();
+    return;
   }
+  static uint8_t idx = 0;
+  turnNPNorPNP(pattern[idx]);  // ON or OFF
+  idx = (idx + 1) & 0x03;      // fast modulo 4
+  runPumpThreadDuration--;
+}
+
+void runPumpFinish() {
+  turnNPNorPNP(0);  // OFF
+#if EMAILCLIENT_SMTP
+  if (ALERTS[3] == '1')
+    smtpSend("Run Pump", String(PLANT_POT_SIZE), 0);
+#endif
+  snprintf(logbuffer, sizeof(logbuffer), "T:%lu,M:%u", PLANT_MANUAL_TIMER, PLANT_SOIL_MOISTURE);
+  dataLog(logbuffer);
+
+  rtcData.emptyBottle++; // Sensorless Empty Detection
+  //calibrateDeepSleep();  // Next sleep compensate for pump runtime
+}
+
+void runPump(bool threaded) {
+#if DEBUG
+  Serial.printf("MOISTURE LIMIT: %u\n", PLANT_SOIL_MOISTURE);
+  Serial.printf("TIMER: %lu\n", PLANT_MANUAL_TIMER);
+#endif
   uint16_t water = 100;
-  /*
-    loopback wire from water jug to A0 powered from GPIO12
-  */
   if (PNP_ADC[2] == '1') {
-    water = waterLevelRead(2);
+    water = waterLevelRead(2);  // Loopback wire from water jug to A0 powered from GPIO12
   }
   //===================
   if (water > 0) {
-    turnNPNorPNP(1);  //ON
-    do {
-      if (pulse[duration] == 1) {
-        turnNPNorPNP(1);  //ON
-      } else {
-        turnNPNorPNP(0);  //OFF
-      }
-      delay(1000);
-      duration--;
-    } while (duration > 0);
-    turnNPNorPNP(0);  //OFF
-#if EMAILCLIENT_SMTP
-    if (ALERTS[3] == '1')
-      smtpSend("Run Pump", String(PLANT_POT_SIZE), 0);
-#endif
-    dataLog("T:" + String(PLANT_MANUAL_TIMER) + ",M:" + String(PLANT_SOIL_MOISTURE));
-  }
-  rtcData.emptyBottle++;  //Sensorless Empty Detection
+    // Watering Map -  Different soils takes different time to soak the water
+    const uint8_t *pattern = dirt;
+    if (PLANT_SOIL_TYPE == 0) pattern = sand;
+    else if (PLANT_SOIL_TYPE == 3) pattern = loam;
+    else if (PLANT_SOIL_TYPE == 4) pattern = moss;
 
-  //calibrateDeepSleep();  //next sleep compensate for pump runtime
+    if (threaded) {
+      thread.attach(1, [pattern]() {
+        runPumpThread(pattern);
+      });
+    } else {
+      uint16_t duration = PLANT_POT_SIZE;
+      uint8_t idx = 0;
+      while (duration--) {
+        turnNPNorPNP(pattern[idx]);  // ON or OFF
+        idx = (idx + 1) & 0x03;      // fast modulo 4
+        delay(1000);
+      }
+      runPumpFinish();
+    }
+  }
 }
 
 uint16_t waterLevelRead(uint8_t sensor) {
-  uint8_t level = 100;
+  uint16_t level = 100;
 #ifdef ESP32
 #if CONFIG_IDF_TARGET_ESP32S2
-  uint8_t threshold = 800;
+  uint16_t threshold = 800;
 #else
   uint16_t threshold = 4080;
 #endif
 #else
-  uint8_t threshold = 255;
+  uint16_t threshold = 255;
 #endif
   uint16_t water = sensorRead(watersensorPin_100);
   if (water < threshold) {
@@ -2267,8 +2217,8 @@ void blinkThread()  //ICACHE_RAM_ATTR void
 {
   //All variables that are used by interrupt service routine declared as "volatile"
   if (blinkDuration == 0) {
+    thread.detach();
     digitalWrite(ledPin, HIGH);  //OFF
-    blinkTick.detach();
   } else {
     digitalWrite(ledPin, !digitalRead(ledPin));
   }
@@ -2288,7 +2238,7 @@ void blinkMorse(uint16_t moisture) {
     blinky(600, d, 0);  //blink a zero with a quick pulse
     delay(1200);
     //_blink arg = {1, 400, d};
-    //blinkTick.once(1200, blinkLoop, &arg);
+    //thread.once(1200, blinkLoop, &arg);
   }
 }
 
@@ -2303,7 +2253,7 @@ void blinky(uint16_t timer, uint16_t duration, uint8_t threaded) {
 #if THREADED
   if (threaded > 0) {
     blinkDuration = duration * 2;  //toggle style
-    blinkTick.attach_ms(timer, blinkThread);
+    thread.attach_ms(timer, blinkThread);
   } else {
 #endif
     blinkDuration = duration;
@@ -2317,13 +2267,13 @@ void blinky(uint16_t timer, uint16_t duration, uint8_t threaded) {
 #ifdef ESP32
       digitalWrite(ledPin, HIGH);  //ON
 #else
-    digitalWrite(ledPin, LOW);   //ON
+    digitalWrite(ledPin, LOW);                              //ON
 #endif
       delay(timer);
 #ifdef ESP32
       digitalWrite(ledPin, LOW);  //OFF
 #else
-    digitalWrite(ledPin, HIGH);  //OFF
+    digitalWrite(ledPin, HIGH);                             //OFF
 #endif
       delay(timer);
       blinkDuration--;  //after restart will be uninitialized 65536
@@ -2345,7 +2295,7 @@ void NVRAM_Erase() {
   EEPROM.commit();
 }
 
-void NVRAM_Write(uint8_t address, String txt) {
+void NVRAMWrite(uint8_t address, String txt) {
   /*
   int EEPROM_SIZE = 32;
   char buffer[EEPROM_SIZE];
@@ -2357,7 +2307,7 @@ void NVRAM_Write(uint8_t address, String txt) {
   const int EEPROM_SIZE = (NVRAM_Map[(address + 1)] - NVRAM_Map[address]);
   //const int EEPROM_SIZE = 32;
 #if DEBUG
-  Serial.printf("NVRAM_Write: %u > %u:%u\n", address, NVRAM_Map[address], EEPROM_SIZE);
+  Serial.printf("NVRAMWrite: %u > %u:%u\n", address, NVRAM_Map[address], EEPROM_SIZE);
 #endif
   int len = txt.length();
   for (int i = 0; i < EEPROM_SIZE; i++) {
@@ -2373,56 +2323,64 @@ void NVRAM_Write(uint8_t address, String txt) {
   EEPROM.commit();
 }
 
-String NVRAM_Read(uint8_t address) {
+String NVRAMRead(uint8_t address) {
   /*
   int EEPROM_SIZE = 32;
   char buffer[EEPROM_SIZE];
   EEPROM.get(address * EEPROM_SIZE, buffer);
   */
-  String buffer = "";
-  const int EEPROM_SIZE = (NVRAM_Map[(address + 1)] - NVRAM_Map[address]);
   //const int EEPROM_SIZE = 32;
-  for (int i = 0; i < EEPROM_SIZE; i++) {
+  const int EEPROM_SIZE = (NVRAM_Map[(address + 1)] - NVRAM_Map[address]);
+  char buffer[EEPROM_SIZE + 1] = { 0 };  // +1 for null terminator
+
+  int i = 0;
+  for (i = 0; i < EEPROM_SIZE; i++) {
     char byte = EEPROM.read(NVRAM_Map[address] + i);
     //char byte = EEPROM.read(address * EEPROM_SIZE + i);
-    if (byte == 0xFF) {
-      break;
-    }
-    buffer += byte;
+    if (byte == 0xFF) break;  // stop at empty byte
+    buffer[i] = byte;
   }
+  //buffer[i] = '\0';
 #if DEBUG
-  Serial.printf("NVRAM_Read: %u > %u:%u\n", address, NVRAM_Map[address], EEPROM_SIZE);
+  Serial.printf("\nNVRAMRead: %u > %u:%u\n", address, NVRAM_Map[address], EEPROM_SIZE);
   for (int i = 0; i < EEPROM_SIZE; i++) {
-    Serial.printf("%02X ", (uint8_t)buffer[i]);  // 2-digit uppercase hex with leading zero
+    Serial.printf("%02X", (uint8_t)buffer[i]);  // 2-digit uppercase hex with leading zero
   }
+  Serial.print(" > ");
+  Serial.print(buffer);
+  Serial.print("\n");
 #endif
 
-  return buffer;
+  return String(buffer);
 }
 
-void NVRAM_Read_Config() {
+void NVRAMRead_Config() {
 
-  DEEP_SLEEP = NVRAM_Read(_DEEP_SLEEP).toInt() * 60;
-  LOG_INTERVAL = NVRAM_Read(_LOG_INTERVAL).toInt();
+  DEEP_SLEEP = NVRAMRead(_DEEP_SLEEP).toInt() * 60;
+  LOG_INTERVAL = NVRAMRead(_LOG_INTERVAL).toInt();
 
-  LOG_ENABLE = NVRAM_Read(_LOG_ENABLE).toInt();
-  PLANT_POT_SIZE = NVRAM_Read(_PLANT_POT_SIZE).toInt();
-  PLANT_SOIL_MOISTURE = NVRAM_Read(_PLANT_SOIL_MOISTURE).toInt();
-  PLANT_SOIL_TYPE = NVRAM_Read(_PLANT_SOIL_TYPE).toInt();
-  PLANT_TYPE = NVRAM_Read(_PLANT_TYPE).toInt();
+  LOG_ENABLE = NVRAMRead(_LOG_ENABLE).toInt();
+  PLANT_POT_SIZE = NVRAMRead(_PLANT_POT_SIZE).toInt();
+  PLANT_SOIL_MOISTURE = NVRAMRead(_PLANT_SOIL_MOISTURE).toInt();
+  PLANT_SOIL_TYPE = NVRAMRead(_PLANT_SOIL_TYPE).toInt();
+  PLANT_TYPE = NVRAMRead(_PLANT_TYPE).toInt();
 
   //==========
-  String nvram = NVRAM_Read(_PNP_ADC);
+  String nvram = NVRAMRead(_PNP_ADC);
   nvram.toCharArray(PNP_ADC, sizeof(nvram));
   turnNPNorPNP(0);
 }
 
-void turnNPNorPNP(uint8_t state) {
+void turnNPNorPNP(const uint8_t state) {
+#if DEBUG
+  Serial.printf("[%u]", state);
+#endif
   if (PNP_ADC[0] == '1' && state == 0) {
-    pinMode(pumpPin, INPUT_PULLUP);  //Float the pin for PNP off
+    // Float the pin for PNP off (true high-impedance)
+    pinMode(pumpPin, INPUT_PULLUP);
   } else {
-    digitalWrite(pumpPin, state);
     pinMode(pumpPin, OUTPUT);
+    digitalWrite(pumpPin, state);
   }
 }
 /*
@@ -2439,7 +2397,7 @@ void offsetTiming() {
   //ESP8266 Bootloader 2.2.2 - 1 hour interval = 2x 30 min intervals (double)
   //ESP8266 Bootloader 2.4.1 - 1 hour interval can be 1 to 1
 
-  PLANT_MANUAL_TIMER = NVRAM_Read(_PLANT_MANUAL_TIMER).toInt();
+  PLANT_MANUAL_TIMER = NVRAMRead(_PLANT_MANUAL_TIMER).toInt();
 
   //if (ALERTS[8] == '1')
   //  DEEP_SLEEP = 900; //15 minutes
@@ -2499,9 +2457,9 @@ String getContentType(String filename) {
     return "image/png";
   else if (filename.endsWith("pg"))
     return "image/jpeg";
+  */
   else if (filename.endsWith("co"))
     return "image/x-icon";
-  */
   else if (filename.endsWith("vg"))
     return "image/svg+xml";
   return text_plain;
@@ -2580,7 +2538,7 @@ void onUpload(AsyncWebServerRequest *request, String filename, size_t index, uin
   }
 }
 #if EMAILCLIENT_SMTP
-void smtpSend(String subject, String body, byte now) {
+void smtpSend(const char *subject, const char *body, uint8_t now) {
 
 #if DEBUG
   Serial.printf("Email: %s\n", subject);
@@ -2593,7 +2551,7 @@ void smtpSend(String subject, String body, byte now) {
     return;
   }
   /*
-  WIRELESS_MODE = NVRAM_Read(_WIRELESS_MODE).toInt();
+  WIRELESS_MODE = NVRAMRead(_WIRELESS_MODE).toInt();
   if (WIRELESS_MODE == 0)  //cannot send email in AP mode
     return;
   */
@@ -2617,7 +2575,7 @@ void smtpSend(String subject, String body, byte now) {
 //  session.time.day_light_offset = 0;
 #endif
 
-  String smtpServer = NVRAM_Read(_SMTP_SERVER);
+  String smtpServer = NVRAMRead(_SMTP_SERVER);
   uint16_t smtpPort = 25;
   uint8_t smtpPortIndex = smtpServer.indexOf(':');
   if (smtpPortIndex != -1) {
@@ -2626,12 +2584,12 @@ void smtpSend(String subject, String body, byte now) {
   }
   session.server.host_name = smtpServer;
   session.server.port = smtpPort;
-  session.login.email = NVRAM_Read(_SMTP_USERNAME);
+  session.login.email = NVRAMRead(_SMTP_USERNAME);
   File oauth = LittleFS.open("/oauth", "r");
   if (oauth) {
     session.login.accessToken = oauth.readString();  //XOAUTH2
   } else {
-    session.login.password = NVRAM_Read(_SMTP_PASSWORD);
+    session.login.password = NVRAMRead(_SMTP_PASSWORD);
   }
   //session.login.user_domain = F("127.0.0.1");
   /*
@@ -2645,8 +2603,8 @@ void smtpSend(String subject, String body, byte now) {
 
   if (smtp.connect(&session)) {
     message.sender.name = PLANT_NAME;
-    message.sender.email = NVRAM_Read(_SMTP_USERNAME);
-    message.addRecipient("", NVRAM_Read(_EMAIL_ALERT));
+    message.sender.email = NVRAMRead(_SMTP_USERNAME);
+    message.addRecipient("", NVRAMRead(_EMAIL_ALERT));
     //message.addCc("");
     //message.addBcc("");
     message.subject = subject;
@@ -2677,24 +2635,6 @@ void smtpSend(String subject, String body, byte now) {
 }
 #endif
 
-#if DEBUG
-String uint64ToString(uint64_t input) {
-  String result = "";
-  uint8_t base = 10;
-
-  do {
-    char c = input % base;
-    input /= base;
-
-    if (c < 10)
-      c += '0';
-    else
-      c += 'A' - 10;
-    result = c + result;
-  } while (input);
-  return result;
-}
-#endif
 //prints all rtcMemory, including the leading crc32
 /*
   void printMemory() {
