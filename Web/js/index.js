@@ -149,8 +149,11 @@ function loadSVG(svgfile) {
 	    		if(nvram.response['nvram'][0].indexOf('esp32') != -1) {
 	    			ESP32 = true;
 	    		}
- 				//index.open('GET', '/svg', true);
-				index.open('GET', 'api?svg=1', true);
+	    		var svgurl = 'api?svg=1';
+	    		if (window.location.hostname.endsWith("github.io"))
+	    			svgurl = '/svg';
+
+				index.open('GET', svgurl, true);
 				index.send();
 				index.onload = function(e) {
 					svgfile = 'bonsai.svg';
