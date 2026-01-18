@@ -45,8 +45,6 @@ document.addEventListener('DOMContentLoaded', function(event)
 	}
 
     loadSVG();
-	
-	updateNTP();
 
 	const modals = document.querySelectorAll('.modal');
     modals.forEach(modal => {
@@ -127,6 +125,9 @@ function updateNTP() {
 	var ntp = new XMLHttpRequest();
 	ntp.open('GET', 'api?week=' + d.getDay() + '&hour=' + d.getHours() + '&minute=' + d.getMinutes() + '&ntp=1', true);
 	ntp.send();
+	ntp.onloadend = function() {
+		adcSoilValue();
+	}
 }
 
 function loadSVG(svgfile) {
@@ -151,7 +152,7 @@ function loadSVG(svgfile) {
 	    		}
 	    		var svgurl = 'api?svg=1';
 	    		if (window.location.hostname.endsWith("github.io"))
-	    			svgurl = '/svg';
+	    			svgurl = 'svg';
 
 				index.open('GET', svgurl, true);
 				index.send();
@@ -204,7 +205,7 @@ function loadSVG(svgfile) {
 							document.getElementById('WaterLevelCheckbox').checked = bool_value;
 		                    svgwaterLevelAdjust(pnp_adc.charAt(2));
 			            }
-			            adcSoilValue();
+			            updateNTP();
 
 				        document.getElementById('background').onclick = function() {
 				            var svgPlant = document.getElementById('svgPlant');
@@ -1408,7 +1409,8 @@ function adcSoilValue()
 					}
 				}
 		    }else{
-		    	let time_countdown = adc_time * (60 * 24) - arr[1];
+		    	var d = new Date();
+		    	let time_countdown = adc_time * 60 * 60; // - arr[1] - (d.getMinutes() * 60);
 			    const days = Math.floor(time_countdown / 86400);
 			    const hours = Math.floor((time_countdown % 86400) / 3600);
 			    if(days > 0) {
