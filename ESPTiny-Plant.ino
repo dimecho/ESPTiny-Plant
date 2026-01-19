@@ -459,24 +459,20 @@ char WIRELESS_SSID[16] = "Plant";
 uint8_t LOG_ENABLE = 0;      //data logger (enable/disable)
 uint32_t LOG_INTERVAL = 30;  //loop() delay - seconds
 //uint8_t NETWORK_DHCP = 0;
-char NETWORK_IP[64] = "192.168.8.8";
+char NETWORK_IP[64] = "192.168.8.8"; //IPv4
 char NETWORK_SUBNET[64] = "255.255.255.0";
 //char NETWORK_GATEWAY[] = "";
 //char NETWORK_DNS[] = "";
 uint16_t PLANT_POT_SIZE = 4;  //pump run timer - seconds
 #ifdef ESP32
 uint16_t PLANT_SOIL_MOISTURE = 600;   //ADC value
-//uint16_t DEEP_SLEEP_S = 0;            //seconds
-//uint64_t DEEP_SLEEP_MS = 0;           //milliseconds
 #else
 uint16_t PLANT_SOIL_MOISTURE = 400;   //ADC value
-//uint16_t DEEP_SLEEP_S = 0;            //seconds
-//uint32_t DEEP_SLEEP_MS = 0;           //milliseconds
 #endif
 uint32_t PLANT_MANUAL_TIMER = 0;  //manual sleep timer - hours
 uint16_t PLANT_SOIL_TYPE = 2;     //['Sand', 'Clay', 'Dirt', 'Loam', 'Moss'];
 uint16_t PLANT_TYPE = 0;          //['Bonsai', 'Monstera', 'Palm'];
-uint32_t DEEP_SLEEP = 8;          //auto sleep timer - minutes * 60
+uint32_t DEEP_SLEEP = 8;          //auto sleep timer - seconds (saved in minutes)
 //=============================
 //String EMAIL_ALERT = "";
 //String SMTP_SERVER = "";
@@ -495,7 +491,6 @@ uint16_t delayBetweenDrySoilReset = 0;    //4 hours = 4 x 60 = 240 minutes = x8 
 uint16_t delayBetweenOverfloodReset = 0;  //8 hours = 8 x 60 = 480 minutes = x16 30 min loops
 uint8_t ON_TIME = 0;                      //from 6am
 uint8_t OFF_TIME = 0;                     //to 6pm
-//uint16_t LOG_INTERVAL_S = 0;              //seconds
 char PNP_ADC[] = "010";                   //0=NPN|1=PNP, ADC sensitivity, Water Level Sensor 0=Disable|1=Enable
 //uint8_t ADC_ERROR_OFFSET = 64;           //WAKE_RF_DISABLED offset
 static const uint8_t sand[] = { 1, 1, 0, 0 };
@@ -1625,19 +1620,20 @@ void loop() {
 #endif
 
   if (millis() - loopTimer < LOG_INTERVAL) return;
-  //rtcData.runTime += LOG_INTERVAL_S;  //track time since NTP sync (as seconds)
+
   /*
-#ifdef ESP8266
   //Measure voltage every 10000s runtime (~2.5 hours)
   if (ALERTS[1] == '1' && rtcData.runTime % 10000 == 0) {
     if (ADCMODE == ADC_TOUT) {
+#ifdef ESP8266
       ESP.rtcUserMemoryWrite(100, (uint32_t *)ADC_VCC, sizeof(ADC_VCC));  //Next time measure VCC
+#endif
     } else {
       //A0 pin needs to be free, not connected to anything in order for the internal measurement to work properly
       //A0 pin in NodeMCU is connected to (resistor/capacitor) and needs to be floating in order to use ADC_MODE(ADC_VCC)
       float dvcc = ESP.getVcc() / 1024.0f;
 #if DEBUG
-      Serial.println("Voltage: " + String(dvcc) + "v");
+      Serial.println("Voltage: %.2f", dvcc);
 #endif
       snprintf(logbuffer, sizeof(logbuffer), "v:%.2f", dvcc);
       dataLog(logbuffer);
@@ -1647,13 +1643,10 @@ void loop() {
       smtpSend("Low Voltage", String(dvcc) + "v", 0);
 #endif
       //}
-#ifdef ESP8266
-      ESP.rtcUserMemoryWrite(32, (uint32_t *)&rtcData, sizeof(rtcData));
-#endif
     }
-    ESP.restart();  //Reboot to switch ADC_MODE
+    readySleep(); //ESP32 cannot remember rtcData after reboot
+    //ESP.restart()
   }
-#endif
   */
   /*
     IMPORTANT for ESP8266!
@@ -1706,13 +1699,13 @@ void loop() {
 
   if ((millis() - webTimer) > delayBetweenWiFi) {  //track web activity for 5 minutes
 #if DEBUG
-  Serial.printf("WiFi Clients: %u\n", WiFiClientCount);
   Serial.printf("Runtime: %u\n", rtcData.runTime);
 #endif
     //Calculate current Day/Time. Works with WIFI_STA (NTP from server) and WIFI_AP (NTP from web-interface)
     //----------------------------------------
-    uint32_t h = rtcData.ntpHour + rtcData.runTime / 3600;  //runtime in hours
-    if (h >= 24) {                                          //day roll-over at 12pm
+    uint32_t h = rtcData.ntpHour + ((rtcData.runTime + (millis() / 1000)) / 3600);  //runtime in hours
+
+    if (h >= 24) {              //day roll-over at 12pm
       rtcData.runTime = 0;
       rtcData.ntpHour = 0;
       rtcData.ntpWeek++;
@@ -1809,10 +1802,8 @@ void loop() {
       }
       rtcData.drySoilTime++;  //Wait for soil to absorb moisture
     } else {
-      snprintf(logbuffer, sizeof(logbuffer), "t:%u", rtcData.waterTime);
-      dataLog(logbuffer);
 #if DEBUG
-      Serial.printf("Water Timer: %u\n", rtcData.waterTime);
+      Serial.println("Water Timer: %u", rtcData.waterTime);
 #endif
       //ESP8266 - We need to split deep sleep as 32-bit unsigned integer is 4294967295 or 0xffffffff max ~71 minutes
       if (rtcData.waterTime >= PLANT_MANUAL_TIMER) {
@@ -1822,6 +1813,8 @@ void loop() {
       }else{
         rtcData.waterTime++;
       }
+      snprintf(logbuffer, sizeof(logbuffer), "t:%u", rtcData.waterTime);
+      dataLog(logbuffer);
     }
     readySleep();
   }
@@ -1838,20 +1831,22 @@ void readySleep() {
 
   //GPIO16 (D0) needs to be tied to RST to wake from deepSleep
   if (DEEP_SLEEP > 1) {
-    //rtcData.runTime += DEEP_SLEEP_S;  //add sleep time, when we wake up will be accurate.
-    rtcData.runTime += DEEP_SLEEP + (millis() / 1000);  //add sleep time, when we wake up will be accurate.
     WiFi.disconnect(true);            //disassociate properly (easier to reconnect)
     WiFi.mode(WIFI_OFF);
 
 #ifdef ESP32
     esp_sleep_disable_wifi_wakeup();
     esp_sleep_enable_timer_wakeup(DEEP_SLEEP * 1000 * 1000);
-    esp_sleep_pd_config(ESP_PD_DOMAIN_RTC_SLOW_MEM, ESP_PD_OPTION_OFF);
+    esp_sleep_pd_config(ESP_PD_DOMAIN_RTC_SLOW_MEM, ESP_PD_OPTION_ON); //RTC memory preserved
+    /*
     esp_sleep_pd_config(ESP_PD_DOMAIN_RTC_FAST_MEM, ESP_PD_OPTION_OFF);
     esp_sleep_pd_config(ESP_PD_DOMAIN_RTC_PERIPH, ESP_PD_OPTION_OFF);
+    */
+    rtcData.runTime += DEEP_SLEEP + (millis() / 1000);  //add sleep time, when we wake up will be accurate.
     esp_deep_sleep_start();
 #else
     ESP.rtcUserMemoryWrite(32, (uint32_t *)&rtcData, sizeof(rtcData));
+    rtcData.runTime += DEEP_SLEEP + (millis() / 1000);  //add sleep time, when we wake up will be accurate.
     //https://github.com/esp8266/Arduino/issues/8728 (WAKE_RF_DISABLED changes ADC behaviour)
     ESP.deepSleep((DEEP_SLEEP * 1000 * 1000), WAKE_RF_DISABLED);  //Will wake up without radio
 #endif
@@ -2342,21 +2337,14 @@ void offsetTiming() {
     DEEP_SLEEP = 1800;                            //30 min
   } else {  //Always ON or Logging ON
   */
-  uint16_t loopTime = (LOG_INTERVAL + DEEP_SLEEP);  //as total seconds
-  //if(loopTime == 0) //Warning: ESP8266 will crash if devided by zero
-  //  loopTime = 1;
-  PLANT_MANUAL_TIMER = (PLANT_MANUAL_TIMER * 3600) / loopTime;       //wait hours (minus pump on time) to loops
+  uint32_t loopTime = LOG_INTERVAL + DEEP_SLEEP;  //as total seconds
+  loopTime = (loopTime == 0) ? 1 : loopTime; //No devide-by-zero
+  
+  PLANT_MANUAL_TIMER = (PLANT_MANUAL_TIMER * 3600) / loopTime;       //wait hours to loops of seconds
   delayBetweenAlertEmails = 1 * 3600 / loopTime;                     //1 hours as loops of seconds
   delayBetweenRefillReset = 2 * 3600 / loopTime;                     //2 hours as loops of seconds
   delayBetweenDrySoilReset = (PLANT_POT_SIZE * 900 / loopTime) + 1;  //proportion pump run time (pot size as hours) converted to loops of seconds
   delayBetweenOverfloodReset = 8 * 3600 / loopTime;                  //8 hours as loops of seconds
-  //}
-
-  //DEEP_SLEEP_S = DEEP_SLEEP;      //store in seconds - no need to convert in loop()
-  //LOG_INTERVAL_S = LOG_INTERVAL;  //store in seconds - no need to convert in loop()
-
-  //DEEP_SLEEP_MS = DEEP_SLEEP * 1000;   //milliseconds millis()
-  //DEEP_SLEEP = DEEP_SLEEP_MS * 1000;   //microseconds micros()
   LOG_INTERVAL = LOG_INTERVAL * 1000;  //milliseconds millis()
 }
 
