@@ -359,9 +359,9 @@ RTC_DATA_ATTR struct {
   uint16_t moistureLog;  //moisture average tracking
   uint16_t alertTime;    //prevent email spam
 } rtcData;
-uint64_t loopTimer = 0;  //loop() slow down
-uint64_t webTimer = 0;   //track last webpage access
-uint64_t delayBetweenWiFi = 0;            //8 minutes
+//uint64_t loopTimer = 0;  //loop() slow down
+uint64_t webTimer = 0;          //track last webpage access
+uint64_t delayBetweenWiFi = 0;  //8 minutes
 #else
 //ESP8266, the RTC user memory is retained across deep sleep and soft reset.
 struct {
@@ -374,9 +374,9 @@ struct {
   uint16_t moistureLog;  //moisture average tracking
   uint16_t alertTime;    //prevent email spam
 } rtcData;
-uint32_t loopTimer = 0;  //loop() slow down
-uint32_t webTimer = 0;   //track last webpage access
-uint32_t delayBetweenWiFi = 0;            //8 minutes
+//uint32_t loopTimer = 0;  //loop() slow down
+uint32_t webTimer = 0;               //track last webpage access
+uint32_t delayBetweenWiFi = 0;       //8 minutes
 #endif
 
 #define _EEPROM_ID 0
@@ -389,7 +389,7 @@ uint32_t delayBetweenWiFi = 0;            //8 minutes
 #define _WIRELESS_USERNAME 7
 #define _WIRELESS_PASSWORD 8
 #define _LOG_ENABLE 9
-#define _LOG_INTERVAL 10
+//#define _LOG_INTERVAL 10
 #define _NETWORK_DHCP 11
 #define _NETWORK_IP 12
 #define _NETWORK_SUBNET 13
@@ -456,23 +456,23 @@ uint8_t WIRELESS_CHANNEL = 7;
 char WIRELESS_SSID[16] = "Plant";
 //char WIRELESS_USERNAME[] = "";
 //char WIRELESS_PASSWORD[] = "";
-uint8_t LOG_ENABLE = 0;      //data logger (enable/disable)
-uint32_t LOG_INTERVAL = 30;  //loop() delay - seconds
+uint8_t LOG_ENABLE = 0;  //data logger (enable/disable)
+//uint32_t LOG_INTERVAL = 30;  //loop() delay - seconds
 //uint8_t NETWORK_DHCP = 0;
-char NETWORK_IP[64] = "192.168.8.8"; //IPv4
+char NETWORK_IP[64] = "192.168.8.8";  //IPv4
 char NETWORK_SUBNET[64] = "255.255.255.0";
 //char NETWORK_GATEWAY[] = "";
 //char NETWORK_DNS[] = "";
 uint16_t PLANT_POT_SIZE = 4;  //pump run timer - seconds
 #ifdef ESP32
-uint16_t PLANT_SOIL_MOISTURE = 600;   //ADC value
+uint16_t PLANT_SOIL_MOISTURE = 600;  //ADC value
 #else
-uint16_t PLANT_SOIL_MOISTURE = 400;   //ADC value
+uint16_t PLANT_SOIL_MOISTURE = 400;  //ADC value
 #endif
 uint32_t PLANT_MANUAL_TIMER = 0;  //manual sleep timer - hours
 uint16_t PLANT_SOIL_TYPE = 2;     //['Sand', 'Clay', 'Dirt', 'Loam', 'Moss'];
 uint16_t PLANT_TYPE = 0;          //['Bonsai', 'Monstera', 'Palm'];
-uint32_t DEEP_SLEEP = 8;          //auto sleep timer - seconds (saved in minutes)
+uint32_t DEEP_SLEEP = 10;          //auto sleep timer - seconds (saved in minutes)
 //=============================
 //String EMAIL_ALERT = "";
 //String SMTP_SERVER = "";
@@ -487,7 +487,7 @@ char DEMO_AVAILABILITY[] = "00000000618";  //M, T, W, T, F, S, S + Time Range
 //=============================
 uint16_t delayBetweenAlertEmails = 0;     //2 hours = 2 x 60 = 120 minutes = x4 30 min loops
 uint16_t delayBetweenRefillReset = 0;     //2 hours = 2 x 60 = 120 minutes = x4 30 min loops
-uint16_t delayBetweenDrySoilReset = 0;    //4 hours = 4 x 60 = 240 minutes = x8 30 min loops + 1
+uint16_t delayBetweenDrySoilReset = 0;    //4 hours = 4 x 60 = 240 minutes = x8 30 min loops
 uint16_t delayBetweenOverfloodReset = 0;  //8 hours = 8 x 60 = 480 minutes = x16 30 min loops
 uint8_t ON_TIME = 0;                      //from 6am
 uint8_t OFF_TIME = 0;                     //to 6pm
@@ -604,7 +604,7 @@ void setup() {
     NVRAMWrite(_WIRELESS_USERNAME, "");
     NVRAMWrite(_WIRELESS_PASSWORD, "");
     NVRAMWrite(_LOG_ENABLE, (char *)LOG_ENABLE);
-    NVRAMWrite(_LOG_INTERVAL, (char *)LOG_INTERVAL);
+    //NVRAMWrite(_LOG_INTERVAL, (char *)LOG_INTERVAL);
     //==========
     NVRAMWrite(_NETWORK_DHCP, "0");
     NVRAMWrite(_NETWORK_IP, NETWORK_IP);
@@ -669,25 +669,26 @@ void setup() {
   Serial.printf("Wakeup Reason:%u\n", wakeupReason);
 #endif
 #ifdef ESP32
-  if (wakeupReason == ESP_RST_DEEPSLEEP) {  //ESP_RST_DEEPSLEEP (8)
+  if (wakeupReason != ESP_RST_DEEPSLEEP) {  //ESP_RST_DEEPSLEEP (8)
 #else
-  if (wakeupReason == 5) {    //REASON_DEEP_SLEEP_AWAKE (5)
+  if (wakeupReason != 5) {    //REASON_DEEP_SLEEP_AWAKE (5)
 #endif
     //Going into sleep mode, do not delay in loop()
-    LOG_INTERVAL = 0; //millis() / 1000;
-  } else {
+    //LOG_INTERVAL = 0;
+    //} else {
     //Emergency Recover (RST to GND)
 #ifdef ESP32
     if (wakeupReason == ESP_RST_EXT) {  //ESP_RST_EXT (2) ESP_RST_SW (3)
 #else
     if (wakeupReason == 6) {  //REASON_EXT_SYS_RST (6)
 #endif
-      LOG_INTERVAL = 600;                    //prevent WiFi from sleeping 5 minutes
+      //LOG_INTERVAL = 600;                    //prevent WiFi from sleeping 5 minutes
+      DEEP_SLEEP = 300;
       ALERTS[0] = '1';                       //email DHCP IP
       ALERTS[1] = '0';                       //low voltage
       memset(&rtcData, 0, sizeof(rtcData));  //reset RTC memory (set all zero)
       setupWiFi(22);
-      blinky(1000, 1);
+      blinky(1200, 1);
       //ArduinoOTA.begin();
     } else {
       setupWiFi(0);
@@ -704,8 +705,8 @@ void setup() {
 //This is a power expensive function 80+mA
 void setupWiFi(uint8_t timeout) {
 
-  blinky(200, 3);  //Alive blink
-  delayBetweenWiFi = DEEP_SLEEP * 1000; //ms
+  blinky(200, 3);                        //Alive blink
+  delayBetweenWiFi = DEEP_SLEEP * 1000;  //ms
 
   WIRELESS_MODE = fastAtoi(NVRAMRead(_WIRELESS_MODE));
   WIRELESS_CHANNEL = fastAtoi(NVRAMRead(_WIRELESS_CHANNEL));
@@ -963,7 +964,7 @@ void setupWiFi(uint8_t timeout) {
         NVRAMWrite(_WIRELESS_HIDE, "0");
         NVRAMWrite(_WIRELESS_SSID, PLANT_NAME);
         NVRAMWrite(_WIRELESS_PASSWORD, "");
-        NVRAMWrite(_LOG_INTERVAL, "60");
+        //NVRAMWrite(_LOG_INTERVAL, "60");
         NVRAMWrite(_NETWORK_DHCP, "0");
         //delay(100);
         ESP.restart();
@@ -1613,15 +1614,9 @@ void loop() {
 #if (SYNC_TCP_SSL_ENABLE && ESP8266)
   secureServer.handleClient();
 #endif
-#ifdef ESP8266
-  delay(1);  //enable Modem-Sleep
-#else
-  vTaskDelay(1);   // yields CPU
-#endif
-
-  if (millis() - loopTimer < LOG_INTERVAL) return;
-
-  /*
+  //if (millis() - loopTimer < LOG_INTERVAL) return;
+  if ((millis() - webTimer) > delayBetweenWiFi) {  //track web activity for 5 minutes
+    /*
   //Measure voltage every 10000s runtime (~2.5 hours)
   if (ALERTS[1] == '1' && rtcData.runTime % 10000 == 0) {
     if (ADCMODE == ADC_TOUT) {
@@ -1648,64 +1643,62 @@ void loop() {
     //ESP.restart()
   }
   */
-  /*
+    /*
     IMPORTANT for ESP8266!
     Make sure that the input voltage on the A0 pin doesn’t exceed 1.0V
   */
 #ifdef ESP8266
-  uint16_t moisture = sensorRead_ESP8266(sensorPin);
+    uint16_t moisture = sensorRead_ESP8266(sensorPin);
 #else
-  uint16_t moisture = sensorRead(sensorPin);
+    uint16_t moisture = sensorRead(sensorPin);
 #endif
-  if (ALERTS[8] == '1') {
-    blinkMorse(moisture);
-    //thread.once(1, blinkMorse, moisture);
-  }
-  snprintf(logbuffer, sizeof(logbuffer), "%u", moisture);
-  dataLog(logbuffer);
-
-  if (rtcData.emptyBottle >= 3) {  //Low Water LED
-#if DEBUG
-    Serial.printf("Empty Warning: %u, %u\n", rtcData.emptyBottle, rtcData.waterTime);
-#endif
-
-    //if (sensorless detection timeout or sensored detection timeout)
-    if ((rtcData.emptyBottle < 10 && rtcData.waterTime > delayBetweenOverfloodReset) || (rtcData.emptyBottle > 10 && rtcData.waterTime > delayBetweenRefillReset)) {
-#if DEBUG
-      Serial.printf("Empty Reset: %u\n", delayBetweenRefillReset);
-#endif
-      dataLog("e:0");
-#if EMAILCLIENT_SMTP
-      if (ALERTS[4] == '1')
-        smtpSend("Flood Protection", (char *)delayBetweenOverfloodReset, 0);
-#endif
-      rtcData.waterTime = 0;
-      rtcData.moistureLog = 0;
-      rtcData.emptyBottle = 0;
-    } else {
-#if DEBUG
-      Serial.printf("Empty Detection: %u\n", rtcData.emptyBottle);
-#endif
-      snprintf(logbuffer, sizeof(logbuffer), "e:%u", rtcData.emptyBottle);
-      dataLog(logbuffer);
-#if EMAILCLIENT_SMTP
-      if (ALERTS[5] == '1')
-        smtpSend("Water Empty", (char *)rtcData.emptyBottle, 0);
-#endif
-      blinky(900, 30);
-      delay(900 * 30 * 2);
+    if (ALERTS[8] == '1') {
+      blinkMorse(moisture);
+      //thread.once(1, blinkMorse, moisture);
     }
-  }
+    snprintf(logbuffer, sizeof(logbuffer), "%u", moisture);
+    dataLog(logbuffer);
 
-  if ((millis() - webTimer) > delayBetweenWiFi) {  //track web activity for 5 minutes
+    if (rtcData.emptyBottle >= 3) {  //Low Water LED
 #if DEBUG
-  Serial.printf("Runtime: %u\n", rtcData.runTime);
+      Serial.printf("Empty Warning: %u, %u\n", rtcData.emptyBottle, rtcData.waterTime);
+#endif
+
+      //if (sensorless detection timeout or sensored detection timeout)
+      if ((rtcData.emptyBottle < 10 && rtcData.waterTime > delayBetweenOverfloodReset) || (rtcData.emptyBottle > 10 && rtcData.waterTime > delayBetweenRefillReset)) {
+#if DEBUG
+        Serial.printf("Empty Reset: %u\n", delayBetweenRefillReset);
+#endif
+        dataLog("e:0");
+#if EMAILCLIENT_SMTP
+        if (ALERTS[4] == '1')
+          smtpSend("Flood Protection", (char *)delayBetweenOverfloodReset, 0);
+#endif
+        rtcData.waterTime = 0;
+        rtcData.moistureLog = 0;
+        rtcData.emptyBottle = 0;
+      } else {
+#if DEBUG
+        Serial.printf("Empty Detection: %u\n", rtcData.emptyBottle);
+#endif
+        snprintf(logbuffer, sizeof(logbuffer), "e:%u", rtcData.emptyBottle);
+        dataLog(logbuffer);
+#if EMAILCLIENT_SMTP
+        if (ALERTS[5] == '1')
+          smtpSend("Water Empty", (char *)rtcData.emptyBottle, 0);
+#endif
+        blinky(900, 30);
+        delay(900 * 30 * 2);
+      }
+    }
+#if DEBUG
+    Serial.printf("Runtime: %u\n", rtcData.runTime);
 #endif
     //Calculate current Day/Time. Works with WIFI_STA (NTP from server) and WIFI_AP (NTP from web-interface)
     //----------------------------------------
     uint32_t h = rtcData.ntpHour + ((rtcData.runTime + (millis() / 1000)) / 3600);  //runtime in hours
 
-    if (h >= 24) {              //day roll-over at 12pm
+    if (h >= 24) {  //day roll-over at 12pm
       rtcData.runTime = 0;
       rtcData.ntpHour = 0;
       rtcData.ntpWeek++;
@@ -1737,14 +1730,14 @@ void loop() {
 #if DEBUG
         Serial.println("WiFi ON");
 #endif
-        LOG_INTERVAL = fastAtoi(NVRAMRead(_LOG_INTERVAL));
-        DEEP_SLEEP = 0;
+        //LOG_INTERVAL = fastAtoi(NVRAMRead(_LOG_INTERVAL));
+        DEEP_SLEEP = 1;
         offsetTiming();
 
         setupWiFi(0);
         setupWebServer();
       }
-    } else if (DEEP_SLEEP == 0 && h >= OFF_TIME) {  //outside of working hours
+    } else if (DEEP_SLEEP == 1 && h >= OFF_TIME) {  //outside of working hours
 #if DEBUG
       Serial.println("WiFi OFF");
 #endif
@@ -1810,15 +1803,21 @@ void loop() {
         rtcData.emptyBottle = 0;  //assume no sensor with manual timer
         rtcData.waterTime = 0;
         runPump(false);
-      }else{
+      } else {
         rtcData.waterTime++;
       }
       snprintf(logbuffer, sizeof(logbuffer), "t:%u", rtcData.waterTime);
       dataLog(logbuffer);
     }
     readySleep();
+  } else {
+#ifdef ESP8266
+    delay(1);  //enable Modem-Sleep
+#else
+    vTaskDelay(1);             // yields CPU
+#endif
   }
-  loopTimer = millis();
+  //loopTimer = millis();
 }
 
 void readySleep() {
@@ -1831,24 +1830,24 @@ void readySleep() {
 
   //GPIO16 (D0) needs to be tied to RST to wake from deepSleep
   if (DEEP_SLEEP > 1) {
-    WiFi.disconnect(true);            //disassociate properly (easier to reconnect)
-    WiFi.mode(WIFI_OFF);
+    //WiFi.disconnect(true);  //disassociate properly (easier to reconnect)
+    //WiFi.mode(WIFI_OFF);
 
 #ifdef ESP32
     esp_sleep_disable_wifi_wakeup();
-    esp_sleep_enable_timer_wakeup(DEEP_SLEEP * 1000 * 1000);
-    esp_sleep_pd_config(ESP_PD_DOMAIN_RTC_SLOW_MEM, ESP_PD_OPTION_ON); //RTC memory preserved
+    esp_sleep_pd_config(ESP_PD_DOMAIN_RTC_SLOW_MEM, ESP_PD_OPTION_ON);  //RTC memory preserved
+    esp_sleep_enable_timer_wakeup(((DEEP_SLEEP * 1000) - millis()) * 1000);
     /*
     esp_sleep_pd_config(ESP_PD_DOMAIN_RTC_FAST_MEM, ESP_PD_OPTION_OFF);
     esp_sleep_pd_config(ESP_PD_DOMAIN_RTC_PERIPH, ESP_PD_OPTION_OFF);
     */
-    rtcData.runTime += DEEP_SLEEP + (millis() / 1000);  //add sleep time, when we wake up will be accurate.
+    rtcData.runTime += DEEP_SLEEP - (millis() / 1000);  //add sleep time, when we wake up will be accurate.
     esp_deep_sleep_start();
 #else
     ESP.rtcUserMemoryWrite(32, (uint32_t *)&rtcData, sizeof(rtcData));
-    rtcData.runTime += DEEP_SLEEP + (millis() / 1000);  //add sleep time, when we wake up will be accurate.
+    rtcData.runTime += DEEP_SLEEP - (millis() / 1000);  //add sleep time, when we wake up will be accurate.
     //https://github.com/esp8266/Arduino/issues/8728 (WAKE_RF_DISABLED changes ADC behaviour)
-    ESP.deepSleep((DEEP_SLEEP * 1000 * 1000), WAKE_RF_DISABLED);  //Will wake up without radio
+    ESP.deepSleep(((DEEP_SLEEP * 1000) - millis()) * 1000, WAKE_RF_DISABLED);  //Will wake up without radio
 #endif
     //TODO: Check state and use WAKE_RF_DEFAULT for second stage
     //ESP.deepSleep(DEEP_SLEEP, WAKE_RF_DEFAULT);
@@ -1935,7 +1934,6 @@ void runPumpFinish() {
   dataLog(logbuffer);
 
   rtcData.emptyBottle++;  // Sensorless Empty Detection
-  //calibrateDeepSleep();  // Next sleep compensate for pump runtime
 }
 
 void runPump(bool threaded) {
@@ -1964,8 +1962,13 @@ void runPump(bool threaded) {
       uint8_t i = 0;
       while (duration--) {
         turnNPNorPNP(pattern[i]);  // ON or OFF
-        i = (i + 1) & 0x03;      // fast modulo 4
+        i = (i + 1) & 0x03;        // fast modulo 4
+#ifdef ESP32
+        esp_sleep_enable_timer_wakeup(1000000ULL);
+        esp_light_sleep_start();  //CPU pauses
+#else
         delay(1000);
+#endif
       }
       runPumpFinish();
     }
@@ -2181,14 +2184,14 @@ void blinkThread() {
 #ifdef ESP32
     digitalWrite(ledPin, LOW);  // OFF
 #else
-    digitalWrite(ledPin, HIGH); // OFF
+    digitalWrite(ledPin, HIGH);                              // OFF
 #endif
   } else {
     //digitalWrite(ledPin, !digitalRead(ledPin));
 #ifdef ESP32
     digitalWrite(ledPin, (blinkDuration & 1) ? HIGH : LOW);
 #else
-    digitalWrite(ledPin, (blinkDuration & 1) ? LOW : HIGH); // inverted logic
+    digitalWrite(ledPin, (blinkDuration & 1) ? LOW : HIGH);  // inverted logic
 #endif
     blinkDuration--;
   }
@@ -2249,7 +2252,7 @@ void NVRAMWrite(uint8_t address, const char *txt) {
   EEPROM.commit();
 }
 
-char* NVRAMRead(uint8_t address) {
+char *NVRAMRead(uint8_t address) {
   /*
   int EEPROM_SIZE = 32;
   char buffer[EEPROM_SIZE];
@@ -2283,7 +2286,7 @@ char* NVRAMRead(uint8_t address) {
 void NVRAMConfig() {
 
   DEEP_SLEEP = fastAtoi(NVRAMRead(_DEEP_SLEEP)) * 60;
-  LOG_INTERVAL = fastAtoi(NVRAMRead(_LOG_INTERVAL));
+  //LOG_INTERVAL = fastAtoi(NVRAMRead(_LOG_INTERVAL));
 
   LOG_ENABLE = fastAtoi(NVRAMRead(_LOG_ENABLE));
   PLANT_POT_SIZE = fastAtoi(NVRAMRead(_PLANT_POT_SIZE));
@@ -2337,15 +2340,16 @@ void offsetTiming() {
     DEEP_SLEEP = 1800;                            //30 min
   } else {  //Always ON or Logging ON
   */
-  uint32_t loopTime = LOG_INTERVAL + DEEP_SLEEP;  //as total seconds
-  loopTime = (loopTime == 0) ? 1 : loopTime; //No devide-by-zero
-  
-  PLANT_MANUAL_TIMER = (PLANT_MANUAL_TIMER * 3600) / loopTime;       //wait hours to loops of seconds
-  delayBetweenAlertEmails = 1 * 3600 / loopTime;                     //1 hours as loops of seconds
-  delayBetweenRefillReset = 2 * 3600 / loopTime;                     //2 hours as loops of seconds
-  delayBetweenDrySoilReset = (PLANT_POT_SIZE * 900 / loopTime) + 1;  //proportion pump run time (pot size as hours) converted to loops of seconds
-  delayBetweenOverfloodReset = 8 * 3600 / loopTime;                  //8 hours as loops of seconds
-  LOG_INTERVAL = LOG_INTERVAL * 1000;  //milliseconds millis()
+  //uint32_t loopTime = LOG_INTERVAL + DEEP_SLEEP;  //as total seconds
+  //loopTime = (loopTime == 0) ? 1 : loopTime; //No devide-by-zero
+
+  DEEP_SLEEP = (DEEP_SLEEP == 0) ? 1 : DEEP_SLEEP; //No devide-by-zero
+  PLANT_MANUAL_TIMER = PLANT_MANUAL_TIMER * 3600 / DEEP_SLEEP;   //wait hours to loops of seconds
+  delayBetweenAlertEmails = 1 * 3600 / DEEP_SLEEP;               //1 hours as loops of seconds
+  delayBetweenRefillReset = 2 * 3600 / DEEP_SLEEP;               //2 hours as loops of seconds
+  delayBetweenDrySoilReset = PLANT_POT_SIZE * 900 / DEEP_SLEEP;  //proportion pump run time (pot size as hours) converted to loops of seconds
+  delayBetweenOverfloodReset = 8 * 3600 / DEEP_SLEEP;            //8 hours as loops of seconds
+  //LOG_INTERVAL = LOG_INTERVAL * 1000;  //milliseconds millis()
 }
 
 String getContentType(String filename) {
@@ -2395,7 +2399,7 @@ void WebUpload(AsyncWebServerRequest *request, String filename, size_t index, ui
       size_t fsSize = UPDATE_SIZE_UNKNOWN;
 #elif defined(ESP8266)
 #if (ARDUINO_ESP8266_MAJOR >= 3 && ARDUINO_ESP8266_MINOR >= 1)
-      size_t fsSize = ((size_t)FS_end - (size_t)FS_start);  //3.1.x
+      size_t fsSize = ((size_t)FS_end - (size_t)FS_start);   //3.1.x
 #else
       size_t fsSize = ((size_t)&_FS_end - (size_t)&_FS_start);
 #endif

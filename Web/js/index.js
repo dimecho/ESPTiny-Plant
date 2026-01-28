@@ -367,9 +367,9 @@ function loadSVG(svgfile) {
 								                document.getElementById('timer-enabled').classList.add('hidden');
 								                document.getElementById('timer-disabled').classList.remove('hidden');
 
-								                document.getElementById('power-text').textContent = 4;
+								                document.getElementById('power-text').textContent = 5;
 								                if (document.getElementById('EnableLogCheckbox').checked === false) {
-								                	saveSetting(DEEP_SLEEP, 4);
+								                	saveSetting(DEEP_SLEEP, 5);
 								                }
 								            }else{
 								                document.getElementById('timer-enabled').classList.remove('hidden');
@@ -410,6 +410,9 @@ function loadSVG(svgfile) {
 							    min: 0, max: sleepMax, value: document.getElementById('power-text').textContent,
 							    color: slider_color, colorEnd: slider_color,
 							    onComplete: function(v) {
+							    	if (v !== 0 && !isValidSleep(v)) {
+								        notify('', 'Recommended as even clock interval 5,10,20,30', 'warning');
+								    }
 							    	if(v == 0) {
 										notify('', 'Sleep Disabled!', 'danger');
 										notify('', 'Wireless Always On', 'success');
@@ -419,11 +422,7 @@ function loadSVG(svgfile) {
 										notify('', 'Sleep > 5 Minutes Recommended', 'success');
 									}
 								    document.getElementById('power-text').textContent = v;
-								    if(v == 0) {
-								    	saveSetting(DEEP_SLEEP, 1);
-								    }else{
-								    	saveSetting(DEEP_SLEEP, v);
-								    } 
+								    saveSetting(DEEP_SLEEP, v);
 							 	}
 							});
 							container._roundslider = slider;
@@ -1571,6 +1570,18 @@ function getOAuthToken()
     } else {
         getAuthorizationCode();
     }
+}
+
+function isValidSleep(v) {
+    if (v <= 0) return false;
+
+    // Small values: must divide evenly into 60
+    if (v < 60) {
+        return (60 % v === 0);
+    }
+
+    // Large values: must be whole hours
+    return (v % 60 === 0);
 }
 
 function calcNextWaterCycle(start, stop, size)
