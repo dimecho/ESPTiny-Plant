@@ -376,7 +376,7 @@ struct {
 } rtcData;
 //uint32_t loopTimer = 0;  //loop() slow down
 uint32_t webTimer = 0;               //track last webpage access
-uint32_t delayBetweenWiFi = 0;       //8 minutes
+uint32_t delayBetweenWiFi = 480000;  //8 minutes
 #endif
 
 #define _EEPROM_ID 0
@@ -454,10 +454,9 @@ uint8_t WIRELESS_PHY_MODE = 2;    //WIRELESS_PHY_MODE_11B = 1, WIRELESS_PHY_MODE
 uint8_t WIRELESS_PHY_POWER = 10;  //Max = 20.5dBm (some ESP modules 24.0dBm) should be multiples of 0.25
 uint8_t WIRELESS_CHANNEL = 7;
 char WIRELESS_SSID[16] = "Plant";
-//char WIRELESS_USERNAME[] = "";
-//char WIRELESS_PASSWORD[] = "";
+char WIRELESS_USERNAME[] = "";
+char WIRELESS_PASSWORD[] = "";
 uint8_t LOG_ENABLE = 0;  //data logger (enable/disable)
-//uint32_t LOG_INTERVAL = 30;  //loop() delay - seconds
 //uint8_t NETWORK_DHCP = 0;
 char NETWORK_IP[64] = "192.168.8.8";  //IPv4
 char NETWORK_SUBNET[64] = "255.255.255.0";
@@ -472,7 +471,7 @@ uint16_t PLANT_SOIL_MOISTURE = 400;  //ADC value
 uint32_t PLANT_MANUAL_TIMER = 0;  //manual sleep timer - hours
 uint16_t PLANT_SOIL_TYPE = 2;     //['Sand', 'Clay', 'Dirt', 'Loam', 'Moss'];
 uint16_t PLANT_TYPE = 0;          //['Bonsai', 'Monstera', 'Palm'];
-uint32_t DEEP_SLEEP = 10;          //auto sleep timer - seconds (saved in minutes)
+uint32_t DEEP_SLEEP = 10;         //auto sleep timer - seconds (saved in minutes)
 //=============================
 //String EMAIL_ALERT = "";
 //String SMTP_SERVER = "";
@@ -555,7 +554,7 @@ void setup() {
   Serial.setDebugOutput(true);
   //ESP8266 SDK 2.2.2 Deep Sleep is 32bit about 2,147,483,647 = 35 min
   //ESP8266 SDK 2.4.1 Deep Sleep is 64bit about 12,731,80,9786 = 3h 30min
-  //Serial.println("deepSleepMax: %lu", ESP.deepSleepMax());
+  //Serial.printf("deepSleepMax: %lu\n", ESP.deepSleepMax());
   //printMemory();
 #endif
 
@@ -591,20 +590,19 @@ void setup() {
 #else
     LittleFS.begin();
 #endif
-    LittleFS.format();
+    //LittleFS.format();
 
     NVRAM_Erase();
-    NVRAMWrite(_EEPROM_ID, (char *)EEPROM_ID);
-    NVRAMWrite(_WIRELESS_MODE, (char *)WIRELESS_MODE);
+    NVRAMWrite(_EEPROM_ID, EEPROM_ID);
+    NVRAMWrite(_WIRELESS_MODE, WIRELESS_MODE);
     NVRAMWrite(_WIRELESS_HIDE, "0");
-    NVRAMWrite(_WIRELESS_PHY_MODE, (char *)WIRELESS_PHY_MODE);
-    NVRAMWrite(_WIRELESS_PHY_POWER, (char *)WIRELESS_PHY_POWER);
-    NVRAMWrite(_WIRELESS_CHANNEL, (char *)WIRELESS_CHANNEL);
+    NVRAMWrite(_WIRELESS_PHY_MODE, WIRELESS_PHY_MODE);
+    NVRAMWrite(_WIRELESS_PHY_POWER, WIRELESS_PHY_POWER);
+    NVRAMWrite(_WIRELESS_CHANNEL, WIRELESS_CHANNEL);
     NVRAMWrite(_WIRELESS_SSID, WIRELESS_SSID);
     NVRAMWrite(_WIRELESS_USERNAME, "");
     NVRAMWrite(_WIRELESS_PASSWORD, "");
-    NVRAMWrite(_LOG_ENABLE, (char *)LOG_ENABLE);
-    //NVRAMWrite(_LOG_INTERVAL, (char *)LOG_INTERVAL);
+    NVRAMWrite(_LOG_ENABLE, LOG_ENABLE);
     //==========
     NVRAMWrite(_NETWORK_DHCP, "0");
     NVRAMWrite(_NETWORK_IP, NETWORK_IP);
@@ -612,12 +610,12 @@ void setup() {
     NVRAMWrite(_NETWORK_GATEWAY, NETWORK_IP);
     NVRAMWrite(_NETWORK_DNS, NETWORK_IP);
     //==========
-    NVRAMWrite(_PLANT_POT_SIZE, (char *)PLANT_POT_SIZE);
-    NVRAMWrite(_PLANT_SOIL_MOISTURE, (char *)PLANT_SOIL_MOISTURE);
-    NVRAMWrite(_PLANT_MANUAL_TIMER, (char *)PLANT_MANUAL_TIMER);
-    NVRAMWrite(_PLANT_SOIL_TYPE, (char *)PLANT_SOIL_TYPE);
-    NVRAMWrite(_PLANT_TYPE, (char *)PLANT_TYPE);
-    NVRAMWrite(_DEEP_SLEEP, (char *)DEEP_SLEEP);
+    NVRAMWrite(_PLANT_POT_SIZE, PLANT_POT_SIZE);
+    NVRAMWrite(_PLANT_SOIL_MOISTURE, PLANT_SOIL_MOISTURE);
+    NVRAMWrite(_PLANT_MANUAL_TIMER, PLANT_MANUAL_TIMER);
+    NVRAMWrite(_PLANT_SOIL_TYPE, PLANT_SOIL_TYPE);
+    NVRAMWrite(_PLANT_TYPE, PLANT_TYPE);
+    NVRAMWrite(_DEEP_SLEEP, DEEP_SLEEP);
     //==========
     NVRAMWrite(_ALERTS, ALERTS);
     NVRAMWrite(_EMAIL_ALERT, "");
@@ -673,16 +671,12 @@ void setup() {
 #else
   if (wakeupReason != 5) {    //REASON_DEEP_SLEEP_AWAKE (5)
 #endif
-    //Going into sleep mode, do not delay in loop()
-    //LOG_INTERVAL = 0;
-    //} else {
     //Emergency Recover (RST to GND)
 #ifdef ESP32
     if (wakeupReason == ESP_RST_EXT) {  //ESP_RST_EXT (2) ESP_RST_SW (3)
 #else
     if (wakeupReason == 6) {  //REASON_EXT_SYS_RST (6)
 #endif
-      //LOG_INTERVAL = 600;                    //prevent WiFi from sleeping 5 minutes
       DEEP_SLEEP = 300;
       ALERTS[0] = '1';                       //email DHCP IP
       ALERTS[1] = '0';                       //low voltage
@@ -726,7 +720,6 @@ void setupWiFi(uint8_t timeout) {
   gateway.fromString(NVRAMRead(_NETWORK_GATEWAY));
   dns.fromString(NVRAMRead(_NETWORK_DNS));
   //-------------------
-
   WiFi.persistent(false);  //Do not write settings to memory
   //0    (for lowest RF power output, supply current ~ 70mA
   //20.5 (for highest RF power output, supply current ~ 80mA
@@ -736,9 +729,8 @@ void setupWiFi(uint8_t timeout) {
 #else
   WiFi.setTxPower((wifi_power_t)WIRELESS_PHY_POWER);
 #endif
-
-  const char *WIRELESS_SSID = NVRAMRead(_WIRELESS_SSID);
-  const char *WIRELESS_PASSWORD = NVRAMRead(_WIRELESS_PASSWORD);
+  strncpy(WIRELESS_SSID, NVRAMRead(_WIRELESS_SSID), sizeof(WIRELESS_SSID));
+  strncpy(WIRELESS_PASSWORD, NVRAMRead(_WIRELESS_PASSWORD), sizeof(WIRELESS_PASSWORD));
 
   if (WIRELESS_MODE == 0) {
     //=====================
@@ -750,9 +742,11 @@ void setupWiFi(uint8_t timeout) {
     //WiFi.enableAP(true);
     WiFi.mode(WIFI_AP);
     WiFi.softAPConfig(ip, gateway, subnet);
-    WiFi.softAP(WIRELESS_SSID, WIRELESS_PASSWORD, WIRELESS_CHANNEL, WIRELESS_HIDE, 3);  //max 3 clients
+    bool ok = WiFi.softAP(WIRELESS_SSID, WIRELESS_PASSWORD, WIRELESS_CHANNEL, WIRELESS_HIDE, 3);  //max 3 clients
 
 #if DEBUG
+    Serial.println(ok ? "AP OK" : "AP FAILED");
+    Serial.println(WIRELESS_SSID);
     Serial.println(WiFi.softAPIP());
     Serial.println(WiFi.macAddress());
     /*
@@ -848,7 +842,7 @@ void setupWiFi(uint8_t timeout) {
       //Connecting to WPA2-ENTERPRISE AP needs more than 26 KB memory
       //HeapSelectDram ephemeral;
       //if (ESP.getFreeHeap() > 26624) { //ensure enough space
-      const char *WIRELESS_USERNAME = NVRAMRead(_WIRELESS_USERNAME);
+      strncpy(WIRELESS_USERNAME, NVRAMRead(_WIRELESS_USERNAME), sizeof(WIRELESS_USERNAME));
       //Must have @<domain.com> otherwise default anonymous@espressif.com is used
       wifi_station_set_enterprise_identity((u8 *)WIRELESS_USERNAME, strlen(WIRELESS_USERNAME));
       //wifi_station_set_enterprise_identity((u8*)"esptest@domain.com", strlen("esptest@domain.com"));
@@ -959,12 +953,10 @@ void setupWiFi(uint8_t timeout) {
 #endif
         //If client mode fails ESP8266 will not be accessible
         //Set Emergency AP SSID for re-configuration
-        //NVRAMWrite(_EEPROM_ID, "0");
         NVRAMWrite(_WIRELESS_MODE, "0");
         NVRAMWrite(_WIRELESS_HIDE, "0");
         NVRAMWrite(_WIRELESS_SSID, PLANT_NAME);
         NVRAMWrite(_WIRELESS_PASSWORD, "");
-        //NVRAMWrite(_LOG_INTERVAL, "60");
         NVRAMWrite(_NETWORK_DHCP, "0");
         //delay(100);
         ESP.restart();
@@ -973,7 +965,7 @@ void setupWiFi(uint8_t timeout) {
       setupWiFi(timeout++);
       return;
     }
-    NVRAMWrite(_WIRELESS_PHY_POWER, (char *)WIRELESS_PHY_POWER);  //save auto tuned wifi power
+    NVRAMWrite(_WIRELESS_PHY_POWER, WIRELESS_PHY_POWER);  //save auto tuned wifi power
 
     WiFi.setAutoReconnect(true);
 
@@ -1206,6 +1198,16 @@ void setupWebServer() {
           ALERTS[i] = fastAtoi(request->getParam("alert")->value().c_str());
           NVRAMWrite(_ALERTS, ALERTS);
         } else {
+          /*
+          const char *s = request->getParam("value")->value().c_str();
+          char *endptr;
+          int32_t v = strtol(s, &endptr, 10);  // base 10
+          if (*endptr == '\0') {
+            NVRAMWrite(i, v);
+          } else {
+            NVRAMWrite(i, s);
+          }
+          */
           NVRAMWrite(i, request->getParam("value")->value().c_str());
           NVRAMConfig();
         }
@@ -1299,6 +1301,18 @@ void setupWebServer() {
 
       for (size_t i = 1; i < request->params(); i++) {
         if (i != skip) {
+          /*
+          const char *s = request->getParam(i)->value().c_str();
+          char *endptr;
+          int32_t v = strtol(s, &endptr, 10);  // base 10
+          if (*endptr == '\0') {
+            NVRAMWrite(n, v);
+            response->printf("[%d] %s:%u\n", n, s, NVRAMReadInt(n));
+          } else {
+            NVRAMWrite(n, s);
+            response->printf("[%d] %s:%s\n", n, s, NVRAMRead(n));
+          }
+          */
           NVRAMWrite(n, request->getParam(i)->value().c_str());
           response->printf("[%d] %s:%s\n", n, request->getParam(i)->name().c_str(), NVRAMRead(n));
           n++;
@@ -1614,7 +1628,6 @@ void loop() {
 #if (SYNC_TCP_SSL_ENABLE && ESP8266)
   secureServer.handleClient();
 #endif
-  //if (millis() - loopTimer < LOG_INTERVAL) return;
   if ((millis() - webTimer) > delayBetweenWiFi) {  //track web activity for 5 minutes
     /*
   //Measure voltage every 10000s runtime (~2.5 hours)
@@ -1730,7 +1743,6 @@ void loop() {
 #if DEBUG
         Serial.println("WiFi ON");
 #endif
-        //LOG_INTERVAL = fastAtoi(NVRAMRead(_LOG_INTERVAL));
         DEEP_SLEEP = 1;
         offsetTiming();
 
@@ -1796,7 +1808,7 @@ void loop() {
       rtcData.drySoilTime++;  //Wait for soil to absorb moisture
     } else {
 #if DEBUG
-      Serial.println("Water Timer: %u", rtcData.waterTime);
+      Serial.printf("Water Timer: %u\n", rtcData.waterTime);
 #endif
       //ESP8266 - We need to split deep sleep as 32-bit unsigned integer is 4294967295 or 0xffffffff max ~71 minutes
       if (rtcData.waterTime >= PLANT_MANUAL_TIMER) {
@@ -1817,7 +1829,6 @@ void loop() {
     vTaskDelay(1);             // yields CPU
 #endif
   }
-  //loopTimer = millis();
 }
 
 void readySleep() {
@@ -2224,6 +2235,18 @@ void NVRAM_Erase() {
   EEPROM.commit();
 }
 
+void NVRAMWrite(uint8_t address, uint32_t value) {
+  /*
+  for (int i = 0; i < 4; i++) {
+    EEPROM.write(NVRAM_Map[address] + i, (value >> (8 * i)) & 0xFF);  // LSB first
+  }
+  EEPROM.commit();
+  */
+  char txt[12];
+  snprintf(txt, sizeof(txt), "%u", value);
+  NVRAMWrite(address, txt);
+}
+
 void NVRAMWrite(uint8_t address, const char *txt) {
   /*
   int EEPROM_SIZE = 32;
@@ -2236,7 +2259,7 @@ void NVRAMWrite(uint8_t address, const char *txt) {
   //const int EEPROM_SIZE = 32;
   const int EEPROM_SIZE = (NVRAM_Map[(address + 1)] - NVRAM_Map[address]);
 #if DEBUG
-  Serial.printf("NVRAMWrite: %u > %u:%u\n", address, NVRAM_Map[address], EEPROM_SIZE);
+  Serial.printf("NVRAMWrite: %u > %u:%u %s\n", address, NVRAM_Map[address], EEPROM_SIZE, txt);
 #endif
   int len = strlen(txt);
   for (int i = 0; i < EEPROM_SIZE; i++) {
@@ -2251,7 +2274,27 @@ void NVRAMWrite(uint8_t address, const char *txt) {
   }
   EEPROM.commit();
 }
-
+/*
+uint32_t NVRAMReadInt(uint8_t address) {
+  uint32_t readValue = 0;
+  for (int i = 0; i < 4; i++) {
+    readValue |= ((uint32_t)EEPROM.read(NVRAM_Map[address] + i) << (8 * i));
+  }
+#if DEBUG
+  uint8_t EEPROM_SIZE = (NVRAM_Map[(address + 1)] - NVRAM_Map[address]);
+  Serial.printf("\nNVRAMReadInt: %u > %u:%u ", address, NVRAM_Map[address], EEPROM_SIZE);
+  char buf[12];
+  snprintf(buf, sizeof(buf), "%u", readValue);
+  for (int i = 0; i < 12; i++) {
+    Serial.printf("%02X", buf[i]);  // 2-digit uppercase hex with leading zero
+  }
+  Serial.print(" > ");
+  Serial.print(buf);
+  Serial.print("\n");
+#endif
+  return readValue;
+}
+*/
 char *NVRAMRead(uint8_t address) {
   /*
   int EEPROM_SIZE = 32;
@@ -2259,21 +2302,21 @@ char *NVRAMRead(uint8_t address) {
   EEPROM.get(address * EEPROM_SIZE, buffer);
   */
   //const int EEPROM_SIZE = 32;
-  const int EEPROM_SIZE = (NVRAM_Map[(address + 1)] - NVRAM_Map[address]);
+  uint8_t EEPROM_SIZE = (NVRAM_Map[(address + 1)] - NVRAM_Map[address]);
   static char buffer[96];
 
   int i = 0;
   for (i = 0; i < EEPROM_SIZE; i++) {
-    char byte = EEPROM.read(NVRAM_Map[address] + i);
+    uint8_t byte = EEPROM.read(NVRAM_Map[address] + i);
     //char byte = EEPROM.read(address * EEPROM_SIZE + i);
     if (byte == 0xFF) break;  // stop at empty byte
     buffer[i] = byte;
   }
   buffer[i] = '\0';
 #if DEBUG
-  Serial.printf("\nNVRAMRead: %u > %u:%u\n", address, NVRAM_Map[address], EEPROM_SIZE);
+  Serial.printf("\nNVRAMRead: %u > %u:%u ", address, NVRAM_Map[address], EEPROM_SIZE);
   for (int i = 0; i < EEPROM_SIZE; i++) {
-    Serial.printf("%02X", (uint8_t)buffer[i]);  // 2-digit uppercase hex with leading zero
+    Serial.printf("%02X", buffer[i]);  // 2-digit uppercase hex with leading zero
   }
   Serial.print(" > ");
   Serial.print(buffer);
@@ -2286,8 +2329,6 @@ char *NVRAMRead(uint8_t address) {
 void NVRAMConfig() {
 
   DEEP_SLEEP = fastAtoi(NVRAMRead(_DEEP_SLEEP)) * 60;
-  //LOG_INTERVAL = fastAtoi(NVRAMRead(_LOG_INTERVAL));
-
   LOG_ENABLE = fastAtoi(NVRAMRead(_LOG_ENABLE));
   PLANT_POT_SIZE = fastAtoi(NVRAMRead(_PLANT_POT_SIZE));
   PLANT_SOIL_MOISTURE = fastAtoi(NVRAMRead(_PLANT_SOIL_MOISTURE));
@@ -2330,26 +2371,12 @@ void offsetTiming() {
   //if (ALERTS[8] == '1')
   //  DEEP_SLEEP = 900; //15 minutes
 
-  //Sleep set and Logging is OFF
-  /*
-  if (DEEP_SLEEP > 1 && LOG_ENABLE < 1 && PLANT_MANUAL_TIMER > 0) {
-    PLANT_MANUAL_TIMER = PLANT_MANUAL_TIMER * 2;  //calculate loop for ESP.deepSleep()
-    delayBetweenAlertEmails = 1 * 60 / 30;        //2 hours as 30 min loops
-    delayBetweenRefillReset = 2 * 60 / 30;        //2 hours as 30 min loops
-    delayBetweenOverfloodReset = 8 * 60 / 30;     //8 hours as 30 min loops
-    DEEP_SLEEP = 1800;                            //30 min
-  } else {  //Always ON or Logging ON
-  */
-  //uint32_t loopTime = LOG_INTERVAL + DEEP_SLEEP;  //as total seconds
-  //loopTime = (loopTime == 0) ? 1 : loopTime; //No devide-by-zero
-
-  DEEP_SLEEP = (DEEP_SLEEP == 0) ? 1 : DEEP_SLEEP; //No devide-by-zero
-  PLANT_MANUAL_TIMER = PLANT_MANUAL_TIMER * 3600 / DEEP_SLEEP;   //wait hours to loops of seconds
-  delayBetweenAlertEmails = 1 * 3600 / DEEP_SLEEP;               //1 hours as loops of seconds
-  delayBetweenRefillReset = 2 * 3600 / DEEP_SLEEP;               //2 hours as loops of seconds
-  delayBetweenDrySoilReset = PLANT_POT_SIZE * 900 / DEEP_SLEEP;  //proportion pump run time (pot size as hours) converted to loops of seconds
-  delayBetweenOverfloodReset = 8 * 3600 / DEEP_SLEEP;            //8 hours as loops of seconds
-  //LOG_INTERVAL = LOG_INTERVAL * 1000;  //milliseconds millis()
+  DEEP_SLEEP = (DEEP_SLEEP == 0) ? 1 : DEEP_SLEEP;               //No devide-by-zero
+  PLANT_MANUAL_TIMER = PLANT_MANUAL_TIMER * 3600 / DEEP_SLEEP;   //wait hours to # of loops
+  delayBetweenAlertEmails = 1 * 3600 / DEEP_SLEEP;               //1 hours as # of loops
+  delayBetweenRefillReset = 2 * 3600 / DEEP_SLEEP;               //2 hours as # of loops
+  delayBetweenDrySoilReset = PLANT_POT_SIZE * 900 / DEEP_SLEEP;  //proportion pump run time (pot size as hours) converted to # of loops
+  delayBetweenOverfloodReset = 8 * 3600 / DEEP_SLEEP;            //8 hours as # of loops
 }
 
 String getContentType(String filename) {
@@ -2550,7 +2577,7 @@ void smtpSend(const char *subject, const char *body, uint8_t now) {
 }
 #endif
 
-static inline int fastAtoi(const char *s) {
+int fastAtoi(const char *s) {
   int v = 0;
   while (*s) {
     v = v * 10 + (*s++ - '0');
@@ -2558,7 +2585,7 @@ static inline int fastAtoi(const char *s) {
   return v;
 }
 
-static inline int fastAtoi2(const char *s, int len) {
+int fastAtoi2(const char *s, int len) {
   int v = 0;
   for (int i = 0; i < len; i++) {
     v = v * 10 + (s[i] - '0');
