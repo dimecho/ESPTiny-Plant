@@ -75,7 +75,7 @@ response->addHeader("Content-Encoding", "gzip");
 Flashing Options:
 
 1. Wireless - Web Browser [http://192.168.8.8/update](http://192.168.8.8/update)
-2. USB-Serial/TTL - [Arduino LittleFS Plugin](https://github.com/earlephilhower/arduino-esp8266littlefs-plugin)
+2. USB-Serial/TTL - [Arduino ESP8266 LittleFS Plugin](https://github.com/earlephilhower/arduino-esp8266littlefs-plugin) / [Arduino ESP32 LittleFS Plugin](https://github.com/lorol/arduino-esp32littlefs-plugin)
 3. USB-Serial/TTL - Script "littlefs-flash-mac" (Mac) or "littlefs-flash-win.ps1" (Windows)
 
 ![Flash](Web/img/flash.png?raw=true)

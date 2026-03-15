@@ -39,12 +39,13 @@ document.addEventListener('DOMContentLoaded', function(event)
 					    }, 4000);
 					});
 				}
+				loadSVG();
 			}
 		}
 		deleteCookies();
+	}else{
+		loadSVG();
 	}
-
-    loadSVG();
 
 	const modals = document.querySelectorAll('.modal');
     modals.forEach(modal => {
@@ -59,17 +60,6 @@ document.addEventListener('DOMContentLoaded', function(event)
 		if(DEMOLOCK) {
 			PlantLogin();
 		}else{
-	        if(document.getElementById('EnableLogCheckbox').checked === true) {
-	        	var loginterval = document.getElementById('EnableLogInterval').value;
-				var deepsleep = document.getElementById('power-text').textContent;
-
-	        	//console.log(loginterval  + ' < ' + deepsleep);
-	        	if(loginterval < (deepsleep * 60)) {
-				    saveSetting(DEEP_SLEEP, 1); //in minutes
-					notify('','Deep Sleep is longer than Log Interval', 'danger');
-					notify('', 'Wireless Always On', 'success');
-	        	}
-	        }
 	        document.getElementById('wireless-SettingsForm').submit();
 		}
 	};
@@ -122,12 +112,16 @@ function svgwaterLevelAdjust(v) {
 
 function updateNTP() {
 	var d = new Date();
+	var epoch = Math.floor(Date.now() / 1000);
 	var ntp = new XMLHttpRequest();
-	ntp.open('GET', 'api?week=' + d.getDay() + '&hour=' + d.getHours() + '&minute=' + d.getMinutes() + '&ntp=1', true);
+	ntp.open('GET', 'api?&ntp=1&tz=' + getPOSIXtz() + '&epoch=' + epoch, true);
 	ntp.send();
-	ntp.onloadend = function() {
-		adcSoilValue();
-	}
+}
+
+function getPOSIXtz() {
+	const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+	const offset = new Date().getTimezoneOffset() / 60;
+	return "UTC" + offset;
 }
 
 function loadSVG(svgfile) {
@@ -145,13 +139,18 @@ function loadSVG(svgfile) {
 	    // If SVG is supported
 	    if (typeof SVGRect != undefined)
 	    {
-	    	if(nvram.response != undefined) {
+	    	if (nvram.response === null) {
+	    		notify('', 'Invalid JSON format received', 'danger');
+	    		setTimeout(function () {
+			        window.location.href = 'nvram.json';
+			    }, 6000);
+	    	}else{
 	    		
 	    		if(nvram.response['nvram'][0].indexOf('esp32') != -1) {
 	    			ESP32 = true;
 	    		}
 	    		var svgurl = 'api?svg=1';
-	    		if (window.location.hostname.endsWith("github.io"))
+	    		if (window.location.hostname.endsWith("github.io") || window.location.hostname === "127.0.0.1")
 	    			svgurl = 'svg';
 
 				index.open('GET', svgurl, true);
@@ -204,6 +203,7 @@ function loadSVG(svgfile) {
 		                    document.getElementById('WaterLevel').value = pnp_adc.charAt(2);
 							document.getElementById('WaterLevelCheckbox').checked = bool_value;
 		                    svgwaterLevelAdjust(pnp_adc.charAt(2));
+		                    adcSoilValue();
 			            }
 			            updateNTP();
 
@@ -548,24 +548,6 @@ function loadSVG(svgfile) {
 				                   	document.getElementById('EnableLog').value = data['nvram'][LOG_ENABLE];
 									document.getElementById('EnableLogCheckbox').checked = bool_value;
 
-									document.getElementById('EnableLogInterval').value = data['nvram'][LOG_INTERVAL];
-									document.getElementById('log-interval-text').textContent = data['nvram'][LOG_INTERVAL];
-									rslider('#log-interval', {
-						            	min: 2,
-      									max: 200,
-      									dashes: 10,
-								      	value: data['nvram'][LOG_INTERVAL],
-								      	onInput: (v) => {
-								        	document.getElementById('log-interval-text').textContent = v;
-									    },
-									    onChange: (v) => {
-									    	if (v < 10) {
-									      		notify('', 'Flash memory will fill up fast!', 'danger');
-									    	}
-									    	document.getElementById('EnableLogInterval').value = v;
-									    }
-								    });
-
 				                    bool_value = data['nvram'][NETWORK_DHCP] == '1' ? true : false;
 				                    document.getElementById('WiFiDHCP').value = data['nvram'][NETWORK_DHCP];
 									document.getElementById('WiFiDHCPCheckbox').checked = bool_value;
@@ -621,34 +603,12 @@ function loadSVG(svgfile) {
 											document.getElementById('keep-EEPROM').classList.remove('hidden');
 											document.getElementById('keep-eeprom-yes').onclick = function() {
 												deleteCookies();
-												//document.cookie = 'WIFI_MODE=' + data['nvram'][WIFI_MODE];
-												document.cookie = 'WIFI_HIDE=' + data['nvram'][WIFI_HIDE];
-												document.cookie = 'WIFI_PHY_MODE=' + data['nvram'][WIFI_PHY_MODE];
-												document.cookie = 'WIFI_PHY_POWER=' + data['nvram'][WIFI_PHY_POWER];
-												document.cookie = 'WIFI_CHANNEL=' + data['nvram'][WIFI_CHANNEL];
-												document.cookie = 'WIFI_SSID=' + data['nvram'][WIFI_SSID];
-												document.cookie = 'WIFI_USERNAME=' + data['nvram'][WIFI_USERNAME];
-												//document.cookie = 'WIFI_PASSWORD=' + data['nvram'][WIFI_PASSWORD];
-												document.cookie = 'LOG_ENABLE=' + data['nvram'][LOG_ENABLE];
-												document.cookie = 'LOG_INTERVAL=' + data['nvram'][LOG_INTERVAL];
-												document.cookie = 'NETWORK_DHCP=' + data['nvram'][NETWORK_DHCP];
-												document.cookie = 'NETWORK_IP=' + data['nvram'][NETWORK_IP];
-												document.cookie = 'NETWORK_SUBNET=' + data['nvram'][NETWORK_SUBNET];
-												document.cookie = 'NETWORK_GATEWAY=' + data['nvram'][NETWORK_GATEWAY];
-												document.cookie = 'NETWORK_DNS=' + data['nvram'][NETWORK_DNS];
-												document.cookie = 'PLANT_POT_SIZE=' + data['nvram'][PLANT_POT_SIZE];
-												document.cookie = 'PLANT_SOIL_MOISTURE=' + data['nvram'][PLANT_SOIL_MOISTURE];
-												document.cookie = 'PLANT_MANUAL_TIMER=' + data['nvram'][PLANT_MANUAL_TIMER];
-												document.cookie = 'PLANT_SOIL_TYPE=' + data['nvram'][PLANT_SOIL_TYPE];
-												document.cookie = 'DEEP_SLEEP=' + data['nvram'][NETWORK_DNS];
-												document.cookie = 'EMAIL_ALERT=' + data['nvram'][EMAIL_ALERT];
-												document.cookie = 'SMTP_SERVER=' + data['nvram'][SMTP_SERVER];
-												document.cookie = 'SMTP_USERNAME=' + data['nvram'][SMTP_USERNAME];
-												document.cookie = 'PLANT_NAME=' + data['nvram'][PLANT_NAME];
-												document.cookie = 'ALERTS=' + data['nvram'][ALERTS];
-												document.cookie = 'TIMEZONE_OFFSET=' + data['nvram'][TIMEZONE_OFFSET];
-												document.cookie = 'DEMO_AVAILABILITY=' + data['nvram'][DEMO_AVAILABILITY];
-												document.cookie = 'PNP_ADC=' + data['nvram'][PNP_ADC];
+												var skip = [1, 8, 20, 25, 28];
+												for (var i = 1; i <= 31; i++) {
+												    if (skip.indexOf(i) === -1) {
+												        document.cookie = i+ '=' + data['nvram'][i];
+													}
+												}
 					                			progressTimer(20, 2);
 							                	document.getElementById('formFirmware').submit();
 					            			}
@@ -807,7 +767,9 @@ function loadSVG(svgfile) {
 						            */
 						            AvailabilityWeek([data['nvram'][DEMO_AVAILABILITY].charAt(0), data['nvram'][DEMO_AVAILABILITY].charAt(1), data['nvram'][DEMO_AVAILABILITY].charAt(2), data['nvram'][DEMO_AVAILABILITY].charAt(3), data['nvram'][DEMO_AVAILABILITY].charAt(4), data['nvram'][DEMO_AVAILABILITY].charAt(5), data['nvram'][DEMO_AVAILABILITY].charAt(6)]);
 
-				                } catch (error) {}
+				                } catch (error) {
+				                	notify('', error, 'danger');
+				                }
 				            }
 				            
 							const togglePasswordIcons = document.querySelectorAll('.toggle-password');
@@ -1264,7 +1226,6 @@ function testEmpty(loop, flood)
         	if(xhr.responseText == 'Locked') {
         		PlantLogin();
         	}else{
-        		var loginterval = document.getElementById('EnableLogInterval').value * 1000;
         		if(loop == 1)
         			notify('', 'Empty Simulation Started', 'success');
 		        if(loop < 3) {
@@ -1302,7 +1263,7 @@ function testEmpty(loop, flood)
 		        	if (email) {
 			        	setTimeout(function() {
 			        		notify('', 'Check Email for Alert', 'success');
-						}, loginterval + 8000);
+						}, 8000);
 			        }
 		        }
         	}

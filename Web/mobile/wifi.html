@@ -5,8 +5,6 @@
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <link rel="stylesheet" type="text/css" href="../css/tailwind.css">
-        <link rel="stylesheet" type="text/css" href="css/rslider.css">
-        <script src="js/rslider.js"></script>
         <script defer src="../js/common.js"></script>
         <script>
         document.addEventListener('DOMContentLoaded', function(event)
@@ -49,20 +47,6 @@
                     document.getElementById('EnableLog').value = nvram.response['nvram'][LOG_ENABLE];
                     document.getElementById('EnableLogCheckbox').checked = bool_value;
 
-                    new rSlider({
-                        target: '#EnableLogInterval',
-                        values: Array.from({ length: 61 }, (_, i) => i),
-                        range: false,
-                        tooltip: true,
-                        scale: false,
-                        labels: false,
-                        step: 1,
-                        set: [nvram.response['nvram'][LOG_INTERVAL]],
-                        onChange: function (v) {
-                            document.getElementById('EnableLogInterval').value = v;
-                        }
-                    });
-
                     bool_value = nvram.response['nvram'][NETWORK_DHCP] == '1' ? true : false;
                     document.getElementById('WiFiDHCP').value = nvram.response['nvram'][NETWORK_DHCP];
                     document.getElementById('WiFiDHCPCheckbox').checked = bool_value;
@@ -88,17 +72,6 @@
                 if(DEMOLOCK) {
                     PlantLogin();
                 }else{
-                    if(document.getElementById('EnableLogCheckbox').checked === true) {
-                        var loginterval = document.getElementById('EnableLogInterval').value;
-                        var deepsleep = document.getElementById('power-text').textContent;
-
-                        //console.log(loginterval  + ' < ' + deepsleep);
-                        if(loginterval < (deepsleep * 60)) {
-                            saveSetting(DEEP_SLEEP, 1); //in minutes
-                            notify('','Deep Sleep is longer than Log Interval', 'danger');
-                            notify('', 'Wireless Always On', 'success');
-                        }
-                    }
                     document.getElementById('wireless-SettingsForm').submit();
                 }
             }
@@ -312,10 +285,6 @@
                                 <label for="EnableLogCheckbox" class="ml-2">Enable Data Log</label>
                             </div>
                         </fieldset>
-                        <div class="bg-white border border-gray-300 rounded-[5px] mt-4">
-                            <div class="p-4">Log Interval (seconds)</div>
-                            <div class="p-6"><input type="text" id="EnableLogInterval" name="LogInterval" class="slider"></div>
-                        </div>
                     </div>
                     <div class="mb-4">
                         <fieldset class="mb-4">

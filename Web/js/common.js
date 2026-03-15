@@ -19,7 +19,7 @@ var soil_type_color = ['#3d9919', '#000000', '#58280c', '#7b4626', '#e39356', '#
 
 var timerUploadCounter = 0;
 
-//ESP8266 EEPROM Variables
+//EEPROM Variables
 var WIFI_MODE = 1;
 var WIFI_HIDE = 2;
 var WIFI_PHY_MODE = 3;
@@ -29,19 +29,19 @@ var WIFI_SSID = 6;
 var WIFI_USERNAME = 7;
 var WIFI_PASSWORD = 8;
 var LOG_ENABLE = 9;
-var LOG_INTERVAL = 10;
 //==========
-var NETWORK_DHCP = 11
-var NETWORK_IP = 12;
-var NETWORK_SUBNET = 13;
-var NETWORK_GATEWAY = 14;
-var NETWORK_DNS = 15;
+var NETWORK_DHCP = 10
+var NETWORK_IP = 11;
+var NETWORK_SUBNET = 12;
+var NETWORK_GATEWAY = 13;
+var NETWORK_DNS = 14;
 //==========
-var PLANT_POT_SIZE = 16;
-var PLANT_SOIL_MOISTURE = 17;
-var PLANT_MANUAL_TIMER = 18;
-var PLANT_SOIL_TYPE = 19;
-var PLANT_TYPE = 20;
+var PLANT_POT_SIZE = 15;
+var PLANT_SOIL_MOISTURE = 16;
+var PLANT_MANUAL_TIMER = 17;
+var PLANT_SOIL_TYPE = 18;
+var PLANT_TYPE = 19;
+//var RESERVED = 20;
 var DEEP_SLEEP = 21;
 //==========
 var EMAIL_ALERT = 22;

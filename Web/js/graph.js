@@ -8,7 +8,6 @@ var lineWidth = 3;
 var pageLimit = 3;
 
 var LOG_ENABLE = 9;
-var LOG_INTERVAL = 10;
 var DEEP_SLEEP = 21;
 var ESP32 = false;
 
@@ -151,8 +150,6 @@ document.addEventListener("DOMContentLoaded", function(event)
             }else{
                 refreshSpeed = v;
                 refreshSpeed *= (1000 * 60);
-                //xhr.open('GET', 'nvram.json?offset=' + LOG_INTERVAL + '&value=10', true);
-                //xhr.send();
 
                 //TODO: Retrive a page once in a while to prevent WiFi sleep
             }

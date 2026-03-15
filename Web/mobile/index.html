@@ -16,7 +16,13 @@
             nvram.open('GET', '/nvram.json', true);
             nvram.send();
             nvram.onload = function(e) {
-                if(nvram.response != undefined) {
+                if(nvram.response != undefined && nvram.response.nvram) {
+
+                    var d = new Date();
+                    var epoch = Math.floor(Date.now() / 1000);
+                    var ntp = new XMLHttpRequest();
+                    ntp.open('GET', 'api?&ntp=1&tz=' + getPOSIXtz() + '&epoch=' + epoch, true);
+                    ntp.send();
                         
                     if(nvram.response['nvram'][0].indexOf('esp32') != -1) {
                         ESP32 = true;
@@ -154,6 +160,11 @@
                 }
             }
         });
+        function getPOSIXtz() {
+            const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+            const offset = new Date().getTimezoneOffset() / 60;
+            return "UTC" + offset;
+        }
         </script>
     </head>
     <body class="bg-gray-100">
