@@ -14,7 +14,10 @@ Remember: Brand new ESP-12 short GPIO0 to GND (flash mode) then UART TX/RX
 #define ASYNCSERVER_DNS 0
 #define SYNCSERVER_mDNS 0
 #define WPA2ENTERPRISE 0
-#define EEPROM_ID 0xAB04  //Identify Sketch by EEPROM
+#define EEPROM_ID 0xAB05  //Identify Sketch by NVS/EEPROM
+#ifdef ESP32
+#define EEPROM_NVS 0      //(Non-Volatile Storage)
+#endif
 #define UART_BAUDRATE 115200
 //#define ARDUINO_SIGNING 0
 //-----------------------------
@@ -54,7 +57,47 @@ Notes for Async HTTPS
 #endif
 */
 #include <LittleFS.h>
+#if EEPROM_NVS
+#include <Preferences.h>
+Preferences preferences;
+#else
 #include <EEPROM.h>
+const int EEPROM_MAP[] = {
+  0,     //_EEPROM_ID 16
+  16,    //_WIRELESS_MODE 8
+  24,    //_WIRELESS_HIDE 8
+  32,    //_WIRELESS_PHY_MODE 8
+  40,    //_WIRELESS_PHY_POWER 8
+  48,    //_WIRELESS_CHANNEL 8
+  56,    //_WIRELESS_SSID 32
+  88,    //_WIRELESS_USERNAME 96
+  184,   //_WIRELESS_PASSWORD 48
+  232,   //_LOG_ENABLE 8
+  240,   //_NETWORK_DHCP 8
+  248,   //_NETWORK_IP 64
+  312,   //_NETWORK_SUBNET 64
+  376,   //_NETWORK_GATEWAY 64
+  440,   //_NETWORK_DNS 64
+  504,   //_PLANT_POT_SIZE 16
+  520,   //_PLANT_SOIL_MOISTURE 16
+  536,   //_PLANT_MANUAL_TIMER 16
+  552,   //_PLANT_SOIL_TYPE 16
+  568,   //_PLANT_TYPE 16
+  584,   //_RESERVED 8
+  592,   //_DEEP_SLEEP 32
+  624,   //_EMAIL_ALERT 64
+  688,   //_SMTP_SERVER 64
+  752,   //_SMTP_USERNAME 96
+  848,   //_SMTP_PASSWORD 48
+  896,   //_PLANT_NAME 32
+  928,   //_ALERTS 16
+  944,   //_DEMO_PASSWORD 32
+  976,   //_TIMEZONE_OFFSET 16
+  992,   //_DEMO_AVAILABILITY 16
+  1008,  //_PNP_ADC 16
+  1024   //+1
+};
+#endif
 #define SPIFFS LittleFS
 #ifdef ESP32
 #define LFS_VERSION 0x0002000b
@@ -368,6 +411,8 @@ RTC_DATA_ATTR struct {
   uint16_t moistureLog;  //moisture average tracking
   uint64_t alertTime;    //prevent email spam
 } rtcData;
+static uint64_t webTimer = 0;
+static uint64_t delayBetweenWiFi = 1000UL;
 #else
 //ESP8266, the RTC user memory is retained across deep sleep and soft reset.
 static struct {
@@ -378,10 +423,9 @@ static struct {
   uint16_t moistureLog;  //moisture average tracking
   uint32_t alertTime;    //prevent email spam
 } rtcData;
+static uint32_t webTimer = 0;
+static uint32_t delayBetweenWiFi = 1000UL;
 #endif
-static unsigned long webTimer = 0;
-static unsigned long delayBetweenWiFi = 1000UL;
-
 #define _EEPROM_ID 0
 #define _WIRELESS_MODE 1
 #define _WIRELESS_HIDE 2
@@ -415,52 +459,16 @@ static unsigned long delayBetweenWiFi = 1000UL;
 #define _DEMO_AVAILABILITY 30
 #define _PNP_ADC 31
 
-const int NVRAM_Map[] = {
-  0,     //_EEPROM_ID 16
-  16,    //_WIRELESS_MODE 8
-  24,    //_WIRELESS_HIDE 8
-  32,    //_WIRELESS_PHY_MODE 8
-  40,    //_WIRELESS_PHY_POWER 8
-  48,    //_WIRELESS_CHANNEL 8
-  56,    //_WIRELESS_SSID 32
-  88,    //_WIRELESS_USERNAME 96
-  184,   //_WIRELESS_PASSWORD 48
-  232,   //_LOG_ENABLE 8
-  240,   //_NETWORK_DHCP 8
-  248,   //_NETWORK_IP 64
-  312,   //_NETWORK_SUBNET 64
-  376,   //_NETWORK_GATEWAY 64
-  440,   //_NETWORK_DNS 64
-  504,   //_PLANT_POT_SIZE 16
-  520,   //_PLANT_SOIL_MOISTURE 16
-  536,   //_PLANT_MANUAL_TIMER 16
-  552,   //_PLANT_SOIL_TYPE 16
-  568,   //_PLANT_TYPE 16
-  584,   //_RESERVED 8
-  592,   //_DEEP_SLEEP 32
-  624,   //_EMAIL_ALERT 64
-  688,   //_SMTP_SERVER 64
-  752,   //_SMTP_USERNAME 96
-  848,   //_SMTP_PASSWORD 48
-  896,   //_PLANT_NAME 32
-  928,   //_ALERTS 16
-  944,   //_DEMO_PASSWORD 32
-  976,   //_TIMEZONE_OFFSET 16
-  992,   //_DEMO_AVAILABILITY 16
-  1008,  //_PNP_ADC 16
-  1023   //+1
-};
-
 uint8_t WIRELESS_MODE = 0;  //WIRELESS_AP = 0, WIRELESS_STA(WPA2) = 1, WIRELESS_STA(WPA2 ENT) = 2, WIRELESS_STA(WEP) = 3
 //uint8_t WIRELESS_HIDE = 0;
 #if defined(ARDUINO_ESP8266_NODEMCU_ESP12) || defined(ARDUINO_ESP8266_NODEMCU_ESP12E)
-uint8_t WIRELESS_PHY_MODE = 1; //WIRELESS_PHY_MODE_11B = 1
+uint8_t WIRELESS_PHY_MODE = 1;  //WIRELESS_PHY_MODE_11B = 1
 #elif defined(ESP8266)
-uint8_t WIRELESS_PHY_MODE = 2; //WIRELESS_PHY_MODE_11G = 2
+uint8_t WIRELESS_PHY_MODE = 2;              //WIRELESS_PHY_MODE_11G = 2
 #elif defined(CONFIG_IDF_TARGET_ESP32C6)
-uint8_t WIRELESS_PHY_MODE = 7; //WIRELESS_PHY_MODE_11AX = 7
+uint8_t WIRELESS_PHY_MODE = 7;  //WIRELESS_PHY_MODE_11AX = 7
 #else
-uint8_t WIRELESS_PHY_MODE = 3; //WIRELESS_PHY_MODE_11N = 3
+uint8_t WIRELESS_PHY_MODE = 3;  //WIRELESS_PHY_MODE_11N = 3
 #endif
 uint8_t WIRELESS_PHY_POWER = 10;  //Max = 20.5dBm (some ESP modules 24.0dBm) should be multiples of 0.25
 uint8_t WIRELESS_CHANNEL = 11;
@@ -552,10 +560,14 @@ void setup() {
   //printMemory();
 #endif
 
-  //======================
-  //NVRAM type of Settings
-  //======================
+//======================
+//NVRAM type of Settings
+//======================
+#if EEPROM_NVS
+  preferences.begin("esp", false);  // Uses EEPROM on ESP8266
+#else
   EEPROM.begin(1024);
+#endif
   int eid = atoi(NVRAMRead(_EEPROM_ID));
 #if DEBUG
   Serial.print("EEPROM CRC Stored: 0x");
@@ -625,20 +637,15 @@ void setup() {
     NVRAMWrite(_PNP_ADC, PNP_ADC);         //TODO: based in flash ID
     memset(&rtcData, 0, sizeof(rtcData));  //reset RTC memory
   } else {
-    NVRAMConfig();
 #ifdef ESP8266
     ESP.rtcUserMemoryRead(32, (uint32_t *)&rtcData, sizeof(rtcData));
     //ADCMODE = get_adc();
     //if (ADCMODE == ADC_VCC) {                                               //Measure VCC this runtime
     //  ESP.rtcUserMemoryWrite(100, (uint32_t *)ADC_TOUT, sizeof(ADC_TOUT));  //Next time measure ADC sensor
     //}
-//#else
-//printf("Opening Non-Volatile Storage (NVS) ... ");
-//nvs_handle_t rtcData;
-//nvs_open("storage", NVS_READWRITE, &rtcData);
-//nvs_set_i32(rtcData, "100", ADC_TOUT);
 #endif
   }
+  NVRAMConfig();
   //EEPROM.end();
   time_t epoch = rtcData.runTime;
 #if CLOCK_DS1307
@@ -695,9 +702,9 @@ void setup() {
 #else
     if (wakeupReason == 6) {  //REASON_EXT_SYS_RST (6)
 #endif
-      DEEP_SLEEP = 10;
-      ALERTS[0] = '1';                       //email DHCP IP
-      ALERTS[1] = '0';                       //low voltage
+      DEEP_SLEEP = 600;
+      ALERTS[0] = '1';  //email DHCP IP
+      ALERTS[1] = '0';  //low voltage
       //memset(&rtcData, 0, sizeof(rtcData));  //reset RTC memory (set all zero)
       setupWiFi(22);
       blinky(1200, 1);
@@ -818,7 +825,7 @@ void setupWiFi(uint8_t timeout) {
       } eap_method_t;
       eap_method_t method = EAP_PEAP;
       struct station_config wifi_config;
-      memset(&wifi_config, 0, sizeof(wifi_config));
+      //memset(&wifi_config, 0, sizeof(wifi_config));
       strcpy((char *)wifi_config.ssid, WIRELESS_SSID);
       //memcpy(wifi_config.ssid, WIRELESS_SSID.c_str(), WIRELESS_SSID.length());
       //memcpy(wifi_config.password, WIRELESS_PASSWORD.c_str(), WIRELESS_PASSWORD.length());	// only for WPA2-PSK
@@ -1208,24 +1215,28 @@ void setupWebServer() {
     if (request->params() > 0) {
       if (strlen(DEMO_PASSWORD) == 0) {
         uint8_t i = atoi(request->getParam("offset")->value().c_str());
-        if (request->hasParam("alert")) {
-          ALERTS[i] = atoi(request->getParam("alert")->value().c_str());
-          NVRAMWrite(_ALERTS, ALERTS);
-        } else {
-          /*
-          const char *s = request->getParam("value")->value().c_str();
-          char *endptr;
-          int32_t v = strtol(s, &endptr, 10);  // base 10
-          if (*endptr == '\0') {
-            NVRAMWrite(i, v);
+        if(i > 0) //Prevent eeprom id change
+        {
+          if (request->hasParam("alert")) {
+            ALERTS[i] = atoi(request->getParam("alert")->value().c_str());
+            NVRAMWrite(_ALERTS, ALERTS);
           } else {
-            NVRAMWrite(i, s);
+            /*
+            const char *s = request->getParam("value")->value().c_str();
+            char *endptr;
+            int32_t v = strtol(s, &endptr, 10);  // base 10
+            if (*endptr == '\0') {
+              NVRAMWrite(i, v);
+            } else {
+              NVRAMWrite(i, s);
+            }
+            */
+            NVRAMWrite(i, request->getParam("value")->value().c_str());
+            NVRAMConfig();
           }
-          */
-          NVRAMWrite(i, request->getParam("value")->value().c_str());
-          NVRAMConfig();
         }
         request->send(200, FPSTR(text_plain), request->getParam("value")->value());
+      
       } else {
         request->send(200, FPSTR(text_plain), FPSTR(locked_html));
       }
@@ -1840,11 +1851,11 @@ void readyWiFiSchedule() {
     //Always ON based on day of week (power cosumption AP = ~70mA STA = ~20mA)
     if (wifiActiveDay && wifiActive) {
 #if DEBUG
-        Serial.println("WiFi ON");
+      Serial.println("WiFi ON");
 #endif
-        DEEP_SLEEP = 1;
-        setupWiFi(0);
-        setupWebServer();
+      DEEP_SLEEP = 1;
+      setupWiFi(0);
+      setupWebServer();
     } else {  //outside of working hours
 #if DEBUG
       Serial.println("WiFi OFF");
@@ -1912,14 +1923,13 @@ void readyPump(uint16_t moisture) {
 #ifdef ESP8266
     if (moisture < 20) {  //Sensor Not in Soil
 #elif defined(CONFIG_IDF_TARGET_ESP32S2)
-    if (moisture < 200) {      //Sensor Not in Soil
+    if (moisture < 200) {  //Sensor Not in Soil
 #else
         if (moisture < 90) {    //Sensor Not in Soil
 #endif
       // Soil dryed out too fast or missed oportunity to water (empty)
       if ((now - rtcData.drySoilTime) > delayBetweenDrySoilReset) {
         if (rtcData.emptyBottle >= 2) {
-          rtcData.drySoilTime = now;
           rtcData.emptyBottle = 0;
           runPump(PLANT_POT_SIZE);
         } else {
@@ -1934,7 +1944,6 @@ void readyPump(uint16_t moisture) {
 #endif
     } else if (moisture < PLANT_SOIL_MOISTURE) {  //Water Plant
       if (rtcData.emptyBottle < 3 && (now - rtcData.drySoilTime) > delayBetweenDrySoilReset) {
-        rtcData.drySoilTime = now;
         rtcData.moistureLog += moisture;
         runPump(PLANT_POT_SIZE);
       } else {
@@ -1952,7 +1961,6 @@ void readyPump(uint16_t moisture) {
         smtpSend("Water Refilled", (char *)moisture, 0);
       }
 #endif
-      rtcData.waterTime = now;
       rtcData.moistureLog = 0;
       rtcData.emptyBottle = 0;
     }
@@ -1987,6 +1995,7 @@ void runPump(uint16_t duration) {
   time_t now;
   time(&now);
   rtcData.waterTime = now;
+  rtcData.drySoilTime = now;
 #if DEBUG
   Serial.printf("MOISTURE LIMIT: %u\n", PLANT_SOIL_MOISTURE);
   Serial.printf("TIMER: %u\n", PLANT_MANUAL_TIMER);
@@ -2248,14 +2257,14 @@ void blinky(uint16_t timer, uint16_t duration) {
 #ifdef ESP32
       digitalWrite(ledPin, LOW);  // OFF
 #else
-        digitalWrite(ledPin, HIGH);                         // OFF
+        digitalWrite(ledPin, HIGH);                        // OFF
 #endif
     } else {
       //digitalWrite(ledPin, !digitalRead(ledPin));
 #ifdef ESP32
       digitalWrite(ledPin, (counter & 1) ? HIGH : LOW);
 #else
-        digitalWrite(ledPin, (counter & 1) ? LOW : HIGH);   // inverted logic
+        digitalWrite(ledPin, (counter & 1) ? LOW : HIGH);  // inverted logic
 #endif
       counter--;
     }
@@ -2263,16 +2272,20 @@ void blinky(uint16_t timer, uint16_t duration) {
 }
 
 void NVRAM_Erase() {
+#if EEPROM_NVS
+  preferences.clear();
+#else
   for (uint32_t i = 0; i < EEPROM.length(); i++) {
     EEPROM.write(i, 0xFF);
   }
-  EEPROM.commit();
+  //EEPROM.commit();
+#endif
 }
 
 void NVRAMWrite(uint8_t address, uint32_t value) {
   /*
   for (int i = 0; i < 4; i++) {
-    EEPROM.write(NVRAM_Map[address] + i, (value >> (8 * i)) & 0xFF);  // LSB first
+    EEPROM.write(EEPROM_MAP[address] + i, (value >> (8 * i)) & 0xFF);  // LSB first
   }
   EEPROM.commit();
   */
@@ -2282,6 +2295,11 @@ void NVRAMWrite(uint8_t address, uint32_t value) {
 }
 
 void NVRAMWrite(uint8_t address, const char *txt) {
+#if EEPROM_NVS
+  char key[4];
+  sprintf(key, "n%d", address);
+  preferences.putString(key, txt);
+#else
   /*
   int EEPROM_SIZE = 32;
   char buffer[EEPROM_SIZE];
@@ -2291,32 +2309,41 @@ void NVRAMWrite(uint8_t address, const char *txt) {
   free(buffer);
   */
   //const int EEPROM_SIZE = 32;
-  const int EEPROM_SIZE = (NVRAM_Map[(address + 1)] - NVRAM_Map[address]);
+  const int EEPROM_SIZE = (EEPROM_MAP[(address + 1)] - EEPROM_MAP[address]);
 #if DEBUG
-  Serial.printf("NVRAMWrite: %u > %u:%u %s\n", address, NVRAM_Map[address], EEPROM_SIZE, txt);
+  Serial.printf("NVRAMWrite: %u > %u:%u %s\n", address, EEPROM_MAP[address], EEPROM_SIZE, txt);
 #endif
   int len = strlen(txt);
   for (int i = 0; i < EEPROM_SIZE; i++) {
     if (i < len) {
-      EEPROM.write(NVRAM_Map[address] + i, txt[i]);
+      EEPROM.write(EEPROM_MAP[address] + i, txt[i]);
       //EEPROM.write(address * EEPROM_SIZE + i, txt[i]);
     } else {
-      EEPROM.write(NVRAM_Map[address] + i, 0xFF);
+      EEPROM.write(EEPROM_MAP[address] + i, 0xFF);
       //EEPROM.write(address * EEPROM_SIZE + i, 0xFF);
       break;
     }
   }
-  EEPROM.commit();
+  //EEPROM.commit();
+#endif
+  thread[0].detach();
+  thread[0].once(2, []() {
+  #if EEPROM_NVS
+      preferences.end();
+  #else
+      EEPROM.commit();
+  #endif
+  });
 }
 /*
 uint32_t NVRAMReadInt(uint8_t address) {
   uint32_t readValue = 0;
   for (int i = 0; i < 4; i++) {
-    readValue |= ((uint32_t)EEPROM.read(NVRAM_Map[address] + i) << (8 * i));
+    readValue |= ((uint32_t)EEPROM.read(EEPROM_MAP[address] + i) << (8 * i));
   }
 #if DEBUG
-  uint8_t EEPROM_SIZE = (NVRAM_Map[(address + 1)] - NVRAM_Map[address]);
-  Serial.printf("\nNVRAMReadInt: %u > %u:%u ", address, NVRAM_Map[address], EEPROM_SIZE);
+  uint8_t EEPROM_SIZE = (EEPROM_MAP[(address + 1)] - EEPROM_MAP[address]);
+  Serial.printf("\nNVRAMReadInt: %u > %u:%u ", address, EEPROM_MAP[address], EEPROM_SIZE);
   char buf[12];
   snprintf(buf, sizeof(buf), "%u", readValue);
   for (int i = 0; i < 12; i++) {
@@ -2330,36 +2357,41 @@ uint32_t NVRAMReadInt(uint8_t address) {
 }
 */
 char *NVRAMRead(uint8_t address) {
+  static char ebuffer[96] = {0};
+#if EEPROM_NVS
+  char key[4];
+  sprintf(key, "n%d", address);
+  if (preferences.isKey(key))
+    preferences.getString(key, ebuffer, sizeof(ebuffer));
+#else
   /*
   int EEPROM_SIZE = 32;
   char buffer[EEPROM_SIZE];
   EEPROM.get(address * EEPROM_SIZE, buffer);
   */
   //const int EEPROM_SIZE = 32;
-  uint8_t EEPROM_SIZE = (NVRAM_Map[(address + 1)] - NVRAM_Map[address]);
-  static char buffer[96];
-
+  uint8_t EEPROM_SIZE = (EEPROM_MAP[(address + 1)] - EEPROM_MAP[address]);
   int i = 0;
   for (i = 0; i < EEPROM_SIZE; i++) {
-    uint8_t byte = EEPROM.read(NVRAM_Map[address] + i);
+    uint8_t byte = EEPROM.read(EEPROM_MAP[address] + i);
     //char byte = EEPROM.read(address * EEPROM_SIZE + i);
     if (byte == 0xFF) break;  // stop at empty byte
-    buffer[i] = byte;
+    ebuffer[i] = byte;
   }
-  buffer[i] = '\0';
+  ebuffer[i] = '\0';
+
 #if DEBUG
-/*
-  Serial.printf("\nNVRAMRead: %u > %u:%u ", address, NVRAM_Map[address], EEPROM_SIZE);
+  Serial.printf("\nNVRAMRead: %u > %u:%u ", address, EEPROM_MAP[address], EEPROM_SIZE);
   for (int i = 0; i < EEPROM_SIZE; i++) {
-    Serial.printf("%02X", buffer[i]);  // 2-digit uppercase hex with leading zero
+    Serial.printf("%02X", ebuffer[i]);  // 2-digit uppercase hex with leading zero
   }
   Serial.print(" > ");
-  Serial.print(buffer);
+  Serial.print(ebuffer);
   Serial.print("\n");
-*/
 #endif
 
-  return buffer;
+#endif
+  return ebuffer;
 }
 
 void NVRAMConfig() {
@@ -2367,12 +2399,12 @@ void NVRAMConfig() {
   turnNPNorPNP(0);
 
   DEEP_SLEEP = atoi(NVRAMRead(_DEEP_SLEEP)) * 60;
-  LOG_ENABLE = atoi(NVRAMRead(_LOG_ENABLE));
+  PLANT_MANUAL_TIMER = atoi(NVRAMRead(_PLANT_MANUAL_TIMER)) * 3600;
   PLANT_POT_SIZE = atoi(NVRAMRead(_PLANT_POT_SIZE));
   PLANT_SOIL_MOISTURE = atoi(NVRAMRead(_PLANT_SOIL_MOISTURE));
   PLANT_SOIL_TYPE = atoi(NVRAMRead(_PLANT_SOIL_TYPE));
   PLANT_TYPE = atoi(NVRAMRead(_PLANT_TYPE));
-  PLANT_MANUAL_TIMER = atoi(NVRAMRead(_PLANT_MANUAL_TIMER)) * 3600;
+  LOG_ENABLE = atoi(NVRAMRead(_LOG_ENABLE));
 
   strncpy(PLANT_NAME, NVRAMRead(_PLANT_NAME), sizeof(PLANT_NAME));
   strncpy(ALERTS, NVRAMRead(_ALERTS), sizeof(ALERTS));
