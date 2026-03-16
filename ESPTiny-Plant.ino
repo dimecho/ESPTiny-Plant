@@ -51,11 +51,6 @@ Notes for Async HTTPS
 
   build.extra_flags=-DESP8266 -DATOMIC_FS_UPDATE
 */
-/*
-#if FLASH_MAP_SUPPORT && ADRUINO_SIGNING
-  FLASH_MAP_SETUP_CONFIG(FLASH_MAP_OTA_FS) //-DFLASH_MAP_SUPPORT=1
-#endif
-*/
 #include <LittleFS.h>
 #if EEPROM_NVS
 #include <Preferences.h>
@@ -404,7 +399,8 @@ RTC offset: 128 / 4 = 32
 #ifdef ESP32
 //ESP32, RTC memory is only retained across deep sleep.
 RTC_DATA_ATTR struct {
-  uint64_t runTime;      //shedule tracking wifi on/off
+  uint64_t runTime;      //shedule tracking now()
+  uint64_t runTime_ms;   //shedule tracking millis()
   uint8_t emptyBottle;   //empty tracking
   uint64_t drySoilTime;  //dry soil tracking timeout
   uint64_t waterTime;    //pump tracking
@@ -416,7 +412,8 @@ static uint64_t delayBetweenWiFi = 1000UL;
 #else
 //ESP8266, the RTC user memory is retained across deep sleep and soft reset.
 static struct {
-  uint32_t runTime;      //shedule tracking wifi on/off
+  uint32_t runTime;      //shedule tracking now()
+  uint64_t runTime_ms;   //shedule tracking millis()
   uint8_t emptyBottle;   //empty tracking
   uint32_t drySoilTime;  //dry soil tracking timeout
   uint32_t waterTime;    //pump tracking
@@ -512,10 +509,10 @@ static uint8_t ON_TIME = 0;     //from 6am
 static uint8_t OFF_TIME = 0;    //to 6pm
 static char PNP_ADC[] = "010";  //0=NPN|1=PNP, ADC sensitivity, Water Level Sensor 0=Disable|1=Enable
 //uint8_t ADC_ERROR_OFFSET = 64;           //WAKE_RF_DISABLED offset
-static const uint8_t sand[] = { 1, 1, 0, 0 };
-static const uint8_t loam[] = { 1, 1, 0, 1 };
-static const uint8_t moss[] = { 1, 0, 1, 0 };
-static const uint8_t dirt[] = { 1, 1, 1, 1 };
+const uint8_t sand[] = { 1, 1, 0, 0 };
+const uint8_t loam[] = { 1, 1, 0, 1 };
+const uint8_t moss[] = { 1, 0, 1, 0 };
+const uint8_t dirt[] = { 1, 1, 1, 1 };
 /*
 #if (CONFIG_IDF_TARGET_ESP32S2 && ARDUINO_ESP32_MAJOR >= 3)
 #include "driver/temperature_sensor.h"
@@ -647,7 +644,7 @@ void setup() {
   }
   NVRAMConfig();
   //EEPROM.end();
-  time_t epoch = rtcData.runTime;
+  time_t epoch = rtcData.runTime + rtcData.runTime_ms / 1000;
 #if CLOCK_DS1307
   Wire.begin();
   Wire.beginTransmission(0x68);
@@ -1738,12 +1735,14 @@ void readySleep() {
     time_t now;
     time(&now);
     rtcData.runTime = now + DEEP_SLEEP;  //add sleep time, when we wake up will be accurate.
+    rtcData.runTime_ms += millis();
     esp_deep_sleep_start();
 #else
     ESP.rtcUserMemoryWrite(32, (uint32_t *)&rtcData, sizeof(rtcData));
     time_t now;
     time(&now);
     rtcData.runTime = now + DEEP_SLEEP;  //add sleep time, when we wake up will be accurate.
+    rtcData.runTime_ms += millis();
     //https://github.com/esp8266/Arduino/issues/8728 (WAKE_RF_DISABLED changes ADC behaviour)
     ESP.deepSleep(sleep_us, WAKE_RF_DISABLED);  //Will wake up without radio
 #endif
