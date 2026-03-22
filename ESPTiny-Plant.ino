@@ -400,7 +400,7 @@ RTC offset: 128 / 4 = 32
 //ESP32, RTC memory is only retained across deep sleep.
 RTC_DATA_ATTR struct {
   uint64_t runTime;      //shedule tracking now()
-  uint64_t runTime_ms;   //shedule tracking millis()
+  uint16_t runTime_ms;   //shedule tracking millis()
   uint8_t emptyBottle;   //empty tracking
   uint64_t drySoilTime;  //dry soil tracking timeout
   uint64_t waterTime;    //pump tracking
@@ -413,7 +413,7 @@ static uint64_t delayBetweenWiFi = 1000UL;
 //ESP8266, the RTC user memory is retained across deep sleep and soft reset.
 static struct {
   uint32_t runTime;      //shedule tracking now()
-  uint64_t runTime_ms;   //shedule tracking millis()
+  uint16_t runTime_ms;   //shedule tracking millis()
   uint8_t emptyBottle;   //empty tracking
   uint32_t drySoilTime;  //dry soil tracking timeout
   uint32_t waterTime;    //pump tracking
@@ -642,9 +642,14 @@ void setup() {
     //}
 #endif
   }
-  NVRAMConfig();
-  //EEPROM.end();
-  time_t epoch = rtcData.runTime + rtcData.runTime_ms / 1000;
+  time_t epoch = rtcData.runTime;
+#if DEBUG
+  Serial.printf("Time calibration (milliseconds):%u\n", rtcData.runTime_ms);
+#endif
+  if (rtcData.runTime_ms >= 60000) { //recycle millis into seconds (1 min drift)
+    epoch += rtcData.runTime_ms / 1000;
+    rtcData.runTime_ms = 0;
+  }
 #if CLOCK_DS1307
   Wire.begin();
   Wire.beginTransmission(0x68);
@@ -664,6 +669,8 @@ void setup() {
   }
 #endif
   setSystemTime(epoch);
+
+  NVRAMConfig();
   /*
     REANSON_DEFAULT_RST = 0, // normal startup by power on
     REANSON_WDT_RST = 1, // hardware watch dog reset
@@ -1715,11 +1722,15 @@ void readySleep() {
       break;
     }
   }
+#if DEBUG
+  Serial.printf("Deep Sleep: %u\n", DEEP_SLEEP);
+#endif
   //GPIO16 (D0) needs to be tied to RST to wake from deepSleep
   if (DEEP_SLEEP > 1 && !anyThreadActive) {
     //WiFi.disconnect(true);  //disassociate properly (easier to reconnect)
     //WiFi.mode(WIFI_OFF);
     unsigned long sleep_us = (DEEP_SLEEP * 1000000ULL);
+    time_t now;
 #ifdef ESP32
     esp_sleep_disable_wifi_wakeup();
 #if CONFIG_IDF_TARGET_ESP32C6
@@ -1732,14 +1743,12 @@ void readySleep() {
     esp_sleep_pd_config(ESP_PD_DOMAIN_RTC_FAST_MEM, ESP_PD_OPTION_OFF);
     esp_sleep_pd_config(ESP_PD_DOMAIN_RTC_PERIPH, ESP_PD_OPTION_OFF);
     */
-    time_t now;
     time(&now);
     rtcData.runTime = now + DEEP_SLEEP;  //add sleep time, when we wake up will be accurate.
     rtcData.runTime_ms += millis();
     esp_deep_sleep_start();
 #else
     ESP.rtcUserMemoryWrite(32, (uint32_t *)&rtcData, sizeof(rtcData));
-    time_t now;
     time(&now);
     rtcData.runTime = now + DEEP_SLEEP;  //add sleep time, when we wake up will be accurate.
     rtcData.runTime_ms += millis();
@@ -1871,6 +1880,9 @@ void readySensor(uint16_t moisture) {
   if (rtcData.waterTime == 0) {
     rtcData.waterTime = now;
   }
+  if (rtcData.drySoilTime == 0) {
+    rtcData.drySoilTime = now;
+  }
 
   if (ALERTS[8] == '1') {
     blinkMorse(moisture);
@@ -1916,9 +1928,6 @@ void readyPump(uint16_t moisture) {
   time(&now);
 
   if (PLANT_MANUAL_TIMER == 0) {
-    if (rtcData.drySoilTime == 0) {
-      rtcData.drySoilTime = now;
-    }
 #ifdef ESP8266
     if (moisture < 20) {  //Sensor Not in Soil
 #elif defined(CONFIG_IDF_TARGET_ESP32S2)
@@ -1968,7 +1977,6 @@ void readyPump(uint16_t moisture) {
     Serial.printf("Water Clock: %u\n", (now - rtcData.waterTime));
     Serial.printf("Water Timer: %u\n", PLANT_MANUAL_TIMER);
 #endif
-    //ESP8266 - We need to split deep sleep as 32-bit unsigned integer is 4294967295 or 0xffffffff max ~71 minutes
     if ((now - rtcData.waterTime) >= PLANT_MANUAL_TIMER) {
       rtcData.emptyBottle = 0;  //assume no sensor with manual timer
       runPump(PLANT_POT_SIZE);
@@ -1991,10 +1999,8 @@ void runPumpFinish() {
 }
 
 void runPump(uint16_t duration) {
-  time_t now;
-  time(&now);
-  rtcData.waterTime = now;
-  rtcData.drySoilTime = now;
+  rtcData.waterTime = 0;
+  rtcData.drySoilTime = 0;
 #if DEBUG
   Serial.printf("MOISTURE LIMIT: %u\n", PLANT_SOIL_MOISTURE);
   Serial.printf("TIMER: %u\n", PLANT_MANUAL_TIMER);
@@ -2646,6 +2652,13 @@ void setSystemTime(time_t epoch) {
   tv.tv_sec = epoch;        // full seconds
   tv.tv_usec = 0;           // no microseconds available
   settimeofday(&tv, NULL);  // set ESP32 system time
+
+#if DEBUG
+  time_t now;
+  time(&now);
+  struct tm *timeinfo = localtime(&now);  // converts UTC to local time using TZ
+  Serial.printf("Date: %02d-%02d-%04d Time: %02d:%02d:%02d DOW: %d\n", (timeinfo->tm_mon + 1), timeinfo->tm_mday, timeinfo->tm_year + 1900, timeinfo->tm_hour, timeinfo->tm_min, timeinfo->tm_sec, timeinfo->tm_wday);
+#endif
 }
 
 //prints all rtcMemory, including the leading crc32
