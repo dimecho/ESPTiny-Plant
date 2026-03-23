@@ -15,7 +15,7 @@ Remember: Brand new ESP-12 short GPIO0 to GND (flash mode) then UART TX/RX
 #define SYNCSERVER_mDNS 0
 #define WPA2ENTERPRISE 0
 #define EEPROM_ID 0xAB05  //Identify Sketch by NVS/EEPROM
-#ifdef ESP32
+#if defined(ESP32)
 #define EEPROM_NVS 0      //(Non-Volatile Storage)
 #endif
 #define UART_BAUDRATE 115200
@@ -94,7 +94,7 @@ const int EEPROM_MAP[] = {
 };
 #endif
 #define SPIFFS LittleFS
-#ifdef ESP32
+#if defined(ESP32)
 #define LFS_VERSION 0x0002000b
 #define U_FS U_SPIFFS
 //#include <esp_chip_info.h>
@@ -269,7 +269,7 @@ static AsyncWebServer httpserver(80);
 static AsyncWebServer server(443);
 #else
 #if (SYNC_TCP_SSL_ENABLE)
-#ifdef ESP8266
+#if defined(ESP8266)
 #include <ESP8266WebServerSecure.h>
 BearSSL::ESP8266WebServerSecure secureServer(443);
 BearSSL::ServerSessions secureCache(4);
@@ -298,7 +298,7 @@ AsyncDNSServer dnsServer;
 #elif defined(CONFIG_IDF_TARGET_ESP32S2)
 #define pumpPin 5  //Output
 #elif defined(CONFIG_IDF_TARGET_ESP32C6)
-#define pumpPin 5  //Output
+#define pumpPin 21  //Output
 #else
 #define pumpPin 16  //Output
 #endif
@@ -307,7 +307,7 @@ AsyncDNSServer dnsServer;
 #elif defined(CONFIG_IDF_TARGET_ESP32S2)
 #define sensorPin 4  //Output
 #elif defined(CONFIG_IDF_TARGET_ESP32C6)
-#define sensorPin 4  //Output
+#define sensorPin 22  //Output
 #else
 #define sensorPin 4  //Output
 #endif
@@ -318,20 +318,22 @@ AsyncDNSServer dnsServer;
   * GPIO 2 (Analog ADC1_CHANNEL_1)
   */
 //#include <esp_adc_cal.h>
-#if CONFIG_IDF_TARGET_ESP32S2
+#if defined(CONFIG_IDF_TARGET_ESP32S2)
 #define watersensorPin_25 14  //Output
 #define watersensorPin_50 13  //Output
 #define watersensorPin_75 10  //Output
 #define watersensorPin_100 8  //Output
 #define ledPin 15             //Output
 #define analogDigitalPin 2    //ADC1_CHANNEL_1  //Input
-#elif CONFIG_IDF_TARGET_ESP32C6
-#define watersensorPin_25 14   //Output
-#define watersensorPin_50 13   //Output
-#define watersensorPin_75 10   //Output
-#define watersensorPin_100 8   //Output
-#define ledPin 8               //Output
-#define analogDigitalPin 0     //ADC1_CHANNEL_1  //Input
+#elif defined(CONFIG_IDF_TARGET_ESP32C6)
+#define watersensorPin_25 1   //Output
+#define watersensorPin_50 2   //Output
+#define watersensorPin_75 3   //Output
+#define watersensorPin_100 4   //Output
+//#include <FastLED.h>
+//CRGB leds[1];
+#define ledPin LED_BUILTIN     //Output
+#define analogDigitalPin 20    //TA0  //Input
 #else                          //WROOM32
 #define watersensorPin_25 32   //Output
 #define watersensorPin_50 25   //Output
@@ -396,7 +398,7 @@ The bootloader command will be stored into the first 128 bytes of user RTC memor
 then it will be retrieved by eboot on boot. That means that user data present there will be lost.
 RTC offset: 128 / 4 = 32
 */
-#ifdef ESP32
+#if defined(ESP32)
 //ESP32, RTC memory is only retained across deep sleep.
 RTC_DATA_ATTR struct {
   uint64_t runTime;      //shedule tracking now()
@@ -479,7 +481,7 @@ char NETWORK_SUBNET[64] = "255.255.255.0";
 //char NETWORK_GATEWAY[] = "";
 //char NETWORK_DNS[] = "";
 static uint16_t PLANT_POT_SIZE = 4;  //pump run timer - seconds
-#ifdef ESP32
+#if defined(ESP32)
 static uint16_t PLANT_SOIL_MOISTURE = 600;  //ADC value
 #else
 static uint16_t PLANT_SOIL_MOISTURE = 400;  //ADC value
@@ -549,7 +551,11 @@ void setup() {
   */
 
 #if DEBUG
-  Serial.begin(UART_BAUDRATE, SERIAL_8N1);
+#if defined(CONFIG_IDF_TARGET_ESP32C6)
+  Serial.begin();  //Native USB CDC
+#else
+  Serial.begin(UART_BAUDRATE, SERIAL_8N1); //UART mode
+#endif
   Serial.setDebugOutput(true);
   //ESP8266 SDK 2.2.2 Deep Sleep is 32bit about 2,147,483,647 = 35 min
   //ESP8266 SDK 2.4.1 Deep Sleep is 64bit about 12,731,80,9786 = 3h 30min
@@ -588,7 +594,7 @@ void setup() {
       }
     }
     //WiFi.scanDelete();
-#ifdef ESP32
+#if defined(ESP32)
     LittleFS.begin(true);
 #else
     LittleFS.begin();
@@ -634,7 +640,7 @@ void setup() {
     NVRAMWrite(_PNP_ADC, PNP_ADC);         //TODO: based in flash ID
     memset(&rtcData, 0, sizeof(rtcData));  //reset RTC memory
   } else {
-#ifdef ESP8266
+#if defined(ESP8266)
     ESP.rtcUserMemoryRead(32, (uint32_t *)&rtcData, sizeof(rtcData));
     //ADCMODE = get_adc();
     //if (ADCMODE == ADC_VCC) {                                               //Measure VCC this runtime
@@ -642,6 +648,8 @@ void setup() {
     //}
 #endif
   }
+  NVRAMConfig();
+  
   time_t epoch = rtcData.runTime;
 #if DEBUG
   Serial.printf("Time calibration (milliseconds):%u\n", rtcData.runTime_ms);
@@ -669,8 +677,6 @@ void setup() {
   }
 #endif
   setSystemTime(epoch);
-
-  NVRAMConfig();
   /*
     REANSON_DEFAULT_RST = 0, // normal startup by power on
     REANSON_WDT_RST = 1, // hardware watch dog reset
@@ -680,9 +686,9 @@ void setup() {
     REANSON_DEEP_SLEEP_AWAKE = 5, // wake up from deep-sleep
     REANSON_HARDWARE_RST = 6, // wake up by RST to GND
   */
-#ifdef ESP32
+#if defined(ESP32)
   esp_reset_reason_t wakeupReason = esp_reset_reason();  // ESP.getResetReason();
-#if (CONFIG_IDF_TARGET_ESP32S2 && ARDUINO_ESP32_MAJOR >= 3)
+#if (defined(CONFIG_IDF_TARGET_ESP32S2) || defined(CONFIG_IDF_TARGET_ESP32C6)) && (ARDUINO_ESP32_MAJOR >= 3)
   temperature_sensor_install(&temp_sensor, &temp_handle);
 #endif
 #else
@@ -693,7 +699,7 @@ void setup() {
 #if DEBUG
   Serial.printf("Wakeup Reason:%u\n", wakeupReason);
 #endif
-#ifdef ESP32
+#if defined(ESP32)
   if (wakeupReason == ESP_RST_DEEPSLEEP) {  //ESP_RST_DEEPSLEEP (8)
 #else
   if (wakeupReason == 5) {    //REASON_DEEP_SLEEP_AWAKE (5)
@@ -701,7 +707,7 @@ void setup() {
     delayBetweenWiFi = 0;
   } else {
     //Emergency Recover (RST to GND)
-#ifdef ESP32
+#if defined(ESP32)
     if (wakeupReason == ESP_RST_EXT) {  //ESP_RST_EXT (2) ESP_RST_SW (3)
 #else
     if (wakeupReason == 6) {  //REASON_EXT_SYS_RST (6)
@@ -753,7 +759,7 @@ void setupWiFi(uint8_t timeout) {
   WiFi.persistent(false);  //Do not write settings to memory
   //0    (for lowest RF power output, supply current ~ 70mA
   //20.5 (for highest RF power output, supply current ~ 80mA
-#ifdef ESP8266
+#if defined(ESP8266)
   WiFi.setOutputPower(WIRELESS_PHY_POWER);
 #else
   WiFi.setTxPower((wifi_power_t)WIRELESS_PHY_POWER);
@@ -768,7 +774,7 @@ void setupWiFi(uint8_t timeout) {
     //WiFi.enableSTA(false);
     //WiFi.enableAP(true);
     WiFi.mode(WIFI_AP);
-#ifdef ESP8266
+#if defined(ESP8266)
     WiFi.setPhyMode((WiFiPhyMode_t)WIRELESS_PHY_MODE);
 #else
     esp_wifi_set_protocol(WIFI_IF_AP, WIRELESS_PHY_MODE);
@@ -807,7 +813,7 @@ void setupWiFi(uint8_t timeout) {
     //WiFi.enableSTA(true);
     //WiFi.enableAP(false);
     WiFi.mode(WIFI_STA);
-#ifdef ESP8266
+#if defined(ESP8266)
     WiFi.setAutoConnect(false);
 #else
     esp_wifi_set_protocol(WIFI_IF_STA, WIRELESS_PHY_MODE);
@@ -819,7 +825,7 @@ void setupWiFi(uint8_t timeout) {
     if (NETWORK_DHCP == 0) {
       WiFi.config(ip, gateway, subnet, dns);
     }
-#ifdef ESP8266
+#if defined(ESP8266)
     WiFi.hostname(PLANT_NAME);
 
     if (WIRELESS_MODE == 2) {  // WPA2-Enterprise
@@ -1014,7 +1020,7 @@ void setupWiFi(uint8_t timeout) {
 void setupWebServer() {
   //LittleFSConfig config;
   //LittleFS.setConfig(config);
-#ifdef ESP32
+#if defined(ESP32)
   if (!LittleFS.begin(true)) {
 #else
 #if DEBUG
@@ -1051,16 +1057,14 @@ void setupWebServer() {
       } else {
         response->printf("%u", waterLevelRead(adc));
       }
-#ifdef ESP32
+#if defined(ESP32)
     } else if (request->hasParam("temp")) {
       float tempC = 0;
-      /*
-#if (CONFIG_IDF_TARGET_ESP32S2 && ARDUINO_ESP32_MAJOR >= 3)
+#if (defined(CONFIG_IDF_TARGET_ESP32S2) || defined(CONFIG_IDF_TARGET_ESP32C6)) && (ARDUINO_ESP32_MAJOR >= 3)
       temperature_sensor_enable(temp_handle);
       temperature_sensor_get_celsius(temp_handle, &tempC);
       temperature_sensor_disable(temp_handle);
 #endif
-      */
       response->printf("%.2f", tempC);
 #endif
     } else if (request->hasParam("stream")) {
@@ -1093,7 +1097,7 @@ void setupWebServer() {
       struct tm *timeinfo = localtime(&now);  // converts UTC to local time using TZ
       response->printf("Date: %02d-%02d-%04d Time: %02d:%02d:%02d DOW: %d", (timeinfo->tm_mon + 1), timeinfo->tm_mday, timeinfo->tm_year + 1900, timeinfo->tm_hour, timeinfo->tm_min, timeinfo->tm_sec, timeinfo->tm_wday);
     } else if (request->hasParam("svg")) {
-#ifdef ESP8266
+#if defined(ESP8266)
       Dir files = LittleFS.openDir("/svg");
       while (files.next()) {
         if (files.fileName().endsWith("vg")) {
@@ -1247,7 +1251,7 @@ void setupWebServer() {
     } else {
       AsyncResponseStream *response = request->beginResponseStream(FPSTR(text_json));
       response->print(F("{\"nvram\": [\""));
-#ifdef ESP8266
+#if defined(ESP8266)
       response->printf("%s ESP8266", ESP.getCoreVersion());
 #else
         //esp_chip_info_t chip_info;
@@ -1574,7 +1578,7 @@ void setupWebServer() {
   httpserver.begin();
 #else
 #if SYNC_TCP_SSL_ENABLE
-#ifdef ESP8266
+#if defined(ESP8266)
   secureServer.getServer().setRSACert(new BearSSL::X509List((const char *)SSLCertificate), new BearSSL::PrivateKey((const char *)SSLPrivateKey));
   /*
   secureServer.getServer().setServerKeyAndCert(
@@ -1631,7 +1635,7 @@ void setupWebServer() {
 }
 
 #if SYNC_TCP_SSL_ENABLE
-#ifdef ESP32
+#if defined(ESP32)
 static int root_get_handler(httpd_req_t *req) {
   //httpd_resp_set_type(req, FPSTR(text_html));
   //httpd_resp_send(req, "<h1>Hello World</h1>", HTTPD_RESP_USE_STRLEN);
@@ -1697,7 +1701,7 @@ void loop() {
     IMPORTANT for ESP8266!
     Make sure that the input voltage on the A0 pin doesn’t exceed 1.0V
     */
-#ifdef ESP8266
+#if defined(ESP8266)
     uint16_t moisture = sensorRead_ESP8266(sensorPin);
 #else
     uint16_t moisture = sensorRead(sensorPin);
@@ -1731,22 +1735,36 @@ void readySleep() {
     //WiFi.mode(WIFI_OFF);
     unsigned long sleep_us = (DEEP_SLEEP * 1000000ULL);
     time_t now;
-#ifdef ESP32
-    esp_sleep_disable_wifi_wakeup();
-#if CONFIG_IDF_TARGET_ESP32C6
+#if defined(ESP32)
+    gpio_hold_en((gpio_num_t)pumpPin); //Safety: Hold pin state during deep sleep
+#if defined(CONFIG_IDF_TARGET_ESP32C6)
+    esp_wifi_stop();
+    esp_sleep_disable_wakeup_source(ESP_SLEEP_WAKEUP_ALL);
     esp_sleep_pd_config(ESP_PD_DOMAIN_RTC_PERIPH, ESP_PD_OPTION_ON);  //RTC memory preserved
-#else
-    esp_sleep_pd_config(ESP_PD_DOMAIN_RTC_SLOW_MEM, ESP_PD_OPTION_ON);  //RTC memory preserved
-#endif
+    esp_sleep_pd_config(ESP_PD_DOMAIN_XTAL, ESP_PD_OPTION_ON);   //Keep crystal on
     esp_sleep_enable_timer_wakeup(sleep_us);
+    time(&now);
+    rtcData.runTime = now; // + DEEP_SLEEP;
+    //rtcData.runTime_ms += millis();
+    //esp_deep_sleep_start();
+    esp_light_sleep_start();
     /*
-    esp_sleep_pd_config(ESP_PD_DOMAIN_RTC_FAST_MEM, ESP_PD_OPTION_OFF);
-    esp_sleep_pd_config(ESP_PD_DOMAIN_RTC_PERIPH, ESP_PD_OPTION_OFF);
+    //ESP32C6 Super Mini has trouble with deepsleep - delay() as an alternative
+    esp_wifi_stop();
+    time(&now);
+    rtcData.runTime = now;
+    delay(DEEP_SLEEP);
     */
+#else
+    esp_sleep_disable_wifi_wakeup();
+    esp_sleep_pd_config(ESP_PD_DOMAIN_RTC_SLOW_MEM, ESP_PD_OPTION_ON);  //RTC memory preserved
+    //esp_sleep_pd_config(ESP_PD_DOMAIN_RTC_FAST_MEM, ESP_PD_OPTION_OFF);
+    esp_sleep_enable_timer_wakeup(sleep_us);
     time(&now);
     rtcData.runTime = now + DEEP_SLEEP;  //add sleep time, when we wake up will be accurate.
     rtcData.runTime_ms += millis();
     esp_deep_sleep_start();
+#endif
 #else
     ESP.rtcUserMemoryWrite(32, (uint32_t *)&rtcData, sizeof(rtcData));
     time(&now);
@@ -1755,8 +1773,6 @@ void readySleep() {
     //https://github.com/esp8266/Arduino/issues/8728 (WAKE_RF_DISABLED changes ADC behaviour)
     ESP.deepSleep(sleep_us, WAKE_RF_DISABLED);  //Will wake up without radio
 #endif
-    //TODO: Check state and use WAKE_RF_DEFAULT for second stage
-    //ESP.deepSleep(DEEP_SLEEP, WAKE_RF_DEFAULT);
   }
 }
 
@@ -1798,7 +1814,7 @@ void readySleep() {
 void dataLog(const char *text) {
   if (LOG_ENABLE == 1) {
     LittleFS.begin();
-#ifdef ESP8266
+#if defined(ESP8266)
     FSInfo fs_info;
     LittleFS.info(fs_info);
     size_t flashsize = fs_info.totalBytes - fs_info.usedBytes - strlen(text);
@@ -1928,9 +1944,9 @@ void readyPump(uint16_t moisture) {
   time(&now);
 
   if (PLANT_MANUAL_TIMER == 0) {
-#ifdef ESP8266
+#if defined(ESP8266)
     if (moisture < 20) {  //Sensor Not in Soil
-#elif defined(CONFIG_IDF_TARGET_ESP32S2)
+#elif defined(CONFIG_IDF_TARGET_ESP32S2) || defined(CONFIG_IDF_TARGET_ESP32C6)
     if (moisture < 200) {  //Sensor Not in Soil
 #else
         if (moisture < 90) {    //Sensor Not in Soil
@@ -2007,7 +2023,7 @@ void runPump(uint16_t duration) {
 #endif
   uint16_t water = 100;
   if (PNP_ADC[2] == '1') {
-    water = waterLevelRead(2);  // Loopback wire from water jug to A0 powered from GPIO12
+    water = waterLevelRead(2);  // Loopback wire from water jug to A0
   }
 #if DEBUG
   Serial.printf("WATER: %u\n", water);
@@ -2037,8 +2053,8 @@ void runPump(uint16_t duration) {
 
 uint16_t waterLevelRead(uint8_t sensor) {
   uint16_t level = 100;
-#ifdef ESP32
-#if CONFIG_IDF_TARGET_ESP32S2
+#if defined(ESP32)
+#if defined(CONFIG_IDF_TARGET_ESP32S2) || defined(CONFIG_IDF_TARGET_ESP32C6)
   uint16_t threshold = 800;
 #else
   uint16_t threshold = 4080;
@@ -2073,7 +2089,7 @@ uint16_t waterLevelRead(uint8_t sensor) {
   }
 }
 
-#ifdef ESP8266
+#if defined(ESP8266)
 uint16_t sensorRead_ESP8266(uint16_t enablePin) {
   uint16_t result = 1024;
 
@@ -2100,7 +2116,7 @@ uint16_t sensorRead(uint8_t enablePin) {
   pinMode(enablePin, OUTPUT);
   digitalWrite(enablePin, HIGH);  //ON
 
-#ifdef ESP32
+#if defined(ESP32)
   analogReadResolution(12);  // Sets the sample bits and read resolution, default is 12-bit (0 - 4095), range is 9 - 12 bits
 // 9-bit gives an ADC range of 0-511
 // 10-bit gives an ADC range of 0-1023
@@ -2123,7 +2139,7 @@ uint16_t sensorRead(uint8_t enablePin) {
 //digitalWrite(analogDigitalPin, HIGH);  //Internal pull-up ON (20k resistor)
 
 // Sets the input attenuation for ALL ADC inputs, default is ADC_11db, range is ADC_0db, ADC_2_5db, ADC_6db, ADC_11db
-#if CONFIG_IDF_TARGET_ESP32S2
+#if defined(CONFIG_IDF_TARGET_ESP32S2) || defined(CONFIG_IDF_TARGET_ESP32C6)
   if (enablePin == sensorPin) {
     analogSetAttenuation(ADC_11db);
   } else {
@@ -2244,7 +2260,14 @@ void blinky(uint16_t timer, uint16_t duration) {
     timer = 40;
   }
   uint16_t counter = duration * 2;  //toggle style
-
+/*
+#if CONFIG_IDF_TARGET_ESP32C6
+  FastLED.addLeds<NEOPIXEL, ledPin>(leds, 1);
+#endif
+leds[0] = CRGB::Red; FastLED.show();
+leds[0] = CRGB::Green; FastLED.show();
+leds[0] = CRGB::Blue; FastLED.show();
+*/
   pinMode(ledPin, OUTPUT);
 
   //mutable allows the lambda to modify its own copy of the captured variables:
@@ -2259,14 +2282,14 @@ void blinky(uint16_t timer, uint16_t duration) {
       Most ESP8266 LED swapped HIGH with LOW
       LED is shared with GPIO2. ESP8266 will need GPIO2 on HIGH level in order to boot.
       */
-#ifdef ESP32
+#if defined(ESP32)
       digitalWrite(ledPin, LOW);  // OFF
 #else
         digitalWrite(ledPin, HIGH);                        // OFF
 #endif
     } else {
       //digitalWrite(ledPin, !digitalRead(ledPin));
-#ifdef ESP32
+#if defined(ESP32)
       digitalWrite(ledPin, (counter & 1) ? HIGH : LOW);
 #else
         digitalWrite(ledPin, (counter & 1) ? LOW : HIGH);  // inverted logic
@@ -2429,6 +2452,8 @@ void turnNPNorPNP(const uint8_t state) {
   Serial.printf("[%u]", state);
 #endif
   //pinMode(pumpPin, OUTPUT);
+  gpio_hold_dis((gpio_num_t)pumpPin); //Safety: Hold pin state disable
+
   if (PNP_ADC[0] == '1') {
     digitalWrite(pumpPin, !state);
     if (state == 0) {
@@ -2472,19 +2497,19 @@ void WebUpload(AsyncWebServerRequest *request, String filename, size_t index, ui
     memset(&rtcData, 0, sizeof(rtcData));  //reset RTC memory (set all zero)
     ESP.rtcUserMemoryWrite(32, (uint32_t *)&rtcData, sizeof(rtcData));
     */
-#ifdef ESP8266
+#if defined(ESP8266)
     Update.runAsync(true);  // tell the updaterClass to run in async mode
 #endif
     if (filename.indexOf("fs") != -1) {
       //if (request->hasParam("filesystem", true)) {
-#ifdef ESP8266
+#if defined(ESP8266)
       close_all_fs();
 //#else
 //     LittleFS.end();
 //     LittleFS.begin();
 #endif
 
-#ifdef ESP32
+#if defined(ESP32)
       //https://github.com/ayushsharma82/ElegantOTA/blob/master/src/ElegantOTA.cpp
       size_t fsSize = UPDATE_SIZE_UNKNOWN;
 #elif defined(ESP8266)
