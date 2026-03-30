@@ -1370,7 +1370,7 @@ function adcSoilValue()
 				}
 		    }else{
 		  		var deepsleep = document.getElementById('power-text').textContent;
-		    	var time_countdown = (adc_time * 60 * 60) - (arr[1] * deepsleep * 60);
+		    	var time_countdown = (adc_time * 60 * 60) - arr[1];
 			    const days = Math.floor(time_countdown / 86400);
 			    const hours = Math.floor((time_countdown % 86400) / 3600);
 			    if(days > 0) {

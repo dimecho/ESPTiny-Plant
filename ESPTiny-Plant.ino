@@ -486,7 +486,7 @@ static uint16_t PLANT_SOIL_MOISTURE = 600;  //ADC value
 #else
 static uint16_t PLANT_SOIL_MOISTURE = 400;  //ADC value
 #endif
-static uint16_t PLANT_MANUAL_TIMER = 0;  //manual sleep timer - hours
+static uint32_t PLANT_MANUAL_TIMER = 0;  //manual sleep timer - seconds (saved in hours)
 static uint16_t PLANT_SOIL_TYPE = 2;     //['Sand', 'Clay', 'Dirt', 'Loam', 'Moss'];
 static uint16_t PLANT_TYPE = 0;          //['Bonsai', 'Monstera', 'Palm'];
 static uint32_t DEEP_SLEEP = 10;         //auto sleep timer - seconds (saved in minutes)
@@ -2452,7 +2452,9 @@ void turnNPNorPNP(const uint8_t state) {
   Serial.printf("[%u]", state);
 #endif
   //pinMode(pumpPin, OUTPUT);
+#if defined(ESP32)
   gpio_hold_dis((gpio_num_t)pumpPin); //Safety: Hold pin state disable
+#endif
 
   if (PNP_ADC[0] == '1') {
     digitalWrite(pumpPin, !state);
