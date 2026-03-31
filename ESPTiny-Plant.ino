@@ -374,7 +374,7 @@ uint32_t get_adc() {
 #endif
 
 #include <Ticker.h>
-Ticker thread[1];
+Ticker thread[2];
 static char logbuffer[64];
 
 const char text_html[] PROGMEM = "text/html";
@@ -1814,19 +1814,12 @@ void readySleep() {
 void dataLog(const char *text) {
   if (LOG_ENABLE == 1) {
     LittleFS.begin();
-#if defined(ESP8266)
-    FSInfo fs_info;
-    LittleFS.info(fs_info);
-    size_t flashsize = fs_info.totalBytes - fs_info.usedBytes - strlen(text);
-#else
-    size_t flashsize = LittleFS.totalBytes() - LittleFS.usedBytes() - strlen(text);
-#endif
-    if (flashsize > 1) {
-      File file = LittleFS.open("/l", "a");
-      if (file) {
-        file.println(text);
-        file.close();
-      }
+    time_t now;
+    time(&now);
+    File file = LittleFS.open("/l", "a");
+    if (file) {
+      file.printf("%lu:%s\n", now, text);
+      file.close();
     } else {
       LittleFS.remove("/l");
     }
@@ -2031,10 +2024,11 @@ void runPump(uint16_t duration) {
   //===================
   if (water > 0) {
     // Watering Map -  Different soils takes different time to soak the water
-    const uint8_t *pattern = dirt;
+    const uint8_t *pattern;
     if (PLANT_SOIL_TYPE == 0) pattern = sand;
     else if (PLANT_SOIL_TYPE == 3) pattern = loam;
     else if (PLANT_SOIL_TYPE == 4) pattern = moss;
+    else pattern = dirt;
 
     uint8_t idx = 0;
     //mutable allows the lambda to modify its own copy of the captured variables:
@@ -2048,6 +2042,14 @@ void runPump(uint16_t duration) {
         duration--;
       }
     });
+    /*
+    while (duration--) {
+      turnNPNorPNP(pattern[idx]);  // ON or OFF
+      idx = (idx + 1) & 0x03;      // fast modulo 4
+      delay(1000);
+    }
+    runPumpFinish();
+    */
   }
 }
 
