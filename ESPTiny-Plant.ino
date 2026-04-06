@@ -362,6 +362,7 @@ AsyncDNSServer dnsServer;
 uint32_t ADCMODE;  //Global variable
 //ADC_MODE(ADC_TOUT); //Sensor input measuring
 //ADC_MODE(ADC_VCC);  //Self voltage measuring
+/*
 ADC_MODE(get_adc());  //Analog to Digital Converter (cannot be both)
 
 //Executed very early on startup, variable defined within the get_adc function
@@ -371,6 +372,7 @@ uint32_t get_adc() {
   if ((adc_mode != ADC_VCC) && (adc_mode != ADC_TOUT)) return ADC_TOUT;
   return adc_mode;
 }
+*/
 #endif
 
 #include <Ticker.h>
@@ -410,7 +412,7 @@ RTC_DATA_ATTR struct {
   uint64_t alertTime;    //prevent email spam
 } rtcData;
 static uint64_t webTimer = 0;
-static uint64_t delayBetweenWiFi = 1000UL;
+static uint64_t delayBetweenWiFi = 1000;
 #else
 //ESP8266, the RTC user memory is retained across deep sleep and soft reset.
 static struct {
@@ -423,7 +425,7 @@ static struct {
   uint32_t alertTime;    //prevent email spam
 } rtcData;
 static uint32_t webTimer = 0;
-static uint32_t delayBetweenWiFi = 1000UL;
+static uint32_t delayBetweenWiFi = 1000;
 #endif
 #define _EEPROM_ID 0
 #define _WIRELESS_MODE 1
@@ -711,11 +713,11 @@ void setup() {
     if (wakeupReason == ESP_RST_EXT) {  //ESP_RST_EXT (2) ESP_RST_SW (3)
 #else
     if (wakeupReason == 6) {  //REASON_EXT_SYS_RST (6)
+      memset(&rtcData, 0, sizeof(rtcData));  //reset RTC memory (set all zero)
 #endif
-      DEEP_SLEEP = 600;
+      delayBetweenWiFi = 600000;
       ALERTS[0] = '1';  //email DHCP IP
       ALERTS[1] = '0';  //low voltage
-      //memset(&rtcData, 0, sizeof(rtcData));  //reset RTC memory (set all zero)
       setupWiFi(22);
       blinky(1200, 1);
       //ArduinoOTA.begin();
@@ -1041,6 +1043,9 @@ void setupWebServer() {
 #endif
     //return;
   }
+  if(LOG_ENABLE == 0) {
+    LittleFS.remove("/l");
+  }
   strncpy(DEMO_PASSWORD, NVRAMRead(_DEMO_PASSWORD), sizeof(DEMO_PASSWORD));
   //==============================================
   //Async Web Server HTTP_GET, HTTP_POST, HTTP_ANY
@@ -1138,11 +1143,7 @@ void setupWebServer() {
       } else if (request->hasParam("pump")) {
         const AsyncWebParameter *testPump = request->getParam(0);
         /*
-#ifdef ESP32
-        snprintf(logbuffer, sizeof(logbuffer), "P:%llu", rtcData.runTime);
-#else
         snprintf(logbuffer, sizeof(logbuffer), "P:%lu", rtcData.runTime);
-#endif
         dataLog(logbuffer);
         */
         //0 = stop, 1= run (timed), 2 = run (continues)
@@ -1190,11 +1191,9 @@ void setupWebServer() {
     if (request->hasParam("end")) {
       LOG_ENABLE = 0;
       LittleFS.remove("/l");
-      //NVRAMWrite(_LOG_ENABLE, "0");
     } else if (request->hasParam("start")) {
       LOG_ENABLE = 1;
       dataLog("l");
-      //NVRAMWrite(_LOG_ENABLE, "1");
     } else if (LittleFS.exists("/l")) {
       AsyncWebServerResponse *response = request->beginResponse(LittleFS, "/l", FPSTR(text_plain));
       request->send(response);
@@ -1664,6 +1663,10 @@ void loop() {
   if (thread[1].active())
     return;
 
+#if DEBUG
+  Serial.printf("%lu > %lu\n",(millis() - webTimer), delayBetweenWiFi);
+#endif
+
   if ((millis() - webTimer) > delayBetweenWiFi) {  //track web activity for 5 minutes
     /*
   //Measure voltage every 10000s runtime (~2.5 hours)
@@ -1721,6 +1724,9 @@ void loop() {
 void readySleep() {
   bool anyThreadActive = false;
   for (uint8_t i = 0; i < 2; i++) {
+#if DEBUG
+    Serial.printf("Thread %u active: %d\n", i, thread[i].active());
+#endif
     if (thread[i].active()) {
       anyThreadActive = true;
       break;
@@ -1731,11 +1737,9 @@ void readySleep() {
 #endif
   //GPIO16 (D0) needs to be tied to RST to wake from deepSleep
   if (DEEP_SLEEP > 1 && !anyThreadActive) {
-    //WiFi.disconnect(true);  //disassociate properly (easier to reconnect)
-    //WiFi.mode(WIFI_OFF);
-    unsigned long sleep_us = (DEEP_SLEEP * 1000000ULL);
     time_t now;
 #if defined(ESP32)
+    uint64_t sleep_us = (uint64_t)DEEP_SLEEP * 1000000ULL;
     gpio_hold_en((gpio_num_t)pumpPin); //Safety: Hold pin state during deep sleep
 #if defined(CONFIG_IDF_TARGET_ESP32C6)
     esp_wifi_stop();
@@ -1747,14 +1751,9 @@ void readySleep() {
     rtcData.runTime = now; // + DEEP_SLEEP;
     //rtcData.runTime_ms += millis();
     //esp_deep_sleep_start();
+
+    //ESP32C6 Super Mini has trouble with deepsleep
     esp_light_sleep_start();
-    /*
-    //ESP32C6 Super Mini has trouble with deepsleep - delay() as an alternative
-    esp_wifi_stop();
-    time(&now);
-    rtcData.runTime = now;
-    delay(DEEP_SLEEP);
-    */
 #else
     esp_sleep_disable_wifi_wakeup();
     esp_sleep_pd_config(ESP_PD_DOMAIN_RTC_SLOW_MEM, ESP_PD_OPTION_ON);  //RTC memory preserved
@@ -1766,6 +1765,9 @@ void readySleep() {
     esp_deep_sleep_start();
 #endif
 #else
+    uint32_t sleep_us = DEEP_SLEEP * 1000000UL;
+    WiFi.disconnect(true);  //disassociate properly (easier to reconnect)
+    WiFi.mode(WIFI_OFF);
     ESP.rtcUserMemoryWrite(32, (uint32_t *)&rtcData, sizeof(rtcData));
     time(&now);
     rtcData.runTime = now + DEEP_SLEEP;  //add sleep time, when we wake up will be accurate.
@@ -1814,14 +1816,15 @@ void readySleep() {
 void dataLog(const char *text) {
   if (LOG_ENABLE == 1) {
     LittleFS.begin();
-    time_t now;
-    time(&now);
     File file = LittleFS.open("/l", "a");
     if (file) {
-      file.printf("%lu:%s\n", now, text);
+#if DEBUG
+      Serial.printf("LOG: %s\n", text);
+#endif
+      time_t now;
+      time(&now);
+      file.printf("%lu:%s\n", (unsigned long)now, text);
       file.close();
-    } else {
-      LittleFS.remove("/l");
     }
   }
 }
