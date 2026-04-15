@@ -411,8 +411,6 @@ RTC_DATA_ATTR struct {
   uint16_t moistureLog;  //moisture average tracking
   uint64_t alertTime;    //prevent email spam
 } rtcData;
-static uint64_t webTimer = 0;
-static uint64_t delayBetweenWiFi = 1000;
 #else
 //ESP8266, the RTC user memory is retained across deep sleep and soft reset.
 static struct {
@@ -424,9 +422,9 @@ static struct {
   uint16_t moistureLog;  //moisture average tracking
   uint32_t alertTime;    //prevent email spam
 } rtcData;
-static uint32_t webTimer = 0;
-static uint32_t delayBetweenWiFi = 1000;
 #endif
+static unsigned long webTimer = 0;
+static unsigned long delayBetweenWiFi = 1000;
 #define _EEPROM_ID 0
 #define _WIRELESS_MODE 1
 #define _WIRELESS_HIDE 2
@@ -1768,10 +1766,10 @@ void readySleep() {
     uint32_t sleep_us = DEEP_SLEEP * 1000000UL;
     WiFi.disconnect(true);  //disassociate properly (easier to reconnect)
     WiFi.mode(WIFI_OFF);
-    ESP.rtcUserMemoryWrite(32, (uint32_t *)&rtcData, sizeof(rtcData));
     time(&now);
     rtcData.runTime = now + DEEP_SLEEP;  //add sleep time, when we wake up will be accurate.
     rtcData.runTime_ms += millis();
+    ESP.rtcUserMemoryWrite(32, (uint32_t *)&rtcData, sizeof(rtcData));
     //https://github.com/esp8266/Arduino/issues/8728 (WAKE_RF_DISABLED changes ADC behaviour)
     ESP.deepSleep(sleep_us, WAKE_RF_DISABLED);  //Will wake up without radio
 #endif
