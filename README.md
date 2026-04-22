@@ -44,6 +44,8 @@ This is the next evolution from the original [ATtiny13 Plant](https://github.com
 
 </p>
 
+**Note:** For Deep-Sleep to work, wire GPIO16 (D0) to RST pin.
+
 ## Build
 
 Sketch (Firmware)

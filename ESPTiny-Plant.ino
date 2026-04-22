@@ -423,8 +423,8 @@ static struct {
   uint32_t alertTime;    //prevent email spam
 } rtcData;
 #endif
-static unsigned long webTimer = 0;
-static unsigned long delayBetweenWiFi = 1000;
+unsigned long webTimer = 0;
+unsigned long delayBetweenWiFi = 1000;
 #define _EEPROM_ID 0
 #define _WIRELESS_MODE 1
 #define _WIRELESS_HIDE 2
@@ -639,7 +639,7 @@ void setup() {
     //==========
     NVRAMWrite(_PNP_ADC, PNP_ADC);         //TODO: based in flash ID
     memset(&rtcData, 0, sizeof(rtcData));  //reset RTC memory
-  } else {
+  }
 #if defined(ESP8266)
     ESP.rtcUserMemoryRead(32, (uint32_t *)&rtcData, sizeof(rtcData));
     //ADCMODE = get_adc();
@@ -647,7 +647,6 @@ void setup() {
     //  ESP.rtcUserMemoryWrite(100, (uint32_t *)ADC_TOUT, sizeof(ADC_TOUT));  //Next time measure ADC sensor
     //}
 #endif
-  }
   NVRAMConfig();
   
   time_t epoch = rtcData.runTime;
@@ -706,6 +705,7 @@ void setup() {
 #endif
     delayBetweenWiFi = 0;
   } else {
+    rtcData.waterTime = 0;
     //Emergency Recover (RST to GND)
 #if defined(ESP32)
     if (wakeupReason == ESP_RST_EXT) {  //ESP_RST_EXT (2) ESP_RST_SW (3)
@@ -1720,7 +1720,8 @@ void loop() {
 }
 
 void readySleep() {
-  bool anyThreadActive = false;
+  bool anyThreadActive = thread[0].active();
+  /*
   for (uint8_t i = 0; i < 2; i++) {
 #if DEBUG
     Serial.printf("Thread %u active: %d\n", i, thread[i].active());
@@ -1730,6 +1731,7 @@ void readySleep() {
       break;
     }
   }
+  */
 #if DEBUG
   Serial.printf("Deep Sleep: %u\n", DEEP_SLEEP);
 #endif
@@ -1764,8 +1766,8 @@ void readySleep() {
 #endif
 #else
     uint32_t sleep_us = DEEP_SLEEP * 1000000UL;
-    WiFi.disconnect(true);  //disassociate properly (easier to reconnect)
-    WiFi.mode(WIFI_OFF);
+    //WiFi.disconnect(true);  //disassociate properly (easier to reconnect)
+    //WiFi.mode(WIFI_OFF);
     time(&now);
     rtcData.runTime = now + DEEP_SLEEP;  //add sleep time, when we wake up will be accurate.
     rtcData.runTime_ms += millis();
@@ -2262,7 +2264,7 @@ void blinky(uint16_t timer, uint16_t duration) {
     duration = 1;
     timer = 40;
   }
-  uint16_t counter = duration * 2;  //toggle style
+  duration *= 2;  //toggle style
 /*
 #if CONFIG_IDF_TARGET_ESP32C6
   FastLED.addLeds<NEOPIXEL, ledPin>(leds, 1);
@@ -2274,12 +2276,12 @@ leds[0] = CRGB::Blue; FastLED.show();
   pinMode(ledPin, OUTPUT);
 
   //mutable allows the lambda to modify its own copy of the captured variables:
-  thread[0].attach_ms(timer, [counter]() mutable {
+  thread[0].attach_ms(timer, [duration]() mutable {
 #if DEBUG
-    Serial.printf("blink: %u\n", counter);
+    Serial.printf("blink: %u\n", duration);
 #endif
     //All variables that are used by interrupt service routine declared as "volatile"
-    if (counter == 0) {
+    if (duration == 0) {
       thread[0].detach();
       /*
       Most ESP8266 LED swapped HIGH with LOW
@@ -2293,11 +2295,11 @@ leds[0] = CRGB::Blue; FastLED.show();
     } else {
       //digitalWrite(ledPin, !digitalRead(ledPin));
 #if defined(ESP32)
-      digitalWrite(ledPin, (counter & 1) ? HIGH : LOW);
+      digitalWrite(ledPin, (duration & 1) ? HIGH : LOW);
 #else
-        digitalWrite(ledPin, (counter & 1) ? LOW : HIGH);  // inverted logic
+        digitalWrite(ledPin, (duration & 1) ? LOW : HIGH);  // inverted logic
 #endif
-      counter--;
+      duration--;
     }
   });
 }

@@ -53,10 +53,20 @@
                             savePNPADC();
                         }
                     });
-          
                     if(nvram.response['nvram'][DEMO_PASSWORD] != '')
                     {
                         DEMOLOCK = true;
+                    }
+                    try {
+                        var v = nvram.response['nvram'][0].split('|');
+                        document.getElementById('coreVersion').textContent = 'Core Version: ' + v[0];
+                        document.getElementById('sdkVersion').textContent = 'SDK Version: ' + v[1];
+                        document.getElementById('fsVersion').textContent = 'LittleFS Version: ' + (0xffff & (v[2] >> 16)) + '.' + (0xffff & (v[2] >> 0)) + '.' + (0xffff & (v[2] >> 20));
+                        document.getElementById('firmwareVersion').textContent = 'Firmware Version: ' + v[3];
+                        document.getElementById('fsram').textContent = 'Flash: ' + Math.round(v[4]/1024) + ' KB (' + v[4] + ')';
+                        document.getElementById('dram').textContent = 'Memory: ' + Math.round(v[5]/1024) + ' KB (' + v[5] + ')';
+                    } catch (error) {
+                        notify('', error, 'danger');
                     }
                 }
             }
@@ -115,7 +125,18 @@
                 <button type="button" class="bg-gray-400 hover:bg-gray-500 text-white rounded w-full py-2" onclick="window.location.href='test.html'">Test</button>
                 <button type="button" class="bg-gray-500 hover:bg-gray-500 text-white rounded w-full py-2" onclick="window.location.href='firmware.html'">Firmware</button>
             </div>
-            <div class="bg-white border border-gray-300 rounded-[5px] mt-4 mb-4">
+            <div class="bg-white border border-gray-300 rounded-lg mt-4 mb-4">
+                <div class="m-4">
+                    <small class="block">GUI Version: 1.0.7</small>
+                    <small class="block" id="coreVersion">Core Version:</small>
+                    <small class="block" id="sdkVersion">SDK Version:</small>
+                    <small class="block" id="fsVersion">LittleFS Version:</small>
+                    <small class="block" id="firmwareVersion">Firmware Version:</small>
+                    <small class="block" id="fsram">Flash:</small>
+                    <small class="block" id="dram">Memory:</small>
+                </div>
+            </div>
+            <div class="bg-white border border-gray-300 rounded-lg mt-4 mb-4">
                 <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 m-4">
                     <div>
                         <form method="POST" action="/update" enctype="multipart/form-data" id="formLittleFS">
@@ -133,16 +154,16 @@
                     </div>
                 </div>
             </div>
-            <div class="bg-white border border-gray-300 rounded-[5px] mt-4">
+            <div class="bg-white border border-gray-300 rounded-lg mt-4">
                 <div class="progress border rounded-sm m-4">
                     <div class="progress-bar bg-blue-500 h-2 rounded-sm" style="width:0%"></div>
                 </div>
             </div>
-            <div class="bg-white border border-gray-300 rounded-[5px] mt-4">
+            <div class="bg-white border border-gray-300 rounded-lg mt-4">
                 <div class="p-4">PNP/NPN Transistor</div>
                 <div class="p-6"><input type="text" id="enable-pnp" name="enable-pnp" class="slider"></div>
             </div>
-            <div class="bg-white border border-gray-300 rounded-[5px] mt-4">
+            <div class="bg-white border border-gray-300 rounded-lg mt-4">
                 <div class="p-4">Moisture Sensor Sensitivity</div>
                 <div class="p-6"><input type="text" id="adc-sensitivity" name="adc-sensitivity" class="slider"></div>
                 <div class="p-4">
@@ -150,7 +171,7 @@
                     <label for="WaterLevelCheckbox" class="">Water Level Sensor</label>
                 </div>
             </div>
-            <div class="bg-white border border-gray-300 rounded-[5px] mt-4">
+            <div class="bg-white border border-gray-300 rounded-lg mt-4">
                 <div class="flex justify-center items-center m-4">
                     <button class="bg-red-500 text-white w-full py-2 rounded hover:bg-red-600" type="button" onclick="resetFlash()">Default Reset</button>
                 </div>
