@@ -705,7 +705,6 @@ void setup() {
 #endif
     delayBetweenWiFi = 0;
   } else {
-    rtcData.waterTime = 0;
     //Emergency Recover (RST to GND)
 #if defined(ESP32)
     if (wakeupReason == ESP_RST_EXT) {  //ESP_RST_EXT (2) ESP_RST_SW (3)
@@ -1056,7 +1055,11 @@ void setupWebServer() {
       if (adc == 1) {
         time_t now;
         time(&now);
+#if defined(ESP8266)
         response->printf("%u|%lu", sensorRead(sensorPin), (now - rtcData.waterTime));
+#else
+        response->printf("%u|%llu", sensorRead(sensorPin), (now - rtcData.waterTime));
+#endif
       } else {
         response->printf("%u", waterLevelRead(adc));
       }
@@ -1097,6 +1100,9 @@ void setupWebServer() {
 #endif
       }
       time(&now);
+      if (rtcData.waterTime == 0) {
+        rtcData.waterTime = now;
+      }
       struct tm *timeinfo = localtime(&now);  // converts UTC to local time using TZ
       response->printf("Date: %02d-%02d-%04d Time: %02d:%02d:%02d DOW: %d", (timeinfo->tm_mon + 1), timeinfo->tm_mday, timeinfo->tm_year + 1900, timeinfo->tm_hour, timeinfo->tm_min, timeinfo->tm_sec, timeinfo->tm_wday);
     } else if (request->hasParam("svg")) {
