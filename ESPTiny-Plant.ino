@@ -16,7 +16,7 @@ Remember: Brand new ESP-12 short GPIO0 to GND (flash mode) then UART TX/RX
 #define WPA2ENTERPRISE 0
 #define EEPROM_ID 0xAB05  //Identify Sketch by NVS/EEPROM
 #if defined(ESP32)
-#define EEPROM_NVS 0      //(Non-Volatile Storage)
+#define EEPROM_NVS 0  //(Non-Volatile Storage)
 #endif
 #define UART_BAUDRATE 115200
 //#define ARDUINO_SIGNING 0
@@ -326,9 +326,9 @@ AsyncDNSServer dnsServer;
 #define ledPin 15             //Output
 #define analogDigitalPin 2    //ADC1_CHANNEL_1  //Input
 #elif defined(CONFIG_IDF_TARGET_ESP32C6)
-#define watersensorPin_25 1   //Output
-#define watersensorPin_50 2   //Output
-#define watersensorPin_75 3   //Output
+#define watersensorPin_25 1    //Output
+#define watersensorPin_50 2    //Output
+#define watersensorPin_75 3    //Output
 #define watersensorPin_100 4   //Output
 //#include <FastLED.h>
 //CRGB leds[1];
@@ -403,24 +403,24 @@ RTC offset: 128 / 4 = 32
 #if defined(ESP32)
 //ESP32, RTC memory is only retained across deep sleep.
 RTC_DATA_ATTR struct {
-  uint64_t runTime;      //shedule tracking now()
+  time_t runTime;        //shedule tracking now()
   uint16_t runTime_ms;   //shedule tracking millis()
   uint8_t emptyBottle;   //empty tracking
-  uint64_t drySoilTime;  //dry soil tracking timeout
-  uint64_t waterTime;    //pump tracking
+  time_t drySoilTime;    //dry soil tracking timeout
+  time_t waterTime;      //pump tracking
   uint16_t moistureLog;  //moisture average tracking
-  uint64_t alertTime;    //prevent email spam
+  time_t alertTime;      //prevent email spam
 } rtcData;
 #else
 //ESP8266, the RTC user memory is retained across deep sleep and soft reset.
 static struct {
-  uint32_t runTime;      //shedule tracking now()
+  time_t runTime;        //shedule tracking now()
   uint16_t runTime_ms;   //shedule tracking millis()
   uint8_t emptyBottle;   //empty tracking
-  uint32_t drySoilTime;  //dry soil tracking timeout
-  uint32_t waterTime;    //pump tracking
+  time_t drySoilTime;    //dry soil tracking timeout
+  time_t waterTime;      //pump tracking
   uint16_t moistureLog;  //moisture average tracking
-  uint32_t alertTime;    //prevent email spam
+  time_t alertTime;      //prevent email spam
 } rtcData;
 #endif
 unsigned long webTimer = 0;
@@ -554,7 +554,7 @@ void setup() {
 #if defined(CONFIG_IDF_TARGET_ESP32C6)
   Serial.begin();  //Native USB CDC
 #else
-  Serial.begin(UART_BAUDRATE, SERIAL_8N1); //UART mode
+  Serial.begin(UART_BAUDRATE, SERIAL_8N1);  //UART mode
 #endif
   Serial.setDebugOutput(true);
   //ESP8266 SDK 2.2.2 Deep Sleep is 32bit about 2,147,483,647 = 35 min
@@ -641,19 +641,21 @@ void setup() {
     memset(&rtcData, 0, sizeof(rtcData));  //reset RTC memory
   }
 #if defined(ESP8266)
-    ESP.rtcUserMemoryRead(32, (uint32_t *)&rtcData, sizeof(rtcData));
-    //ADCMODE = get_adc();
-    //if (ADCMODE == ADC_VCC) {                                               //Measure VCC this runtime
-    //  ESP.rtcUserMemoryWrite(100, (uint32_t *)ADC_TOUT, sizeof(ADC_TOUT));  //Next time measure ADC sensor
-    //}
+  ESP.rtcUserMemoryRead(32, (uint32_t *)&rtcData, sizeof(rtcData));
+  //ADCMODE = get_adc();
+  //if (ADCMODE == ADC_VCC) {                                               //Measure VCC this runtime
+  //  ESP.rtcUserMemoryWrite(100, (uint32_t *)ADC_TOUT, sizeof(ADC_TOUT));  //Next time measure ADC sensor
+  //}
 #endif
   NVRAMConfig();
-  
+  if (rtcData.runTime == 0) {
+    rtcData.runTime = 1700000000;
+  }
   time_t epoch = rtcData.runTime;
 #if DEBUG
   Serial.printf("Time calibration (milliseconds):%u\n", rtcData.runTime_ms);
 #endif
-  if (rtcData.runTime_ms >= 60000) { //recycle millis into seconds (1 min drift)
+  if (rtcData.runTime_ms >= 60000) {  //recycle millis into seconds (1 min drift)
     epoch += rtcData.runTime_ms / 1000;
     rtcData.runTime_ms = 0;
   }
@@ -701,7 +703,7 @@ void setup() {
 #if defined(ESP32)
   if (wakeupReason == ESP_RST_DEEPSLEEP) {  //ESP_RST_DEEPSLEEP (8)
 #else
-  if (wakeupReason == 5) {    //REASON_DEEP_SLEEP_AWAKE (5)
+  if (wakeupReason == 5) {                   //REASON_DEEP_SLEEP_AWAKE (5)
 #endif
     delayBetweenWiFi = 0;
   } else {
@@ -709,7 +711,7 @@ void setup() {
 #if defined(ESP32)
     if (wakeupReason == ESP_RST_EXT) {  //ESP_RST_EXT (2) ESP_RST_SW (3)
 #else
-    if (wakeupReason == 6) {  //REASON_EXT_SYS_RST (6)
+    if (wakeupReason == 6) {                 //REASON_EXT_SYS_RST (6)
       memset(&rtcData, 0, sizeof(rtcData));  //reset RTC memory (set all zero)
 #endif
       delayBetweenWiFi = 600000;
@@ -1040,7 +1042,7 @@ void setupWebServer() {
 #endif
     //return;
   }
-  if(LOG_ENABLE == 0) {
+  if (LOG_ENABLE == 0) {
     LittleFS.remove("/l");
   }
   strncpy(DEMO_PASSWORD, NVRAMRead(_DEMO_PASSWORD), sizeof(DEMO_PASSWORD));
@@ -1058,7 +1060,7 @@ void setupWebServer() {
 #if defined(ESP8266)
         response->printf("%u|%lu", sensorRead(sensorPin), (now - rtcData.waterTime));
 #else
-        response->printf("%u|%llu", sensorRead(sensorPin), (now - rtcData.waterTime));
+          response->printf("%u|%llu", sensorRead(sensorPin), (now - rtcData.waterTime));
 #endif
       } else {
         response->printf("%u", waterLevelRead(adc));
@@ -1085,18 +1087,15 @@ void setupWebServer() {
       }
       time_t now;
       if (request->hasParam("epoch")) {
-        time_t epoch = atoi(request->getParam("epoch")->value().c_str());
-        setSystemTime(epoch);
+        now = atoi(request->getParam("epoch")->value().c_str());
+        setSystemTime(now);
 #if CLOCK_DS1307
-        time(&now);                        // get current system time (UTC internally)
         struct tm *now_tm = gmtime(&now);  // interprets as UTC
-        if (request->hasParam("epoch")) {
-          rtc.fillByYMD((now_tm->tm_year + 1900), (now_tm->tm_mon + 1), now_tm->tm_mday);
-          rtc.fillByHMS(now_tm->tm_hour, now_tm->tm_min, now_tm->tm_sec);
-          rtc.fillDayOfWeek(now_tm->tm_wday + 1);
-          rtc.setTime();
-          //rtc.startClock();
-        }
+        rtc.fillByYMD((now_tm->tm_year + 1900), (now_tm->tm_mon + 1), now_tm->tm_mday);
+        rtc.fillByHMS(now_tm->tm_hour, now_tm->tm_min, now_tm->tm_sec);
+        rtc.fillDayOfWeek(now_tm->tm_wday + 1);
+        rtc.setTime();
+        //rtc.startClock();
 #endif
       }
       time(&now);
@@ -1226,7 +1225,7 @@ void setupWebServer() {
     if (request->params() > 0) {
       if (strlen(DEMO_PASSWORD) == 0) {
         uint8_t i = atoi(request->getParam("offset")->value().c_str());
-        if(i > 0) //Prevent eeprom id change
+        if (i > 0)  //Prevent eeprom id change
         {
           if (request->hasParam("alert")) {
             ALERTS[i] = atoi(request->getParam("alert")->value().c_str());
@@ -1247,7 +1246,7 @@ void setupWebServer() {
           }
         }
         request->send(200, FPSTR(text_plain), request->getParam("value")->value());
-      
+
       } else {
         request->send(200, FPSTR(text_plain), FPSTR(locked_html));
       }
@@ -1666,13 +1665,13 @@ void loop() {
 #endif
   if (thread[1].active())
     return;
-
+  /*
 #if DEBUG
   Serial.printf("%lu > %lu\n",(millis() - webTimer), delayBetweenWiFi);
 #endif
-
+*/
   if ((millis() - webTimer) > delayBetweenWiFi) {  //track web activity for 5 minutes
-    /*
+                                                   /*
   //Measure voltage every 10000s runtime (~2.5 hours)
   if (ALERTS[1] == '1' && rtcData.runTime % 10000 == 0) {
     if (ADCMODE == ADC_TOUT) {
@@ -1738,23 +1737,27 @@ void readySleep() {
     }
   }
   */
-#if DEBUG
-  Serial.printf("Deep Sleep: %u\n", DEEP_SLEEP);
-#endif
   //GPIO16 (D0) needs to be tied to RST to wake from deepSleep
   if (DEEP_SLEEP > 1 && !anyThreadActive) {
     time_t now;
+    time(&now);
+    uint32_t deepsleep_offset = PLANT_MANUAL_TIMER - (now - rtcData.waterTime);
+    if(deepsleep_offset < DEEP_SLEEP) {
+      DEEP_SLEEP = deepsleep_offset;
+    }
+#if DEBUG
+  Serial.printf("Deep Sleep: %u\n", DEEP_SLEEP);
+#endif
 #if defined(ESP32)
     uint64_t sleep_us = (uint64_t)DEEP_SLEEP * 1000000ULL;
-    gpio_hold_en((gpio_num_t)pumpPin); //Safety: Hold pin state during deep sleep
+    gpio_hold_en((gpio_num_t)pumpPin);  //Safety: Hold pin state during deep sleep
 #if defined(CONFIG_IDF_TARGET_ESP32C6)
     esp_wifi_stop();
     esp_sleep_disable_wakeup_source(ESP_SLEEP_WAKEUP_ALL);
     esp_sleep_pd_config(ESP_PD_DOMAIN_RTC_PERIPH, ESP_PD_OPTION_ON);  //RTC memory preserved
-    esp_sleep_pd_config(ESP_PD_DOMAIN_XTAL, ESP_PD_OPTION_ON);   //Keep crystal on
+    esp_sleep_pd_config(ESP_PD_DOMAIN_XTAL, ESP_PD_OPTION_ON);        //Keep crystal on
     esp_sleep_enable_timer_wakeup(sleep_us);
-    time(&now);
-    rtcData.runTime = now; // + DEEP_SLEEP;
+    rtcData.runTime = now;  // + DEEP_SLEEP;
     //rtcData.runTime_ms += millis();
     //esp_deep_sleep_start();
 
@@ -1765,7 +1768,6 @@ void readySleep() {
     esp_sleep_pd_config(ESP_PD_DOMAIN_RTC_SLOW_MEM, ESP_PD_OPTION_ON);  //RTC memory preserved
     //esp_sleep_pd_config(ESP_PD_DOMAIN_RTC_FAST_MEM, ESP_PD_OPTION_OFF);
     esp_sleep_enable_timer_wakeup(sleep_us);
-    time(&now);
     rtcData.runTime = now + DEEP_SLEEP;  //add sleep time, when we wake up will be accurate.
     rtcData.runTime_ms += millis();
     esp_deep_sleep_start();
@@ -1774,7 +1776,6 @@ void readySleep() {
     uint32_t sleep_us = DEEP_SLEEP * 1000000UL;
     //WiFi.disconnect(true);  //disassociate properly (easier to reconnect)
     //WiFi.mode(WIFI_OFF);
-    time(&now);
     rtcData.runTime = now + DEEP_SLEEP;  //add sleep time, when we wake up will be accurate.
     rtcData.runTime_ms += millis();
     ESP.rtcUserMemoryWrite(32, (uint32_t *)&rtcData, sizeof(rtcData));
@@ -1949,7 +1950,7 @@ void readyPump(uint16_t moisture) {
 #if defined(ESP8266)
     if (moisture < 20) {  //Sensor Not in Soil
 #elif defined(CONFIG_IDF_TARGET_ESP32S2) || defined(CONFIG_IDF_TARGET_ESP32C6)
-    if (moisture < 200) {  //Sensor Not in Soil
+    if (moisture < 200) {                       //Sensor Not in Soil
 #else
         if (moisture < 90) {    //Sensor Not in Soil
 #endif
@@ -2022,6 +2023,7 @@ void runPump(uint16_t duration) {
 #if DEBUG
   Serial.printf("MOISTURE LIMIT: %u\n", PLANT_SOIL_MOISTURE);
   Serial.printf("TIMER: %u\n", PLANT_MANUAL_TIMER);
+  Serial.printf("DURATION: %u\n", duration);
 #endif
   uint16_t water = 100;
   if (PNP_ADC[2] == '1') {
@@ -2039,9 +2041,17 @@ void runPump(uint16_t duration) {
     else if (PLANT_SOIL_TYPE == 4) pattern = moss;
     else pattern = dirt;
 
+#if DEBUG
+  Serial.printf("PATTERN: %u%u%u%u\n", pattern[0], pattern[1], pattern[2], pattern[3]);
+#endif
+    blinky(1000, 1); //Prevents Deep Sleep with readySleep() until next loop()
+
     uint8_t idx = 0;
     //mutable allows the lambda to modify its own copy of the captured variables:
     thread[1].attach(1, [duration, pattern, idx]() mutable {
+#if DEBUG
+  Serial.printf("THREAD: %u - ", duration);
+#endif
       if (duration == 0) {
         thread[1].detach();
         runPumpFinish();
@@ -2271,7 +2281,7 @@ void blinky(uint16_t timer, uint16_t duration) {
     timer = 40;
   }
   duration *= 2;  //toggle style
-/*
+                  /*
 #if CONFIG_IDF_TARGET_ESP32C6
   FastLED.addLeds<NEOPIXEL, ledPin>(leds, 1);
 #endif
@@ -2296,7 +2306,7 @@ leds[0] = CRGB::Blue; FastLED.show();
 #if defined(ESP32)
       digitalWrite(ledPin, LOW);  // OFF
 #else
-        digitalWrite(ledPin, HIGH);                        // OFF
+        digitalWrite(ledPin, HIGH);                         // OFF
 #endif
     } else {
       //digitalWrite(ledPin, !digitalRead(ledPin));
@@ -2367,11 +2377,11 @@ void NVRAMWrite(uint8_t address, const char *txt) {
 #endif
   thread[0].detach();
   thread[0].once(2, []() {
-  #if EEPROM_NVS
-      preferences.end();
-  #else
+#if EEPROM_NVS
+    preferences.end();
+#else
       EEPROM.commit();
-  #endif
+#endif
   });
 }
 /*
@@ -2396,7 +2406,7 @@ uint32_t NVRAMReadInt(uint8_t address) {
 }
 */
 char *NVRAMRead(uint8_t address) {
-  static char ebuffer[96] = {0};
+  static char ebuffer[96] = { 0 };
 #if EEPROM_NVS
   char key[4];
   sprintf(key, "n%d", address);
@@ -2460,11 +2470,11 @@ void NVRAMConfig() {
 
 void turnNPNorPNP(const uint8_t state) {
 #if DEBUG
-  Serial.printf("[%u]", state);
+  Serial.printf("[%u]\n", state);
 #endif
   //pinMode(pumpPin, OUTPUT);
 #if defined(ESP32)
-  gpio_hold_dis((gpio_num_t)pumpPin); //Safety: Hold pin state disable
+  gpio_hold_dis((gpio_num_t)pumpPin);  //Safety: Hold pin state disable
 #endif
 
   if (PNP_ADC[0] == '1') {
