@@ -593,35 +593,62 @@ function loadSVG(svgfile) {
 									    }
 									});
 
-									document.getElementById('fileFirmware').addEventListener('change', function() {
+									document.getElementById('fileFirmware').addEventListener('change', function(e) {
 						            	if(DEMOLOCK) {
 											PlantLogin();
 										}else{
 											document.getElementById('formFirmware').setAttribute('action', 'http://' + window.location.hostname + '/update'); // force HTTP
-											document.getElementById('keep-eeprom-text').textContent = 'After firmware upgrade, keep current settings?';
-											document.getElementById('wireless-Settings').classList.add('hidden');
-											document.getElementById('keep-EEPROM').classList.remove('hidden');
-											document.getElementById('keep-eeprom-yes').onclick = function() {
-												deleteCookies();
-												var skip = [1, 8, 20, 25, 28];
-												for (var i = 1; i <= 31; i++) {
-												    if (skip.indexOf(i) === -1) {
-												        document.cookie = i+ '=' + data['nvram'][i];
-													}
-												}
-					                			progressTimer(20, 2);
+											//Lookup EEPROM_ID in binary and compare with current firmware
+											const file = e.target.files[0];
+    										if (file) {
+    											console.log(v[6]);
+												const reader = new FileReader();
+											    reader.onload = function(e) {
+											        const arrayBuffer = e.target.result;
+											        const uint8Array = new Uint8Array(arrayBuffer);
+											        const hexTarget = parseInt(v[6], 16) >>> 0;
+											        let hexFound = false;
+											        for (let i = 0; i < uint8Array.length - 3; i++) {
+												        const hexValue = (uint8Array[i]) | (uint8Array[i + 1] << 8) | (uint8Array[i + 2] << 16) | (uint8Array[i + 3] << 24);
+												        if ((hexValue >>> 0) === hexTarget) {
+												            hexFound = true;
+												            break;
+												        }
+												    }
+												    deleteCookies();
+											    	if(data['nvram'][PNP_ADC] != 0) {
+						            					document.cookie = PNP_ADC + '=' + data['nvram'][PNP_ADC];
+						            				}
+											        if(hexFound) {
+											        	progressTimer(20, 1);
+							                			document.getElementById('formFirmware').submit();
+											        }else{
+					    								document.getElementById('keep-eeprom-text').textContent = 'After firmware upgrade, keep current settings?';
+														document.getElementById('wireless-Settings').classList.add('hidden');
+														document.getElementById('keep-EEPROM').classList.remove('hidden');
+														document.getElementById('keep-eeprom-yes').onclick = function() {
+															var skip = [1, 8, 20, 25, 28];
+															for (var i = 1; i <= 31; i++) {
+															    if (skip.indexOf(i) === -1) {
+															        document.cookie = i + '=' + data['nvram'][i];
+																}
+															}
+								                			progressTimer(20, 2);
+										                	document.getElementById('formFirmware').submit();
+								            			}
+								            			document.getElementById('keep-eeprom-no').onclick = function() {
+								            				document.getElementById('keep-EEPROM').classList.add('hidden');
+								            				document.getElementById('wireless-Settings').classList.remove('hidden');
+								                			progressTimer(20, 1);
+										                	document.getElementById('formFirmware').submit();
+							            				}
+											        }
+											    };
+											    reader.readAsArrayBuffer(file);
+											}else{
+												progressTimer(20, 1);
 							                	document.getElementById('formFirmware').submit();
-					            			}
-					            			document.getElementById('keep-eeprom-no').onclick = function() {
-					            				deleteCookies();
-					            				if(data['nvram'][PNP_ADC] != 0) {
-					            					document.cookie = 'PNP_ADC=' + data['nvram'][PNP_ADC];
-					            				}
-					            				document.getElementById('keep-EEPROM').classList.add('hidden');
-					            				document.getElementById('wireless-Settings').classList.remove('hidden');
-					                			progressTimer(20, 1);
-							                	document.getElementById('formFirmware').submit();
-					            			}
+											}
 							            }
 						            });
 

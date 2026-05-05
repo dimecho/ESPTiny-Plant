@@ -14,7 +14,7 @@ Remember: Brand new ESP-12 short GPIO0 to GND (flash mode) then UART TX/RX
 #define ASYNCSERVER_DNS 0
 #define SYNCSERVER_mDNS 0
 #define WPA2ENTERPRISE 0
-#define EEPROM_ID 0xAB05  //Identify Sketch by NVS/EEPROM
+#define EEPROM_ID 0x6B05AB01  //Identify Sketch by NVS/EEPROM
 #if defined(ESP32)
 #define EEPROM_NVS 0  //(Non-Volatile Storage)
 #endif
@@ -58,29 +58,29 @@ Preferences preferences;
 #else
 #include <EEPROM.h>
 const int EEPROM_MAP[] = {
-  0,     //_EEPROM_ID 16
-  16,    //_WIRELESS_MODE 8
-  24,    //_WIRELESS_HIDE 8
-  32,    //_WIRELESS_PHY_MODE 8
-  40,    //_WIRELESS_PHY_POWER 8
-  48,    //_WIRELESS_CHANNEL 8
-  56,    //_WIRELESS_SSID 32
-  88,    //_WIRELESS_USERNAME 96
-  184,   //_WIRELESS_PASSWORD 48
-  232,   //_LOG_ENABLE 8
-  240,   //_NETWORK_DHCP 8
-  248,   //_NETWORK_IP 64
-  312,   //_NETWORK_SUBNET 64
-  376,   //_NETWORK_GATEWAY 64
-  440,   //_NETWORK_DNS 64
-  504,   //_PLANT_POT_SIZE 16
-  520,   //_PLANT_SOIL_MOISTURE 16
-  536,   //_PLANT_MANUAL_TIMER 16
-  552,   //_PLANT_SOIL_TYPE 16
-  568,   //_PLANT_TYPE 16
-  584,   //_RESERVED 8
-  592,   //_DEEP_SLEEP 32
-  624,   //_EMAIL_ALERT 64
+  0,     //_EEPROM_ID 32
+  32,    //_WIRELESS_MODE 8
+  40,    //_WIRELESS_HIDE 8
+  48,    //_WIRELESS_PHY_MODE 8
+  56,    //_WIRELESS_PHY_POWER 8
+  64,    //_WIRELESS_CHANNEL 8
+  72,    //_WIRELESS_SSID 32
+  104,   //_WIRELESS_USERNAME 96
+  200,   //_WIRELESS_PASSWORD 48
+  248,   //_LOG_ENABLE 8
+  256,   //_NETWORK_DHCP 8
+  264,   //_NETWORK_IP 64
+  328,   //_NETWORK_SUBNET 64
+  392,   //_NETWORK_GATEWAY 64
+  456,   //_NETWORK_DNS 64
+  520,   //_PLANT_POT_SIZE 16
+  536,   //_PLANT_SOIL_MOISTURE 16
+  552,   //_PLANT_MANUAL_TIMER 16
+  568,   //_PLANT_SOIL_TYPE 16
+  584,   //_PLANT_TYPE 16
+  600,   //_RESERVED 8
+  608,   //_DEEP_SLEEP 32
+  640,   //_EMAIL_ALERT 48
   688,   //_SMTP_SERVER 64
   752,   //_SMTP_USERNAME 96
   848,   //_SMTP_PASSWORD 48
@@ -571,7 +571,7 @@ void setup() {
 #else
   EEPROM.begin(1024);
 #endif
-  int eid = atoi(NVRAMRead(_EEPROM_ID));
+  uint32_t eid = atoi(NVRAMRead(_EEPROM_ID));
 #if DEBUG
   Serial.print("EEPROM CRC Stored: 0x");
   Serial.println(eid, HEX);
@@ -1266,7 +1266,7 @@ void setupWebServer() {
       //uint16_t major = (LFS_VERSION >> 16) & 0xFFFF; // 0x0002
       //uint16_t minor = LFS_VERSION & 0xFFFF;         // 0x0005
       //response->printf("%u.%u", major, minor);
-      response->printf("|%s|%u|%s|%u|%u\"", ESP.getSdkVersion(), LFS_VERSION, _VERSION, ESP.getFreeSketchSpace(), ESP.getFreeHeap());  //esp_himem_get_free_size()
+      response->printf("|%s|%u|%s|%u|%u|%08X\"", ESP.getSdkVersion(), LFS_VERSION, _VERSION, ESP.getFreeSketchSpace(), ESP.getFreeHeap(), EEPROM_ID);  //esp_himem_get_free_size()
 #if DEBUG
       Serial.printf("Flash free: %6d bytes\r\n", ESP.getFreeSketchSpace());
       Serial.printf("DRAM free: %6d bytes\r\n", ESP.getFreeHeap());
