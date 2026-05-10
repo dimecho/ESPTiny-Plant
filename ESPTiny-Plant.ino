@@ -76,11 +76,11 @@ const int EEPROM_MAP[] = {
   520,   //_PLANT_POT_SIZE 16
   536,   //_PLANT_SOIL_MOISTURE 16
   552,   //_PLANT_MANUAL_TIMER 16
-  568,   //_PLANT_SOIL_TYPE 16
-  584,   //_PLANT_TYPE 16
-  600,   //_RESERVED 8
-  608,   //_DEEP_SLEEP 32
-  640,   //_EMAIL_ALERT 48
+  568,   //_PLANT_SOIL_TYPE 8
+  576,   //_PLANT_TYPE 8
+  584,   //_RESERVED 8
+  592,   //_DEEP_SLEEP 32
+  624,   //_EMAIL_ALERT 64
   688,   //_SMTP_SERVER 64
   752,   //_SMTP_USERNAME 96
   848,   //_SMTP_PASSWORD 48
@@ -487,8 +487,8 @@ static uint16_t PLANT_SOIL_MOISTURE = 600;  //ADC value
 static uint16_t PLANT_SOIL_MOISTURE = 400;  //ADC value
 #endif
 static uint32_t PLANT_MANUAL_TIMER = 0;  //manual sleep timer - seconds (saved in hours)
-static uint16_t PLANT_SOIL_TYPE = 2;     //['Sand', 'Clay', 'Dirt', 'Loam', 'Moss'];
-static uint16_t PLANT_TYPE = 0;          //['Bonsai', 'Monstera', 'Palm'];
+static uint8_t PLANT_SOIL_TYPE = 2;     //['Sand', 'Clay', 'Dirt', 'Loam', 'Moss'];
+static uint8_t PLANT_TYPE = 0;          //['Bonsai', 'Monstera', 'Palm'];
 static uint32_t DEEP_SLEEP = 10;         //auto sleep timer - seconds (saved in minutes)
 //=============================
 //String EMAIL_ALERT = "";
@@ -720,10 +720,12 @@ void setup() {
       setupWiFi(22);
       blinky(1200, 1);
       //ArduinoOTA.begin();
+      setupWebServer();
     } else {
       setupWiFi(0);
+      setupWebServer();
+      strncpy(DEMO_PASSWORD, NVRAMRead(_DEMO_PASSWORD), sizeof(DEMO_PASSWORD));
     }
-    setupWebServer();
   }
 #if DEBUG
   Serial.printf("Boot calibration (milliseconds):%u\n", millis());
@@ -1045,7 +1047,6 @@ void setupWebServer() {
   if (LOG_ENABLE == 0) {
     LittleFS.remove("/l");
   }
-  strncpy(DEMO_PASSWORD, NVRAMRead(_DEMO_PASSWORD), sizeof(DEMO_PASSWORD));
   //==============================================
   //Async Web Server HTTP_GET, HTTP_POST, HTTP_ANY
   //==============================================
@@ -1774,12 +1775,13 @@ void readySleep() {
 #endif
 #else
     uint32_t sleep_us = DEEP_SLEEP * 1000000UL;
-    //WiFi.disconnect(true);  //disassociate properly (easier to reconnect)
-    //WiFi.mode(WIFI_OFF);
+    WiFi.disconnect(true);  //disassociate properly (easier to reconnect)
+    WiFi.mode(WIFI_OFF);
     rtcData.runTime = now + DEEP_SLEEP;  //add sleep time, when we wake up will be accurate.
     rtcData.runTime_ms += millis();
     ESP.rtcUserMemoryWrite(32, (uint32_t *)&rtcData, sizeof(rtcData));
     //https://github.com/esp8266/Arduino/issues/8728 (WAKE_RF_DISABLED changes ADC behaviour)
+    delay(1);
     ESP.deepSleep(sleep_us, WAKE_RF_DISABLED);  //Will wake up without radio
 #endif
   }
