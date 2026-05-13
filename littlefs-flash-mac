@@ -42,9 +42,9 @@ else
             if [[ $serial == *usb* ]] || [[ $serial == *ch34* ]] || [[ $serial == *pl23* ]] ; then
                 echo $serial
                 if [ $esp = 1 ]; then
-                    $esp_path/$esp_version/tools/esptool/esptool.py --port $serial --baud 115200 write_flash 0x100000 build/flash-littlefs.bin
+                    $esp_path/$esp_version/tools/esptool/esptool.py --port $serial --baud 115200 write-flash 0x100000 build/flash-littlefs.bin
                 else
-                    $esp_tool_path/$esp_tool_version/esptool --port $serial --baud 115200 write_flash 0x210000 build/flash-littlefs.bin
+                    $esp_tool_path/$esp_tool_version/esptool --port $serial --baud 115200 write-flash 0x210000 build/flash-littlefs.bin
                 fi
                 break
             fi
@@ -55,9 +55,9 @@ else
             if [[ $usb == *usb* ]]; then
                 echo $usb
                 if [ $esp = 1 ]; then
-                    $esp_path/$esp_version/tools/esptool/esptool.py --port $usb --baud 115200 write_flash 0x100000 build/flash-littlefs.bin
+                    $esp_path/$esp_version/tools/esptool/esptool.py --port $usb --baud 115200 write-flash 0x100000 build/flash-littlefs.bin
                 else
-                    sudo $esp_tool_path/$esp_tool_version/esptool --port $usb --baud 115200 write_flash 0x210000 build/flash-littlefs.bin
+                    sudo $esp_tool_path/$esp_tool_version/esptool --port $usb --baud 115200 write-flash 0x210000 build/flash-littlefs.bin
                 fi
                 break
             fi

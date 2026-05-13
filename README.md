@@ -36,6 +36,8 @@ This is the next evolution from the original [ATtiny13 Plant](https://github.com
 
 </p>
 
+**Note:** USB-C Flashig: Hold RST and IO buttons, release RST while holding IO (release IO after 2-3 seconds).
+
 ## ESP8266 Diagram
 
 <p align="center">

@@ -648,17 +648,6 @@ void setup() {
   //}
 #endif
   NVRAMConfig();
-  if (rtcData.runTime == 0) {
-    rtcData.runTime = 1700000000;
-  }
-  time_t epoch = rtcData.runTime;
-#if DEBUG
-  Serial.printf("Time calibration (milliseconds):%u\n", rtcData.runTime_ms);
-#endif
-  if (rtcData.runTime_ms >= 60000) {  //recycle millis into seconds (1 min drift)
-    epoch += rtcData.runTime_ms / 1000;
-    rtcData.runTime_ms = 0;
-  }
 #if CLOCK_DS1307
   Wire.begin();
   Wire.beginTransmission(0x68);
@@ -674,10 +663,22 @@ void setup() {
       .tm_year = rtc.year + 100,
       .tm_wday = rtc.dayOfWeek - 1
     };
-    epoch = mktime(&timeinfo);  //Convert to epoch
+    time_t epoch = mktime(&timeinfo);  //Convert to epoch
+    setSystemTime(epoch);
+  }
+#else
+  if (rtcData.runTime > 0) {
+    time_t epoch = rtcData.runTime;
+  #if DEBUG
+    Serial.printf("Time calibration (milliseconds):%u\n", rtcData.runTime_ms);
+  #endif
+    if (rtcData.runTime_ms >= 60000) {  //recycle millis into seconds (1 min drift)
+      epoch += rtcData.runTime_ms / 1000;
+      rtcData.runTime_ms = 0;
+    }
+    setSystemTime(epoch);
   }
 #endif
-  setSystemTime(epoch);
   /*
     REANSON_DEFAULT_RST = 0, // normal startup by power on
     REANSON_WDT_RST = 1, // hardware watch dog reset
@@ -1099,10 +1100,9 @@ void setupWebServer() {
         //rtc.startClock();
 #endif
       }
+      rtcData.waterTime = 0;
+      rtcData.drySoilTime = 0;
       time(&now);
-      if (rtcData.waterTime == 0) {
-        rtcData.waterTime = now;
-      }
       struct tm *timeinfo = localtime(&now);  // converts UTC to local time using TZ
       response->printf("Date: %02d-%02d-%04d Time: %02d:%02d:%02d DOW: %d", (timeinfo->tm_mon + 1), timeinfo->tm_mday, timeinfo->tm_year + 1900, timeinfo->tm_hour, timeinfo->tm_min, timeinfo->tm_sec, timeinfo->tm_wday);
     } else if (request->hasParam("svg")) {
@@ -1130,10 +1130,11 @@ void setupWebServer() {
       if (request->hasParam("reset")) {
         NVRAM_Erase();
         NVRAMWrite(_PNP_ADC, PNP_ADC);
-        //thread[0].detach();
-        thread[0].attach(2, []() {
+        thread[1].detach();
+        thread[1].attach(3, []() {
           ESP.restart();
         });
+        response->addHeader(FPSTR(refresh_http), "6;url=/");
         response->print(F("..."));
       } else if (request->hasParam("smtp")) {
 #if EMAILCLIENT_SMTP
@@ -1426,11 +1427,11 @@ void setupWebServer() {
       } else {
         response->print(F("Update Success! ..."));
       }
-      response->addHeader(FPSTR(refresh_http), "6;url=/");
       //thread[0].detach();
       thread[0].attach(2, []() {
         ESP.restart();
       });
+      response->addHeader(FPSTR(refresh_http), "6;url=/");
       request->send(response);
     },
     WebUpload);
