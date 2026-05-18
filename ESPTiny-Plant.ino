@@ -515,6 +515,8 @@ const uint8_t sand[] = { 1, 1, 0, 0 };
 const uint8_t loam[] = { 1, 1, 0, 1 };
 const uint8_t moss[] = { 1, 0, 1, 0 };
 const uint8_t dirt[] = { 1, 1, 1, 1 };
+enum sensorMode { MIN, MAX, AVG };
+uint16_t sensorRead(uint8_t enablePin, sensorMode mode = MIN);
 /*
 #if (CONFIG_IDF_TARGET_ESP32S2 && ARDUINO_ESP32_MAJOR >= 3)
 #include "driver/temperature_sensor.h"
@@ -1100,9 +1102,9 @@ void setupWebServer() {
         //rtc.startClock();
 #endif
       }
-      rtcData.waterTime = 0;
-      rtcData.drySoilTime = 0;
       time(&now);
+      rtcData.waterTime = now;
+      rtcData.drySoilTime = now;
       struct tm *timeinfo = localtime(&now);  // converts UTC to local time using TZ
       response->printf("Date: %02d-%02d-%04d Time: %02d:%02d:%02d DOW: %d", (timeinfo->tm_mon + 1), timeinfo->tm_mday, timeinfo->tm_year + 1900, timeinfo->tm_hour, timeinfo->tm_min, timeinfo->tm_sec, timeinfo->tm_wday);
     } else if (request->hasParam("svg")) {
@@ -2086,16 +2088,16 @@ uint16_t waterLevelRead(uint8_t sensor) {
 #else
   uint16_t threshold = 255;
 #endif
-  uint16_t water = sensorRead(watersensorPin_100);
+  uint16_t water = sensorRead(watersensorPin_100, MAX);
   if (water < threshold) {
     level = 75;
-    water = sensorRead(watersensorPin_75);
+    water = sensorRead(watersensorPin_75, MAX);
     if (water < threshold) {
       level = 50;
-      water = sensorRead(watersensorPin_50);
+      water = sensorRead(watersensorPin_50, MAX);
       if (water < threshold) {
         level = 25;
-        water = sensorRead(watersensorPin_25);
+        water = sensorRead(watersensorPin_25, MAX);
         if (water < threshold) {
           level = 0;
         }
@@ -2130,7 +2132,7 @@ uint16_t sensorRead_ESP8266(uint16_t enablePin) {
 }
 #endif
 
-uint16_t sensorRead(uint8_t enablePin) {
+uint16_t sensorRead(uint8_t enablePin, sensorMode mode) {
   uint16_t result = 0;
   /*
   * ESP8266 ADC pin 0 to 1.1 volt
@@ -2163,44 +2165,36 @@ uint16_t sensorRead(uint8_t enablePin) {
 //digitalWrite(analogDigitalPin, HIGH);  //Internal pull-up ON (20k resistor)
 
 // Sets the input attenuation for ALL ADC inputs, default is ADC_11db, range is ADC_0db, ADC_2_5db, ADC_6db, ADC_11db
-#if defined(CONFIG_IDF_TARGET_ESP32S2) || defined(CONFIG_IDF_TARGET_ESP32C6)
   if (enablePin == sensorPin) {
     analogSetAttenuation(ADC_11db);
   } else {
     analogSetAttenuation(ADC_0db);
   }
-  result = analogRead(analogDigitalPin);
-#else
-  analogSetAttenuation(ADC_11db);
   uint8_t sensitivity = ((uint8_t)PNP_ADC[1] + 1) * 100;
-  uint16_t minResult = 4095;
+  uint16_t finalResult = 0;
+  if (sensitivity >= 8) {
+    mode == AVG;
+  }
+  if (mode == MIN) {
+    finalResult = 4095;
+  }
   for (uint8_t i = 0; i < sensitivity; i++) {
     result = analogRead(analogDigitalPin);
-    if (result < minResult) {  //Lowest
-      minResult = result;
+    if (mode == MIN && result < finalResult) {  //Lowest
+      finalResult = result;
+    } else if (mode == MAX && result > finalResult) { //Highest
+      finalResult = result;
+    } else if (mode == AVG) { //Average
+      finalResult += result;
     }
   }
-  result = minResult;
-#endif
+  if (finalResult > 4095) {
+    finalResult /= sensitivity;
+  }
+  result = finalResult;
 #else
   result = analogRead(analogDigitalPin);
 #endif
-  /*
-  uint16_t minResult = 0;
-  for (uint8_t i = 0; i <= sensitivity; i++) {
-    result = analogRead(analogDigitalPin);
-    if (result > minResult) { //Highest
-      minResult = result;
-    }
-  }
-  result = minResult;
-  */
-  /*
-  for (uint8_t i = 0; i < sensitivity; i++) {
-    result += analogRead(analogDigitalPin);
-  }
-  result /= sensitivity;         //Average
-  */
   /*
   if (WiFi.getMode() == WIFI_OFF) {
     result -= ADC_ERROR_OFFSET;
