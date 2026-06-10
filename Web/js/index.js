@@ -1431,7 +1431,11 @@ function testSoil()
 	    if(adc.status == 200) {
 	    	let arr = (adc?.responseText || '0|0').split('|');
 			var a = parseInt(arr[0]);
-	    	notify('', 'Soil Moisture = ' + a, 'success');
+			var m = 1024;
+			if(ESP32) {
+				m = 4096;
+			}
+	    	notify('', 'Soil Moisture at ' + a + ' of ' + m, 'success');
 		}
 	}
 }
@@ -1448,11 +1452,7 @@ function testWater()
 	    adc.send();
 	    adc.onloadend = function() {
 		    if(adc.status == 200) {
-		    	if(adc.responseText > 0) {
-		    		notify('', 'Water Level Above Pump', 'success');
-		    	}else{
-		    		notify('', 'Water Level Below Pump', 'danger');
-		    	}
+		    	notify('', 'Water Level at ' + adc.responseText + '%', 'success');
 			}
 		}
     }
@@ -1498,7 +1498,13 @@ function testBattery()
 
 function testLED()
 {
-
+	xhr.open('GET', 'api?led=3', true);
+    xhr.send();
+    xhr.onload = function() {
+        if (xhr.status == 200) {
+        	notify('', 'LED OK', 'danger');
+        }
+    }
 }
 
 function testEmail()

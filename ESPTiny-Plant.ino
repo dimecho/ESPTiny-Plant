@@ -1069,6 +1069,10 @@ void setupWebServer() {
       } else {
         response->printf("%u", waterLevelRead(adc));
       }
+    } else if (request->hasParam("led")) {
+      uint8_t led = atoi(request->getParam("led")->value().c_str());
+      blinky(900, led);
+      response->printf("%u", led);
 #if defined(ESP32)
     } else if (request->hasParam("temp")) {
       float tempC = 0;
@@ -2170,9 +2174,10 @@ uint16_t sensorRead(uint8_t enablePin, sensorMode mode) {
   } else {
     analogSetAttenuation(ADC_0db);
   }
-  uint8_t sensitivity = ((uint8_t)PNP_ADC[1] + 1) * 100;
+#endif
+  uint8_t sensitivity = (uint8_t)PNP_ADC[1] + 1;
   uint16_t finalResult = 0;
-  if (sensitivity >= 8) {
+  if (sensitivity >= 10) {
     mode == AVG;
   }
   if (mode == MIN) {
@@ -2192,9 +2197,6 @@ uint16_t sensorRead(uint8_t enablePin, sensorMode mode) {
     finalResult /= sensitivity;
   }
   result = finalResult;
-#else
-  result = analogRead(analogDigitalPin);
-#endif
   /*
   if (WiFi.getMode() == WIFI_OFF) {
     result -= ADC_ERROR_OFFSET;
@@ -2336,7 +2338,7 @@ void NVRAMWrite(uint8_t address, uint32_t value) {
   EEPROM.commit();
   */
   char txt[12];
-  snprintf(txt, sizeof(txt), "%u", value);
+  utoa(value, txt, 10);
   NVRAMWrite(address, txt);
 }
 
