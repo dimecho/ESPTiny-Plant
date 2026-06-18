@@ -473,7 +473,24 @@
 							            <div class="flex items-center mt-2">
 							                <input type="hidden" id="WaterLevel" name="WaterLevel" value="0">
 							                <input type="checkbox" id="WaterLevelCheckbox" class="mr-2" onclick="HiddenCheck('WaterLevel', this)">
-							                <label for="WaterLevelCheckbox" class="text-gray-800 dark:text-gray-300"><small>Water Level Sensor</small></label>
+							                <label for="WaterLevelCheckbox" class="text-gray-800 dark:text-gray-300"><small>Water Level Sensor</small>
+												<span class="relative group cursor-help">&#63;&#x20DD;
+												  <span class="absolute hidden group-hover:block bg-black text-white text-xs rounded p-2 w-64 bottom-full left-1/2 -translate-x-1/2 mb-1 z-10">
+												    Loopback wire through soil to 'Moisture Sensor' (up to 4 wires/levels)
+												  </span>
+												</span>
+							                </label>
+							            </div>
+							            <div class="flex items-center mt-2">
+							                <input type="hidden" id="MOSFET" name="MOSFET" value="0">
+							                <input type="checkbox" id="MOSFETCheckbox" class="mr-2" onclick="HiddenCheck('MOSFET', this)">
+								            <label for="MOSFETCheckbox" class="text-gray-800 dark:text-gray-300"><small>Enable MOSFET Support</small>
+								                <span class="relative group cursor-help">&#63;&#x20DD;
+												  <span class="absolute hidden group-hover:block bg-black text-white text-xs rounded p-2 w-64 bottom-full left-1/2 -translate-x-1/2 mb-1 z-10">
+												    Discharge N-Channel 'NPN' or Pull-Up P-Channel 'PNP' for MOSFET turn off
+												  </span>
+												</span>
+											</label>
 							            </div>
 							        </div>
 							    </div>

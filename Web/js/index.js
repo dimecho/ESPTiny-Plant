@@ -1,4 +1,4 @@
-var pnp_adc = "000";
+var pnp_adc = "0000";
 document.addEventListener('DOMContentLoaded', function(event)
 {
 	if(document.cookie != '') {
@@ -198,10 +198,13 @@ function loadSVG(svgfile) {
 			            if(nvram.response != undefined) {
 			                NVRAMtoSVG(nvram.response);
 
-			                pnp_adc = nvram.response['nvram'][PNP_ADC] + '000';
+			                pnp_adc = nvram.response['nvram'][PNP_ADC] + '0000';
 							var bool_value = pnp_adc.charAt(2) == '1' ? true : false;
 		                    document.getElementById('WaterLevel').value = pnp_adc.charAt(2);
 							document.getElementById('WaterLevelCheckbox').checked = bool_value;
+							bool_value = pnp_adc.charAt(3) == '1' ? true : false;
+							document.getElementById('MOSFET').value = pnp_adc.charAt(3);
+							document.getElementById('MOSFETCheckbox').checked = bool_value;
 		                    svgwaterLevelAdjust(pnp_adc.charAt(2));
 		                    adcSoilValue();
 			            }
@@ -299,10 +302,10 @@ function loadSVG(svgfile) {
 							}
 							var slider = new RoundSlider(container, {
 							    radius: dynamicRadius,
-							    min: 0, max: 1, value: document.getElementById('WaterLevel').getAttribute('value'),
+							    min: 0, max: 1, value: document.getElementById('WaterLevel').value,
 							    color: '#4facfe', colorEnd: '#00f2fe',
 							    onComplete: function(v) {
-							    	saveSetting(PNP_ADC, pnp_adc.charAt(0) + '' + pnp_adc.charAt(1) + '' + v, function(lock) {
+							    	saveSetting(PNP_ADC, pnp_adc.charAt(0) + '' + pnp_adc.charAt(1) + '' + v + '' + pnp_adc.charAt(3), function(lock) {
 								    	if (lock != 'Locked') {
 								    		var bool_value = v == '1' ? true : false;
 								    		document.getElementById('WaterLevel').value = v;
@@ -659,13 +662,12 @@ function loadSVG(svgfile) {
 								      	color: '#FF5722',
 									    onChange: (v) => {
 									        document.getElementById('enable-pnp').value = v;
-											const waterLevel = document.getElementById('WaterLevel').value;
 										    if (v == 1) {
 										        notify('', 'PNP Transistor! Controlled with LOW (Negative)', 'danger');
 										        notify('', 'If you get this WRONG, Pump will run Non-Stop!', 'warning');
 										    }
-										    pnp_adc = v + '' + document.getElementById('adc-sensitivity').value  + '' + waterLevel;
-										    saveSetting(PNP_ADC,  pnp_adc.charAt(0) + '' + pnp_adc.charAt(1)  + '' + waterLevel);
+										    pnp_adc = v + '' + document.getElementById('adc-sensitivity').value  + '' + document.getElementById('WaterLevel').value + '' + document.getElementById('MOSFET').value;
+										    saveSetting(PNP_ADC,  pnp_adc.charAt(0) + '' + pnp_adc.charAt(1)  + '' + pnp_adc.charAt(2) + '' + pnp_adc.charAt(3));
 									    }
 								    });
 						            rslider('#adc-sensitivity', {
@@ -679,9 +681,8 @@ function loadSVG(svgfile) {
 									    },
 									    onChange: (v) => {
 									        document.getElementById('adc-sensitivity').value = v;
-										   	const waterLevel = document.getElementById('WaterLevel').getAttribute('value');
-										   	pnp_adc = document.getElementById('enable-pnp').value  + '' + v + '' + waterLevel;
-									    	saveSetting(PNP_ADC, pnp_adc.charAt(0) + '' + pnp_adc.charAt(1) + '' + waterLevel);
+										   	pnp_adc = document.getElementById('enable-pnp').value  + '' + v + '' + document.getElementById('WaterLevel').value + '' + document.getElementById('MOSFET').value;
+									    	saveSetting(PNP_ADC, pnp_adc.charAt(0) + '' + pnp_adc.charAt(1) + '' + pnp_adc.charAt(2) + '' + pnp_adc.charAt(3));
 									    }
 								    });
 								    
@@ -1017,8 +1018,10 @@ function HiddenCheck(id, element) {
     		saveSetting(LOG_ENABLE, 0, function(lock) {if (lock != 'Locked') {notify('','Graph & Log Collection is OFF', 'success')}});
     	}
     }else if(id == 'WaterLevel') {
-        saveSetting(PNP_ADC, pnpslider.currentValue + '' + adcslider.currentValue + '' + document.getElementById('WaterLevel').getAttribute('value'), function(lock) {if (lock != 'Locked' && element.checked) {notify('','Check Water Sensor and Water is Full', 'info')}});
-        svgwaterLevelAdjust(document.getElementById('WaterLevel').getAttribute('value'));
+        saveSetting(PNP_ADC, document.getElementById('enable-pnp').value + '' + document.getElementById('adc-sensitivity').value+ '' + document.getElementById('WaterLevel').value + '' + document.getElementById('MOSFET').value, function(lock) {if (lock != 'Locked' && element.checked) {notify('','Check Water Sensor and Water is Full', 'info')}});
+        svgwaterLevelAdjust(document.getElementById('WaterLevel').value);
+    }else if(id == 'MOSFET') {
+        saveSetting(PNP_ADC, document.getElementById('enable-pnp').value + '' + document.getElementById('adc-sensitivity').value + '' + document.getElementById('WaterLevel').value + '' + document.getElementById('MOSFET').value);
     }else if(id == 'WiFiDHCP') {
         var b = false;
 
@@ -1113,7 +1116,7 @@ function testPump()
 					        	var tm = parseInt(document.getElementById('pot-size-text').textContent) + 1;
 					        	if(xhr.responseText == 'Locked') {
 					        		PlantLogin();
-					        	}else if(document.getElementById('WaterLevel').getAttribute('value') == 1) {
+					        	}else if(document.getElementById('WaterLevel').value == 1) {
 					        		notify('', 'Water Level Sensor is On', 'warning');
 							    	var adc = new XMLHttpRequest();
 								    adc.open('GET', 'api?adc=2', true);
@@ -1442,7 +1445,7 @@ function testSoil()
 
 function testWater()
 {
-    if(document.getElementById('WaterLevel').getAttribute('value') == 0)
+    if(document.getElementById('WaterLevel').value == 0)
     {
     	notify('', 'Enable Water Sensor in Firmware', 'danger');
     	notify('', 'Hardware Mod is Required!', 'warning');

@@ -509,7 +509,7 @@ uint16_t delayBetweenOverfloodReset = 8 * 3600;
 ;                               //8 hours = 8 x 60 = 480 minutes = x16 30 min loops
 static uint8_t ON_TIME = 0;     //from 6am
 static uint8_t OFF_TIME = 0;    //to 6pm
-static char PNP_ADC[] = "010";  //0=NPN|1=PNP, ADC sensitivity, Water Level Sensor 0=Disable|1=Enable
+static char PNP_ADC[] = "0100";  //(0=NPN|1=PNP)(ADC sensitivity)(Water Level Sensor 0=Disable|1=Enable)(0=Transistor/Relay|1=MOSFET)
 //uint8_t ADC_ERROR_OFFSET = 64;           //WAKE_RF_DISABLED offset
 const uint8_t sand[] = { 1, 1, 0, 0 };
 const uint8_t loam[] = { 1, 1, 0, 1 };
@@ -2471,21 +2471,25 @@ void turnNPNorPNP(const uint8_t state) {
 #if DEBUG
   Serial.printf("[%u]\n", state);
 #endif
-  //pinMode(pumpPin, OUTPUT);
 #if defined(ESP32)
   gpio_hold_dis((gpio_num_t)pumpPin);  //Safety: Hold pin state disable
 #endif
-
-  if (PNP_ADC[0] == '1') {
+  pinMode(pumpPin, OUTPUT);
+  if (PNP_ADC[0] == '1') { //PNP
     digitalWrite(pumpPin, !state);
-    if (state == 0) {
-      pinMode(pumpPin, INPUT_PULLUP);  // Float the pin for PNP off (true high-impedance)
-    } else {
-      pinMode(pumpPin, OUTPUT);
-    }
-  } else {
-    pinMode(pumpPin, OUTPUT);
+  } else { //NPN
     digitalWrite(pumpPin, state);
+  }
+  if(PNP_ADC[3] == '1' && state == 0) {
+    if(PNP_ADC[0] == '1') { //PNP
+      pinMode(pumpPin, INPUT_PULLUP);  //True high-impedance via internal 40k - May affect deep sleep power consumption - internal pull-ups can leak current
+    }else{ //NPN Gate Discharge
+#ifdef ESP32
+      pinMode(pumpPin, INPUT_PULLDOWN);  //Internal 40k pulldown (ESP32 only)
+#else
+      pinMode(pumpPin, INPUT);  //Use external pulldown 10k resistor to GND
+#endif
+    }
   }
 }
 
