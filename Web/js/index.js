@@ -125,6 +125,8 @@ function getPOSIXtz() {
 }
 
 function loadSVG(svgfile) {
+	if(svgfile == undefined)
+		svgfile = 'bonsai.svg';
 
 	var nvram = new XMLHttpRequest();
     nvram.responseType = 'json';
@@ -156,28 +158,29 @@ function loadSVG(svgfile) {
 				index.open('GET', svgurl, true);
 				index.send();
 				index.onload = function(e) {
-					svgfile = 'bonsai.svg';
 					if(index.response != undefined) {
 						try {
 							var list = document.getElementById('listLayout');
 							var n = 0;
 							index.responseText.split('\n').forEach(function (item) {
 								//console.log(item);
-								if(n == nvram.response['nvram'][PLANT_TYPE]) {
-									svgfile = item; //match index # to file name
-								}
-								if(item.indexOf('soil.') == -1) {
-									var listdiv = document.createElement('div');
-									listdiv.classList.add('form-check');
-								    var listlabel = document.createElement('label');
-								    listlabel.classList.add('ml-2');
-								    listlabel.textContent = item;
-									var listcheckbox = document.createElement('input');
-									listcheckbox.setAttribute('type', 'checkbox');
-									listcheckbox.classList.add('form-check-input');
-									listdiv.appendChild(listcheckbox);
-									listdiv.appendChild(listlabel);
-									list.appendChild(listdiv);
+								if (item !== '') {
+									if(n == nvram.response['nvram'][PLANT_TYPE]) {
+										svgfile = item; //match index # to file name
+									}
+									if(item.indexOf('soil.') == -1) {
+										var listdiv = document.createElement('div');
+										listdiv.classList.add('form-check');
+									    var listlabel = document.createElement('label');
+									    listlabel.classList.add('ml-2');
+									    listlabel.textContent = item;
+										var listcheckbox = document.createElement('input');
+										listcheckbox.setAttribute('type', 'checkbox');
+										listcheckbox.classList.add('form-check-input');
+										listdiv.appendChild(listcheckbox);
+										listdiv.appendChild(listlabel);
+										list.appendChild(listdiv);
+									}
 								}
 								n++;
 							});
@@ -1109,7 +1112,7 @@ function testPump()
 			    log.onload = function() {
 			        if (log.status == 200) {
 						var xhr = new XMLHttpRequest();
-						xhr.open('GET', 'api?pump=1', true);
+						xhr.open('POST', 'appi?pump=1&wifi=' + (document.getElementById('TestNoWifiCheckbox').checked ? 0 : 1), true);
 					    xhr.send();
 					    xhr.onload = function() {
 					        if (xhr.status == 200) {
@@ -1470,7 +1473,7 @@ function flushWater()
 	var timer;
 	var xhr = new XMLHttpRequest();
 	document.getElementById('flush-water-start').onclick = function() {
-    	xhr.open('GET', 'api?pump=2', true);
+    	xhr.open('POST', 'appi?pump=2', true);
 	    xhr.send();
 	    xhr.onload = function() {
 	        if (xhr.status == 200) {
@@ -1483,7 +1486,7 @@ function flushWater()
 	}
 	document.getElementById('flush-water-stop').onclick = function() {
 		clearInterval(timer);
-    	xhr.open('GET', 'api?pump=0', true);
+    	xhr.open('POST', 'appi?pump=0', true);
 	    xhr.send();
 	    xhr.onload = function() {
 	        if (xhr.status == 200) {

@@ -706,9 +706,17 @@ void setup() {
 #if defined(ESP32)
   if (wakeupReason == ESP_RST_DEEPSLEEP) {  //ESP_RST_DEEPSLEEP (8)
 #else
-  if (wakeupReason == 5) {                   //REASON_DEEP_SLEEP_AWAKE (5)
+  if (wakeupReason == 5) {                  //REASON_DEEP_SLEEP_AWAKE (5)
 #endif
     delayBetweenWiFi = 0;
+#if defined(ESP32)
+  } else if (wakeupReason == ESP_RST_BROWNOUT) { //ESP_RST_BROWNOUT (9)
+    snprintf(logbuffer, sizeof(logbuffer), "v:2.7");
+    dataLog(logbuffer);
+#if EMAILCLIENT_SMTP
+    smtpSend("Low Voltage", "~2.7v", 0);
+#endif
+#endif
   } else {
     //Emergency Recover (RST to GND)
 #if defined(ESP32)
@@ -1151,12 +1159,47 @@ void setupWebServer() {
 #else
           response->print(F("No SMTP"));
 #endif
-      } else if (request->hasParam("pump")) {
+      } else if (request->hasParam("empty")) {
+        time_t now;
+        time(&now);
+        uint8_t water = atoi(request->getParam("empty")->value().c_str());
+        rtcData.emptyBottle = water;
+        if (water > 3) {
+          rtcData.waterTime = now - delayBetweenOverfloodReset;
+        }
+        response->printf("%u", (now - rtcData.waterTime));
+      }
+    } else {
+      response->print(FPSTR(locked_html));
+    }
+    request->send(response);
+  });
+  server.on("/appi", HTTP_POST, [](AsyncWebServerRequest *request) {
+    AsyncResponseStream *response = request->beginResponseStream(FPSTR(text_plain));
+    if (strlen(DEMO_PASSWORD) == 0) {
+      if (request->hasParam("pump")) {
         const AsyncWebParameter *testPump = request->getParam(0);
+        const AsyncWebParameter *testPumpWifi = request->getParam(1);
         /*
         snprintf(logbuffer, sizeof(logbuffer), "P:%lu", rtcData.runTime);
         dataLog(logbuffer);
         */
+        if (testPumpWifi->value() == "0") {
+          thread[0].detach();
+          thread[0].attach(PLANT_POT_SIZE + 1, []() {
+#if defined(ESP32)
+            esp_wifi_start();
+#else
+            WiFi.mode(WIFI_AP);
+#endif
+          });
+#if defined(ESP32)
+        esp_wifi_stop();
+#else
+        WiFi.disconnect(true);  //disassociate properly (easier to reconnect)
+        WiFi.mode(WIFI_OFF);
+#endif
+        }
         //0 = stop, 1= run (timed), 2 = run (continues)
         if (testPump->value() == "1") {
           runPump(PLANT_POT_SIZE);
@@ -1167,15 +1210,6 @@ void setupWebServer() {
           runPumpFinish();
         }
         response->print(F("..."));
-      } else if (request->hasParam("empty")) {
-        time_t now;
-        time(&now);
-        uint8_t water = atoi(request->getParam("empty")->value().c_str());
-        rtcData.emptyBottle = water;
-        if (water > 3) {
-          rtcData.waterTime = now - delayBetweenOverfloodReset;
-        }
-        response->printf("%u", (now - rtcData.waterTime));
       }
     } else {
       response->print(FPSTR(locked_html));
@@ -1671,14 +1705,12 @@ void loop() {
 #if (SYNC_TCP_SSL_ENABLE && ESP8266)
   secureServer.handleClient();
 #endif
-  if (thread[1].active())
-    return;
   /*
 #if DEBUG
   Serial.printf("%lu > %lu\n",(millis() - webTimer), delayBetweenWiFi);
 #endif
 */
-  if ((millis() - webTimer) > delayBetweenWiFi) {  //track web activity for 5 minutes
+  if (!thread[1].active() && (millis() - webTimer) > delayBetweenWiFi) {  //track web activity for 5 minutes
                                                    /*
   //Measure voltage every 10000s runtime (~2.5 hours)
   if (ALERTS[1] == '1' && rtcData.runTime % 10000 == 0) {
@@ -1733,8 +1765,7 @@ void loop() {
 }
 
 void readySleep() {
-  bool anyThreadActive = thread[0].active();
-  /*
+  bool anyThreadActive = false;
   for (uint8_t i = 0; i < 2; i++) {
 #if DEBUG
     Serial.printf("Thread %u active: %d\n", i, thread[i].active());
@@ -1744,7 +1775,6 @@ void readySleep() {
       break;
     }
   }
-  */
   //GPIO16 (D0) needs to be tied to RST to wake from deepSleep
   if (DEEP_SLEEP > 1 && !anyThreadActive) {
     time_t now;
@@ -1758,7 +1788,7 @@ void readySleep() {
 #endif
 #if defined(ESP32)
     uint64_t sleep_us = (uint64_t)DEEP_SLEEP * 1000000ULL;
-    gpio_hold_en((gpio_num_t)pumpPin);  //Safety: Hold pin state during deep sleep
+    //gpio_hold_en((gpio_num_t)pumpPin);  //Safety: Hold pin state during deep sleep
 #if defined(CONFIG_IDF_TARGET_ESP32C6)
     esp_wifi_stop();
     esp_sleep_disable_wakeup_source(ESP_SLEEP_WAKEUP_ALL);
@@ -2016,14 +2046,12 @@ void readyPump(uint16_t moisture) {
 
 void runPumpFinish() {
   turnNPNorPNP(0);  // OFF
-#if EMAILCLIENT_SMTP
-  if (ALERTS[3] == '1')
-    smtpSend("Run Pump", (char *)PLANT_POT_SIZE, 0);
+#ifdef RTC_CNTL_BROWN_OUT_REG
+  WRITE_PERI_REG(RTC_CNTL_BROWN_OUT_REG, 1); //enable brownout detector
 #endif
+  rtcData.emptyBottle++;  // Sensorless Empty Detection
   snprintf(logbuffer, sizeof(logbuffer), "T:%u,M:%u", PLANT_MANUAL_TIMER, PLANT_SOIL_MOISTURE);
   dataLog(logbuffer);
-
-  rtcData.emptyBottle++;  // Sensorless Empty Detection
 }
 
 void runPump(uint16_t duration) {
@@ -2053,7 +2081,7 @@ void runPump(uint16_t duration) {
 #if DEBUG
   Serial.printf("PATTERN: %u%u%u%u\n", pattern[0], pattern[1], pattern[2], pattern[3]);
 #endif
-    blinky(1000, 1); //Prevents Deep Sleep with readySleep() until next loop()
+    //blinky(1000, 1); //Prevents Deep Sleep with readySleep() until next loop()
 
     uint8_t idx = 0;
     //mutable allows the lambda to modify its own copy of the captured variables:
@@ -2063,13 +2091,17 @@ void runPump(uint16_t duration) {
 #endif
       if (duration == 0) {
         thread[1].detach();
-        runPumpFinish();
+        runPumpFinish(); //Note: Ticker callback has low stack (~768 bytes)
       } else {
         turnNPNorPNP(pattern[idx]);  // ON or OFF
         idx = (idx + 1) & 0x03;      // fast modulo 4
         duration--;
       }
     });
+#if EMAILCLIENT_SMTP
+  if (ALERTS[3] == '1')
+    smtpSend("Run Pump", (char *)PLANT_POT_SIZE, 0);
+#endif
     /*
     while (duration--) {
       turnNPNorPNP(pattern[idx]);  // ON or OFF
@@ -2126,7 +2158,7 @@ uint16_t sensorRead_ESP8266(uint16_t enablePin) {
   //A0 conflicts with WiFi Module (to reflect accurate readings from GUI turn ON WiFi during ADC)
   //-----------------
   if (WiFi.getMode() == WIFI_OFF) {
-    WiFi.mode(WIFI_AP);  //WiFi.begin();
+    WiFi.mode(WIFI_AP);
     result = sensorRead(enablePin);
     WiFi.mode(WIFI_OFF);
   } else {
@@ -2444,7 +2476,7 @@ char *NVRAMRead(uint8_t address) {
 
 void NVRAMConfig() {
   strncpy(PNP_ADC, NVRAMRead(_PNP_ADC), sizeof(PNP_ADC));
-  turnNPNorPNP(0);
+  //turnNPNorPNP(0);
 
   DEEP_SLEEP = atoi(NVRAMRead(_DEEP_SLEEP)) * 60;
   PLANT_MANUAL_TIMER = atoi(NVRAMRead(_PLANT_MANUAL_TIMER)) * 3600;
@@ -2471,10 +2503,13 @@ void turnNPNorPNP(const uint8_t state) {
 #if DEBUG
   Serial.printf("[%u]\n", state);
 #endif
-#if defined(ESP32)
-  gpio_hold_dis((gpio_num_t)pumpPin);  //Safety: Hold pin state disable
-#endif
+//#if defined(ESP32)
+//  gpio_hold_dis((gpio_num_t)pumpPin);  //Safety: Hold pin state disable
+//#endif
   pinMode(pumpPin, OUTPUT);
+#ifdef RTC_CNTL_BROWN_OUT_REG
+    WRITE_PERI_REG(RTC_CNTL_BROWN_OUT_REG, 0); //disable brownout detector
+#endif
   if (PNP_ADC[0] == '1') { //PNP
     digitalWrite(pumpPin, !state);
   } else { //NPN
@@ -2485,7 +2520,7 @@ void turnNPNorPNP(const uint8_t state) {
       pinMode(pumpPin, INPUT_PULLUP);  //True high-impedance via internal 40k - May affect deep sleep power consumption - internal pull-ups can leak current
     }else{ //NPN Gate Discharge
 #ifdef ESP32
-      pinMode(pumpPin, INPUT_PULLDOWN);  //Internal 40k pulldown (ESP32 only)
+     pinMode(pumpPin, INPUT_PULLDOWN);  //Internal 40k pulldown (ESP32 only)
 #else
       pinMode(pumpPin, INPUT);  //Use external pulldown 10k resistor to GND
 #endif
