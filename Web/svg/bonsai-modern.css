@@ -18,7 +18,7 @@
 * { box-sizing: border-box; margin: 0; padding: 0; }
 
 :root {
-  --bg: #24201a;
+  --bg: #131e17;
   --text: #e0e0e0;
   --heading: #c4d8cc;
   --muted: #8a9a9b;
@@ -34,7 +34,7 @@
 }
 
 [data-theme="light"] {
-  --bg: #f5f0eb;
+  --bg: #ecf0ea;
   --text: #2a2a2a;
   --heading: #3a5a48;
   --muted: #6b7b6b;
@@ -184,3 +184,7 @@ header p {
 
 .feature-group { cursor: pointer; transform-box: fill-box; transform-origin: center; transition: transform 0.2s ease, filter 0.2s ease; }
 .feature-group:hover, .feature-group.active { transform: scale(1.12); filter: brightness(1.2); }
+
+.swatch { position:relative; }
+.water-check { display:none; position:absolute; top:-4px; right:-4px; width:24px; height:24px; background:#4a8257; border:2px solid #fff; border-radius:50%; align-items:center; justify-content:center; font-size:13px; color:#fff; font-weight:bold; line-height:1; box-shadow:0 0 4px rgba(0,0,0,0.3); z-index:2; }
+.water-check.on { display:flex; }

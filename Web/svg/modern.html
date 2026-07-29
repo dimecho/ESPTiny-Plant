@@ -16,7 +16,7 @@
 
 <div class="split-layout">
   <div class="svg-panel">
-    <object data="bonsai-modern-grouped.svg" type="image/svg+xml" id="svgObject"></object>
+    <object data="bonsai-modern.svg" type="image/svg+xml" id="svgObject"></object>
   </div>
   <div class="cards-panel">
     <div class="feature-card" data-feature="wifi">
@@ -36,8 +36,10 @@
       <div class="card-info"><h3>Timer</h3><p>Watering schedule timer</p></div>
     </div>
     <div class="feature-card" data-feature="water">
-      <div class="swatch" style="background:#397c7d"></div>
-      <div class="card-info"><h3>Water</h3><p>Water pump and level</p></div>
+      <div class="swatch" style="background:#397c7d">
+        <span class="water-check">✓</span>
+      </div>
+      <div class="card-info"><h3>Water</h3><p>Water level sensor</p></div>
     </div>
     <div class="feature-card" data-feature="pot-size">
       <div class="swatch" style="background:#cf6434"></div>
@@ -79,6 +81,20 @@ document.getElementById('svgObject').addEventListener('load', function onLoad() 
       if (group) group.classList.remove('active');
     });
   });
+
+  var waterCard = document.querySelector('.feature-card[data-feature="water"]');
+  if (waterCard) {
+    var waterOn = false;
+    waterCard.style.cursor = 'pointer';
+    waterCard.addEventListener('click', function() {
+      waterOn = !waterOn;
+      var check = this.querySelector('.water-check');
+      if (check) check.classList.toggle('on', waterOn);
+      var xhr = new XMLHttpRequest();
+      xhr.open('GET', '/api?watersensor=' + (waterOn ? 1 : 0), true);
+      xhr.send();
+    });
+  }
 });
 </script>
 
