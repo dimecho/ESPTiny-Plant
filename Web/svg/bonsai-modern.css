@@ -1,0 +1,186 @@
+@keyframes fade-in {
+  0% { opacity: 0; }
+  100% { opacity: 1; }
+}
+@keyframes grow {
+  0% { transform: scale(0,0); }
+  100% { transform: scale(1,1); }
+}
+@keyframes grow-x {
+  0% { transform: scaleX(0); }
+  100% { transform: scaleX(1); }
+}
+@keyframes grow-y {
+  0% { transform: scaleY(0); }
+  100% { transform: scaleY(1); }
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg: #24201a;
+  --text: #e0e0e0;
+  --heading: #c4d8cc;
+  --muted: #8a9a9b;
+  --card-bg: rgba(255,255,255,0.04);
+  --card-border: rgba(255,255,255,0.08);
+  --card-hover-bg: rgba(255,255,255,0.1);
+  --card-hover-border: rgba(255,255,255,0.25);
+  --card-title: #e0e0e0;
+  --card-text: #8a9a9b;
+  --theme-btn-bg: rgba(255,255,255,0.1);
+  --theme-btn-border: rgba(255,255,255,0.2);
+  --theme-btn-hover: rgba(255,255,255,0.2);
+}
+
+[data-theme="light"] {
+  --bg: #f5f0eb;
+  --text: #2a2a2a;
+  --heading: #3a5a48;
+  --muted: #6b7b6b;
+  --card-bg: rgba(0,0,0,0.03);
+  --card-border: rgba(0,0,0,0.1);
+  --card-hover-bg: rgba(0,0,0,0.06);
+  --card-hover-border: rgba(0,0,0,0.2);
+  --card-title: #2a2a2a;
+  --card-text: #6b7b6b;
+  --theme-btn-bg: rgba(0,0,0,0.08);
+  --theme-btn-border: rgba(0,0,0,0.15);
+  --theme-btn-hover: rgba(0,0,0,0.15);
+}
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: system-ui, -apple-system, sans-serif;
+  min-height: 100vh;
+  animation: fade-in 1s ease-out;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+header {
+  margin: 0 0 1rem;
+  text-align: center;
+  width: 100%;
+  animation: grow-y 0.6s ease-out;
+  transform-origin: top;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+  flex-wrap: wrap;
+  padding-top: 1rem;
+}
+
+header h1 {
+  font-size: 1.8rem;
+  font-weight: 300;
+  letter-spacing: 2px;
+  color: var(--heading);
+}
+
+header p {
+  color: var(--muted);
+  font-size: 0.9rem;
+  margin-top: 0.3rem;
+}
+
+.split-layout {
+  display: flex;
+  gap: 2rem;
+  width: 95vw;
+  max-width: 1400px;
+  margin: 1rem auto 2rem;
+  animation: grow 0.8s ease-out;
+  transform-origin: center center;
+}
+
+.svg-panel {
+  flex: 6;
+  min-width: 0;
+}
+
+.svg-panel object {
+  width: 100%;
+  height: auto;
+  display: block;
+}
+
+.cards-panel {
+  flex: 4;
+  display: flex;
+  flex-direction: column;
+  gap: 0.8rem;
+  justify-content: center;
+  min-width: 250px;
+}
+
+.feature-card {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 0.9rem 1.2rem;
+  background: var(--card-bg);
+  border: 1px solid var(--card-border);
+  border-radius: 10px;
+  cursor: pointer;
+  transition: all 0.25s ease-in-out;
+  animation: grow-x 0.5s ease-out backwards;
+  transform-origin: left center;
+}
+
+.feature-card:nth-child(1) { animation-delay: 0.1s; }
+.feature-card:nth-child(2) { animation-delay: 0.15s; }
+.feature-card:nth-child(3) { animation-delay: 0.2s; }
+.feature-card:nth-child(4) { animation-delay: 0.25s; }
+.feature-card:nth-child(5) { animation-delay: 0.3s; }
+.feature-card:nth-child(6) { animation-delay: 0.35s; }
+.feature-card:nth-child(7) { animation-delay: 0.4s; }
+.feature-card:nth-child(8) { animation-delay: 0.45s; }
+
+.feature-card:hover {
+  background: var(--card-hover-bg);
+  border-color: var(--card-hover-border);
+  transform: translateX(8px);
+}
+
+.swatch {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  border: 2px solid rgba(255,255,255,0.15);
+}
+
+.card-info h3 {
+  font-size: 1rem;
+  font-weight: 500;
+  color: var(--card-title);
+}
+
+.card-info p {
+  font-size: 0.8rem;
+  color: var(--card-text);
+  margin-top: 0.2rem;
+}
+
+.theme-toggle {
+  background: var(--theme-btn-bg);
+  border: 1px solid var(--theme-btn-border);
+  color: var(--text);
+  padding: 0.4rem 0.9rem;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 0.85rem;
+  transition: all 0.2s ease;
+  line-height: 1;
+}
+
+.theme-toggle:hover {
+  background: var(--theme-btn-hover);
+}
+
+.feature-group { cursor: pointer; transform-box: fill-box; transform-origin: center; transition: transform 0.2s ease, filter 0.2s ease; }
+.feature-group:hover, .feature-group.active { transform: scale(1.12); filter: brightness(1.2); }

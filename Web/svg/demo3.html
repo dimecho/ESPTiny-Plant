@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Bonsai Modern — Demo 3: Split Layout</title>
+<script>document.documentElement.setAttribute('data-theme', localStorage.getItem('theme') || 'dark')</script>
+  <link href="bonsai-modern.css" rel="stylesheet" type="text/css" />
+</head>
+<body>
+<header>
+  <h1></h1>
+  <p></p>
+  <button class="theme-toggle" id="themeToggle">Dark</button>
+</header>
+
+<div class="split-layout">
+  <div class="svg-panel">
+    <object data="bonsai-modern-grouped.svg" type="image/svg+xml" id="svgObject"></object>
+  </div>
+  <div class="cards-panel">
+    <div class="feature-card" data-feature="wifi">
+      <div class="swatch" style="background:#62a29a"></div>
+      <div class="card-info"><h3>WiFi</h3><p>Wireless connectivity status</p></div>
+    </div>
+    <div class="feature-card" data-feature="power">
+      <div class="swatch" style="background:#4a8257"></div>
+      <div class="card-info"><h3>Power</h3><p>Power supply and energy</p></div>
+    </div>
+    <div class="feature-card" data-feature="graph">
+      <div class="swatch" style="background:#d4b84c"></div>
+      <div class="card-info"><h3>Graph</h3><p>Sensor data visualization</p></div>
+    </div>
+    <div class="feature-card" data-feature="timer">
+      <div class="swatch" style="background:#11333b"></div>
+      <div class="card-info"><h3>Timer</h3><p>Watering schedule timer</p></div>
+    </div>
+    <div class="feature-card" data-feature="water">
+      <div class="swatch" style="background:#397c7d"></div>
+      <div class="card-info"><h3>Water</h3><p>Water pump and level</p></div>
+    </div>
+    <div class="feature-card" data-feature="pot-size">
+      <div class="swatch" style="background:#cf6434"></div>
+      <div class="card-info"><h3>Pot Size</h3><p>Container size setting</p></div>
+    </div>
+    <div class="feature-card" data-feature="soil">
+      <div class="swatch" style="background:#58280c"></div>
+      <div class="card-info"><h3>Soil</h3><p>Soil type and composition</p></div>
+    </div>
+    <div class="feature-card" data-feature="moisture">
+      <div class="swatch" style="background:#33b5e5"></div>
+      <div class="card-info"><h3>Moisture</h3><p>Soil moisture reading</p></div>
+    </div>
+  </div>
+</div>
+
+
+<script>
+document.getElementById('svgObject').addEventListener('load', function onLoad() {
+  var svgDoc = this.contentDocument;
+  if (!svgDoc) return;
+
+  var cards = document.querySelectorAll('.feature-card');
+
+  function findFeatureGroup(name) {
+    return svgDoc.querySelector('[data-feature="' + name + '"]');
+  }
+
+  cards.forEach(function(card) {
+    card.addEventListener('mouseenter', function() {
+      var name = this.dataset.feature;
+      var group = findFeatureGroup(name);
+      if (group) group.classList.add('active');
+    });
+
+    card.addEventListener('mouseleave', function() {
+      var name = this.dataset.feature;
+      var group = findFeatureGroup(name);
+      if (group) group.classList.remove('active');
+    });
+  });
+});
+</script>
+
+<script>
+var html = document.documentElement;
+var saved = localStorage.getItem('theme') || 'dark';
+html.setAttribute('data-theme', saved);
+document.getElementById('themeToggle').textContent = saved === 'dark' ? 'Light' : 'Dark';
+
+document.getElementById('themeToggle').addEventListener('click', function() {
+  var current = html.getAttribute('data-theme');
+  var next = current === 'dark' ? 'light' : 'dark';
+  html.setAttribute('data-theme', next);
+  localStorage.setItem('theme', next);
+  this.textContent = next === 'dark' ? 'Light' : 'Dark';
+});
+</script>
+</body>
+</html>
