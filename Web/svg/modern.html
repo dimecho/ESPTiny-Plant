@@ -3,15 +3,31 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Bonsai Modern — Demo 3: Split Layout</title>
-<script>document.documentElement.setAttribute('data-theme', localStorage.getItem('theme') || 'dark')</script>
+<title>tiny plant</title>
+<script>
+var savedTheme = localStorage.getItem('theme') || 'dark';
+document.documentElement.setAttribute('data-theme', savedTheme);
+
+function applySvgTheme() {
+  try {
+    var win = document.getElementById('svgObject').contentDocument.defaultView;
+    if (win && win.svgApplyTheme) {
+      win.svgApplyTheme(document.documentElement.getAttribute('data-theme') === 'dark');
+    }
+  } catch(e) {}
+}
+</script>
   <link href="bonsai-modern.css" rel="stylesheet" type="text/css" />
+  <script src="../js/qrcode.js"></script>
+
 </head>
 <body>
+<div id="preloader-overlay"><div id="preloader-bar"><div id="preloader-fill"></div></div></div>
 <header>
   <h1></h1>
   <p></p>
-  <button class="theme-toggle" id="themeToggle">Dark</button>
+  <button class="theme-toggle" id="themeToggle"></button>
+  <button class="font-toggle" id="fontToggle">A</button>
 </header>
 
 <div class="split-layout">
@@ -19,47 +35,372 @@
     <object data="bonsai-modern.svg" type="image/svg+xml" id="svgObject"></object>
   </div>
   <div class="cards-panel">
-    <div class="feature-card" data-feature="wifi">
+    <div class="feature-card" data-feature="wifi" id="wifiCard">
       <div class="swatch" style="background:#62a29a"></div>
       <div class="card-info"><h3>WiFi</h3><p>Wireless connectivity status</p></div>
     </div>
-    <div class="feature-card" data-feature="power">
-      <div class="swatch" style="background:#4a8257"></div>
-      <div class="card-info"><h3>Power</h3><p>Power supply and energy</p></div>
+    <div class="feature-card" data-feature="power" id="powerCard">
+      <div class="power-normal" id="powerNormal">
+        <div class="swatch" style="background:#4a8257"></div>
+        <div class="card-info"><h3>Power</h3><p>Power supply and energy</p></div>
+      </div>
+      <div class="power-slider-wrap" id="powerSliderWrap">
+        <span class="power-slider-label">Sleep in minutes</span>
+        <input type="range" min="0" max="30" value="0" class="range-slider" id="powerSlider" style="--slider-color:#4a8257">
+      </div>
     </div>
-    <div class="feature-card" data-feature="graph">
+    <div class="feature-card" data-feature="graph" id="graphCard">
       <div class="swatch" style="background:#d4b84c"></div>
       <div class="card-info"><h3>Graph</h3><p>Sensor data visualization</p></div>
     </div>
-    <div class="feature-card" data-feature="timer">
-      <div class="swatch" style="background:#11333b"></div>
-      <div class="card-info"><h3>Timer</h3><p>Watering schedule timer</p></div>
+    <div class="feature-card" data-feature="timer" id="timerCard">
+      <div class="timer-normal" id="timerNormal">
+        <div class="swatch" style="background:#11333b">
+          <input type="checkbox" class="card-checkbox" id="timerCheckbox" style="accent-color:#11333b">
+        </div>
+        <div class="card-info"><h3>Timer</h3><p>Watering schedule timer</p></div>
+      </div>
+      <div class="timer-slider-wrap" id="timerSliderWrap">
+        <span class="timer-slider-label" id="timerSliderLabel">Water every 0 hours</span>
+        <input type="range" min="0" max="120" value="0" class="range-slider" id="timerSlider" style="--slider-color:#11333b">
+      </div>
     </div>
     <div class="feature-card" data-feature="water">
       <div class="swatch" style="background:#397c7d">
-        <span class="water-check">✓</span>
+        <input type="checkbox" class="card-checkbox" id="waterCheckbox" style="accent-color:#397c7d">
       </div>
       <div class="card-info"><h3>Water</h3><p>Water level sensor</p></div>
     </div>
-    <div class="feature-card" data-feature="pot-size">
-      <div class="swatch" style="background:#cf6434"></div>
-      <div class="card-info"><h3>Pot Size</h3><p>Container size setting</p></div>
+    <div class="feature-card" data-feature="pot-size" id="potSizeCard">
+      <div class="potsize-normal" id="potSizeNormal">
+        <div class="swatch" style="background:#cf6434"></div>
+        <div class="card-info"><h3>Pot Size</h3><p>Container size setting</p></div>
+      </div>
+      <div class="potsize-slider-wrap" id="potSizeSliderWrap">
+        <span class="potsize-slider-label" id="potSizeSliderLabel">Water for 2 seconds</span>
+        <input type="range" min="2" max="240" value="2" class="range-slider" id="potSizeSlider" style="--slider-color:#cf6434">
+      </div>
     </div>
-    <div class="feature-card" data-feature="soil">
-      <div class="swatch" style="background:#58280c"></div>
-      <div class="card-info"><h3>Soil</h3><p>Soil type and composition</p></div>
+    <div class="feature-card" data-feature="soil" id="soilCard">
+      <div class="soil-normal" id="soilNormal">
+        <div class="swatch" style="background:#58280c"></div>
+        <div class="card-info"><h3>Soil</h3><p>Soil type and composition</p></div>
+      </div>
+      <div class="soil-boxes-wrap" id="soilBoxesWrap">
+        <div class="soil-box" data-soil="Moss" style="--soil-color:#4a8257">Moss</div>
+        <div class="soil-box" data-soil="Loam" style="--soil-color:#111110">Loam</div>
+        <div class="soil-box" data-soil="Dirt" style="--soil-color:#58280c">Dirt</div>
+        <div class="soil-box" data-soil="Clay" style="--soil-color:#bc8f6b">Clay</div>
+        <div class="soil-box" data-soil="Sand" style="--soil-color:#d4b84c">Sand</div>
+        <div class="soil-box" data-soil="Rock" style="--soil-color:#9ca0a2">Rock</div>
+      </div>
     </div>
-    <div class="feature-card" data-feature="moisture">
-      <div class="swatch" style="background:#33b5e5"></div>
-      <div class="card-info"><h3>Moisture</h3><p>Soil moisture reading</p></div>
+    <div class="feature-card" data-feature="moisture" id="moistureCard">
+      <div class="moisture-normal" id="moistureNormal">
+        <div class="swatch" style="background:#33b5e5"></div>
+        <div class="card-info"><h3>Moisture</h3><p>Soil moisture reading</p></div>
+      </div>
+      <div class="moisture-slider-wrap" id="moistureSliderWrap">
+        <span class="moisture-slider-label" id="moistureSliderLabel">Moisture 20</span>
+        <input type="range" min="20" max="999" value="20" class="range-slider" id="moistureSlider" style="--slider-color:#33b5e5">
+      </div>
     </div>
   </div>
 </div>
 
+<div id="wifiModal" class="modal-overlay">
+  <div class="modal-content">
+    <button class="modal-close" id="wifiModalClose">&times;</button>
+    <div class="modal-tabs" id="wifiTabs">
+      <button class="modal-tab active" data-tab="wireless">Wireless</button>
+      <button class="modal-tab" data-tab="alerts">Alerts</button>
+      <button class="modal-tab" data-tab="security">Security</button>
+      <button class="modal-tab" data-tab="layout">Layout</button>
+      <button class="modal-tab" data-tab="hardware">Hardware</button>
+      <button class="modal-tab" data-tab="firmware">Firmware</button>
+    </div>
+      <div class="tab-panel active" id="tab-wireless">
+        <form id="wifiForm" onsubmit="return false;" style="display:flex;flex-direction:column;gap:0.5rem">
+        <label class="tab-label">WiFi Mode:</label>
+        <select class="tab-select" id="WiFiMode" name="Mode">
+          <option value="0">WiFi Access Point</option>
+          <option value="1">WiFi Client (WPA2 Personal)</option>
+          <option value="2">WiFi Client (WPA2 Enterprise)</option>
+          <option value="3">WiFi Client (WEP Key)</option>
+        </select>
+        <div class="alert-warn hidden" id="AlertWifiInfo">Wireless Client must be enabled!</div>
+        <input type="hidden" id="WiFiHidden" name="Hidden" value="0">
+        <label class="tab-checkbox-label"><input type="checkbox" class="tab-checkbox" id="WiFiHiddenCheckbox"> Hidden SSID</label>
+        <div id="qrcode"></div>
+        <label class="tab-label">PHY Mode:</label>
+        <select class="tab-select" id="WiFiPhyMode" name="PhyMode">
+          <option value="1">802.11 b</option>
+          <option value="2">802.11 g</option>
+          <option value="3">802.11 n</option>
+          <option value="4">802.11 ax</option>
+        </select>
+        <label class="tab-label">Power:</label>
+        <div class="inline-row">
+          <select class="tab-select" id="WiFiPower" name="Power">
+            <option value="1">1 dBm (1mW)</option>
+            <option value="2">2 dBm (1mW)</option>
+            <option value="3">3 dBm (1mW)</option>
+            <option value="4">4 dBm (2mW)</option>
+            <option value="5">5 dBm (3mW)</option>
+            <option value="6">6 dBm (3mW)</option>
+            <option value="7">7 dBm (5mW)</option>
+            <option value="8">8 dBm (6mW)</option>
+            <option value="9">9 dBm (7mW)</option>
+            <option value="10">10 dBm (10mW)</option>
+            <option value="11">11 dBm (12mW)</option>
+            <option value="12">12 dBm (15mW)</option>
+            <option value="13">13 dBm (19mW)</option>
+            <option value="14">14 dBm (25mW)</option>
+            <option value="15">15 dBm (31mW)</option>
+            <option value="16">16 dBm (39mW)</option>
+            <option value="17">17 dBm (50mW)</option>
+            <option value="18">18 dBm (63mW)</option>
+            <option value="19">19 dBm (79mW)</option>
+            <option value="20">20 dBm (100mW)</option>
+            <option value="21">20.5 dBm (112mW)</option>
+          </select>
+          <button class="tab-btn" type="button" id="autoWiFiPowerBtn">Autotune</button>
+        </div>
+        <div class="alert-warn hidden" id="AlertWiFiPower">WiFi power may not reach AP</div>
+        <label class="tab-label">Channel:</label>
+        <select class="tab-select" id="WiFiChannel" name="Channel"></select>
+        <label class="tab-label">SSID:</label>
+        <input type="text" class="tab-input" id="WiFiSSID" name="SSID" placeholder="Plant">
+        <label class="tab-label">Username (WPA2 Enterprise):</label>
+        <input type="text" class="tab-input" id="WiFiUsername" name="Username" placeholder="Username">
+        <label class="tab-label">Password:</label>
+        <div class="inline-row">
+          <input type="password" class="tab-input" id="WiFiPassword" name="Password" placeholder="Password" style="flex:1">
+          <button class="tab-btn" id="wifiPasswordToggle" type="button">Show</button>
+        </div>
+        <input type="hidden" id="EnableLog" name="Log" value="0">
+        <label class="tab-checkbox-label"><input type="checkbox" class="tab-checkbox" id="EnableLogCheckbox"> Enable Data Log</label>
+        <input type="hidden" id="WiFiDHCP" name="DHCP" value="0">
+        <label class="tab-checkbox-label"><input type="checkbox" class="tab-checkbox" id="WiFiDHCPCheckbox"> Enable DHCP</label>
+        <div class="alert-warn hidden" id="AlertWiFiDHCP">Don't forget to enable DHCP</div>
+        <label class="tab-label">IPv4 Address:</label>
+        <input type="text" class="tab-input" id="WiFiIP" name="IP" placeholder="192.168.0.2">
+        <label class="tab-label">Subnet Mask:</label>
+        <input type="text" class="tab-input" id="WiFiSubnet" name="Subnet" placeholder="255.255.255.0">
+        <label class="tab-label">Gateway:</label>
+        <input type="text" class="tab-input" id="WiFiGateway" name="Gateway" placeholder="192.168.0.1">
+        <label class="tab-label">DNS:</label>
+        <input type="text" class="tab-input" id="WiFiDNS" name="DNS" placeholder="8.8.8.8">
+        </form>
+    </div>
+      <div class="tab-panel" id="tab-alerts">
+        <div class="tab-alerts-body">
+          <div class="alert-info hidden" id="AlertInfo">Wireless Client must be enabled!</div>
+          <div class="alert-info hidden" id="AlertEncryptionInfo">No TLS Encryption — add port (e.g. smtp.server.com:587)</div>
+          <label class="tab-label">Recipient Email:</label>
+          <input type="text" class="tab-input" id="AlertEmail" placeholder="recipient@example.com">
+          <label class="tab-label">SMTP Server:</label>
+          <input type="text" class="tab-input" id="AlertSMTPServer" placeholder="smtp.example.com">
+          <label class="tab-label">SMTP Username:</label>
+          <input type="text" class="tab-input" id="AlertSMTPUsername" placeholder="user@example.com">
+          <label class="tab-label">SMTP Password:</label>
+          <div class="inline-row">
+            <input type="password" class="tab-input" id="AlertSMTPPassword" placeholder="Password" style="flex:1">
+            <button class="tab-btn" id="smtpPwToggle" type="button">Show</button>
+          </div>
+          <label class="tab-label">OAuth2.0 Access Token:</label>
+          <div class="inline-row">
+            <input type="password" class="tab-input" id="AlertSMTPToken" placeholder="Access Token" style="flex:1">
+            <button class="tab-btn" type="button" onclick="getOAuthToken()">Generate Token</button>
+          </div>
+          <label class="tab-label">Plant Name:</label>
+          <input type="text" class="tab-input" id="AlertPlantName" placeholder="My Plant">
+          <label class="tab-label">Send Email Alerts:</label>
+          <input type="hidden" id="Alerts" value="">
+          <div class="alert-checkbox-grid">
+            <label class="tab-checkbox-label"><input type="checkbox" class="tab-checkbox"> DHCP IP</label>
+            <label class="tab-checkbox-label"><input type="checkbox" class="tab-checkbox"> Low Battery</label>
+            <label class="tab-checkbox-label"><input type="checkbox" class="tab-checkbox"> Low Moisture</label>
+            <label class="tab-checkbox-label"><input type="checkbox" class="tab-checkbox"> Pump Run</label>
+            <label class="tab-checkbox-label"><input type="checkbox" class="tab-checkbox"> Over Water</label>
+            <label class="tab-checkbox-label"><input type="checkbox" class="tab-checkbox"> Empty Water</label>
+            <label class="tab-checkbox-label"><input type="checkbox" class="tab-checkbox"> Internal Errors</label>
+            <label class="tab-checkbox-label"><input type="checkbox" class="tab-checkbox"> High Priority</label>
+          </div>
+        </div>
+      </div>
+      <div class="tab-panel" id="tab-security">
+        <div class="tab-security-body">
+          <button id="createPasskey" class="sec-passkey-btn hidden" type="button">
+            <span>Create a passkey</span>
+          </button>
+          <label class="tab-label">Settings Password:</label>
+          <div class="inline-row">
+            <input type="password" class="tab-input" id="DemoPassword" placeholder="Password" style="flex:1">
+            <button class="tab-btn" id="secPwToggle" type="button">Show</button>
+          </div>
+          <label class="tab-label">Timezone:</label>
+          <select class="tab-select" id="DemoTimezone">
+            <option value="UTC7">(UTC-7) Pacific Time (Canada)</option>
+            <option value="UTC7">(UTC-7) Mountain Time (Canada)</option>
+            <option value="UTC6">(UTC-6) Central Time (Canada)</option>
+            <option value="UTC5">(UTC-5) Eastern Time (Canada)</option>
+            <option value="UTC4">(UTC-4) Atlantic Time (Canada)</option>
+            <option value="NST3:30">(UTC-3:30) Newfoundland</option>
+          </select>
+          <label class="tab-label">WiFi Availability:</label>
+          <input type="hidden" id="DemoAvailability" value="">
+          <div class="sec-avail-grid">
+            <label class="tab-checkbox-label"><input type="checkbox" class="tab-checkbox"> Sunday</label>
+            <label class="tab-checkbox-label"><input type="checkbox" class="tab-checkbox"> Monday</label>
+            <label class="tab-checkbox-label"><input type="checkbox" class="tab-checkbox"> Tuesday</label>
+            <label class="tab-checkbox-label"><input type="checkbox" class="tab-checkbox"> Wednesday</label>
+            <label class="tab-checkbox-label"><input type="checkbox" class="tab-checkbox"> Thursday</label>
+            <label class="tab-checkbox-label"><input type="checkbox" class="tab-checkbox"> Friday</label>
+            <label class="tab-checkbox-label"><input type="checkbox" class="tab-checkbox"> Saturday</label>
+          </div>
+          <label class="tab-label">Availability Hours:</label>
+          <div class="inline-row" style="gap:0.5rem">
+            <input type="number" class="tab-input" id="AvailStart" min="0" max="23" value="9" placeholder="09" style="flex:1">
+            <span style="align-self:center">to</span>
+            <input type="number" class="tab-input" id="AvailEnd" min="0" max="23" value="17" placeholder="17" style="flex:1">
+          </div>
+        </div>
+      </div>
+      <div class="tab-panel" id="tab-layout">
+        <div class="tab-layout-body">
+          <form method="POST" action="/upload" enctype="multipart/form-data" id="formLayout">
+            <input type="file" accept=".svg,.css" name="filesystem" id="fileLayout" class="hidden">
+            <input type="submit" class="hidden">
+          </form>
+          <div class="lay-btn-row">
+            <button class="tab-btn lay-btn-blue" type="button" id="browseLayout">Upload Layout</button>
+            <button class="tab-btn lay-btn-green" type="button" id="defaultLayout">Set Default</button>
+            <button class="tab-btn lay-btn-red" type="button" id="removeLayout">Remove Layout</button>
+          </div>
+          <div id="listLayout"></div>
+        </div>
+      </div>
+      <div class="tab-panel" id="tab-hardware">
+        <div class="hw-grid">
+          <button class="hw-btn hw-btn-green" type="button" onclick="testPump()">Test Pump</button>
+          <button class="hw-btn hw-btn-green" type="button" onclick="testGraph()">Test Graph</button>
+          <button class="hw-btn hw-btn-green" type="button" onclick="testBattery()">Test Battery</button>
+          <button class="hw-btn hw-btn-green" type="button" onclick="testSleep()">Test Sleep</button>
+          <button class="hw-btn hw-btn-green" type="button" onclick="testEmpty(0,true)">Test Flood</button>
+          <button class="hw-btn hw-btn-green" type="button" onclick="testEmpty(0,false)">Test Empty</button>
+          <button class="hw-btn hw-btn-green" type="button" onclick="testRefill()">Test Refill</button>
+          <button class="hw-btn hw-btn-green" type="button" onclick="testEmail()">Test Email</button>
+          <button class="hw-btn hw-btn-green" type="button" onclick="testLED()">Test LED</button>
+          <button class="hw-btn hw-btn-green" type="button" onclick="testSoil()">Test Soil Sensor</button>
+          <button class="hw-btn hw-btn-green" type="button" onclick="testWater()">Test Water Sensor</button>
+          <button class="hw-btn hw-btn-green" type="button" onclick="testNTP()">Test Timer</button>
+          <button class="hw-btn hw-btn-amber" type="button" onclick="flushWater()">Flush Water</button>
+        </div>
+      </div>
+      <div class="tab-panel" id="tab-firmware">
+        <div class="fw-col fw-versions">
+          <small>GUI Version: 1.0.7</small>
+          <small id="coreVersion">Core Version: 3.0.2</small>
+          <small id="sdkVersion">SDK Version: 2.2.2</small>
+          <small id="fsVersion">LittleFS Version: 1.4.0</small>
+          <small id="firmwareVersion">Firmware Version: 1.0</small>
+          <small id="fsram">Flash: 0</small>
+          <small id="dram">Memory: 0</small>
+        </div>
+        <div class="fw-col">
+          <div class="fw-row fw-row-flash">
+            <form method="POST" action="/update" enctype="multipart/form-data" id="formLittleFS">
+              <input type="file" accept=".bin,.signed" name="filesystem" id="fileLittleFS" class="hidden">
+              <input type="submit" class="hidden">
+            </form>
+            <button class="fw-btn fw-btn-teal fw-btn-lg" type="button" id="browseLittleFS">Flash LittleFS</button>
+            <form method="POST" action="/update" enctype="multipart/form-data" id="formFirmware">
+              <input type="file" accept=".bin,.signed" name="firmware" id="fileFirmware" class="hidden">
+              <input type="submit" class="hidden">
+            </form>
+            <button class="fw-btn fw-btn-amber fw-btn-lg" type="button" id="browseFirmware">Flash Firmware</button>
+          </div>
+          <div class="fw-progress-wrap"><div class="progress-bar"><div class="progress-fill" id="fwProgress" style="width:0%"></div></div></div>
+          <div class="fw-toggle-row">
+            <label id="pnpLabelNPN" class="active">NPN</label>
+            <div class="fw-toggle" id="pnpToggle"></div>
+            <label id="pnpLabelPNP">PNP</label>
+          </div>
+          <div class="fw-section">
+            <input type="range" min="0" max="9" value="0" class="range-slider" id="adcSlider" style="--slider-color:#33b5e5">
+            <span>Moisture Sensor Sensitivity</span>
+            <span class="slider-value" id="adcSensitivityText">0</span>
+          </div>
+          <input type="hidden" id="WaterLevel" value="0">
+          <label class="tab-checkbox-label"><input type="checkbox" class="tab-checkbox" id="WaterLevelCheckbox"> Water Level Sensor <span class="hw-tip">?<span class="hw-tip-text">Loopback wire through soil to 'Moisture Sensor' (up to 4 wires/levels)</span></span></label>
+          <input type="hidden" id="MOSFET" value="0">
+          <label class="tab-checkbox-label"><input type="checkbox" class="tab-checkbox" id="MOSFETCheckbox"> Enable MOSFET Support <span class="hw-tip">?<span class="hw-tip-text">Discharge N-Channel 'NPN' or Pull-Up P-Channel 'PNP' for MOSFET turn off</span></span></label>
+        </div>
+        <div class="fw-row fw-row-end">
+          <button class="fw-btn fw-btn-red fw-btn-lg" type="button" onclick="resetFlash()">Default Reset</button>
+          <form method="POST" action="/upload" enctype="multipart/form-data" id="formCertificate">
+            <input type="file" accept=".der,.cer" name="cert" id="fileCertificate" class="hidden">
+            <input type="submit" class="hidden">
+          </form>
+          <button class="fw-btn fw-btn-indigo fw-btn-lg" type="button" id="browseCertificate">Certificate</button>
+          <form method="POST" action="/upload" enctype="multipart/form-data" id="formPrivateKey">
+            <input type="file" accept=".der,.key" name="key" id="filePrivateKey" class="hidden">
+            <input type="submit" class="hidden">
+          </form>
+          <button class="fw-btn fw-btn-sage fw-btn-lg" type="button" id="browsePrivateKey">Private Key</button>
+        </div>
+      </div>
+    <div class="modal-footer">
+      <button class="modal-btn modal-btn-cancel">Cancel</button>
+      <button class="modal-btn modal-btn-save" id="wifiSaveBtn">Save</button>
+    </div>
+    </div>
+  </div>
+</div>
+
+<div id="testPumpModal" class="modal-overlay">
+  <div class="modal-content" style="max-width:600px">
+    <button class="modal-close" id="testPumpClose">&times;</button>
+    <div class="test-pump-body">
+      <label class="tab-checkbox-label">
+        <input type="checkbox" class="tab-checkbox" id="TestNoWifiCheckbox"> Disable WiFi During Test
+        <span class="test-pump-tip-wrap">?<span class="test-pump-tip-text">Maximize the Amps</span></span>
+      </label>
+      <input type="range" class="range-slider" id="testPumpSlider" min="1" max="200" value="1" style="--slider-color:#33994a">
+      <div class="test-pump-delay-label">Delay Test in Seconds: <span id="test-pump-delay-timer">1</span></div>
+      <div class="fw-progress-wrap"><div class="progress-bar"><div class="progress-fill" id="testPumpProgress" style="width:0%"></div></div></div>
+      <button class="modal-btn modal-btn-save" type="button" id="testPumpStart" style="width:100%">Run Pump Test</button>
+    </div>
+  </div>
+</div>
+
+<div id="flushWaterModal" class="modal-overlay">
+  <div class="modal-content" style="max-width:600px">
+    <button class="modal-close" id="flushWaterClose">&times;</button>
+    <div class="flush-water-body">
+      <p class="flush-water-desc">Empty large water containers.<br><br><span class="flush-water-badge">Warning</span> Pump will run until stopped!</p>
+      <div class="flush-water-btns">
+        <button class="modal-btn modal-btn-cancel" type="button" id="flushWaterStop" style="flex:1">Stop Pump</button>
+        <button class="modal-btn modal-btn-save" type="button" id="flushWaterStart" style="flex:1">Start Pump</button>
+      </div>
+    </div>
+  </div>
+</div>
 
 <script>
+var preloader = document.getElementById('preloader-overlay');
+var started = Date.now();
+
+var svgDoc = null;
+
 document.getElementById('svgObject').addEventListener('load', function onLoad() {
-  var svgDoc = this.contentDocument;
+  svgDoc = this.contentDocument;
+  var elapsed = Date.now() - started;
+  var remaining = Math.max(0, 1500 - elapsed);
+  setTimeout(function() {
+    preloader.classList.add('done');
+  }, remaining);
   if (!svgDoc) return;
 
   var cards = document.querySelectorAll('.feature-card');
@@ -81,35 +422,1013 @@ document.getElementById('svgObject').addEventListener('load', function onLoad() 
       if (group) group.classList.remove('active');
     });
   });
+});
 
-  var waterCard = document.querySelector('.feature-card[data-feature="water"]');
-  if (waterCard) {
-    var waterOn = false;
-    waterCard.style.cursor = 'pointer';
-    waterCard.addEventListener('click', function() {
-      waterOn = !waterOn;
-      var check = this.querySelector('.water-check');
-      if (check) check.classList.toggle('on', waterOn);
+function svgText(id) {
+  return svgDoc ? svgDoc.getElementById(id) : null;
+}
+
+function setupCheckbox(id) {
+  var cb = document.getElementById(id);
+  if (cb) {
+    cb.addEventListener('change', function() {
       var xhr = new XMLHttpRequest();
-      xhr.open('GET', '/api?watersensor=' + (waterOn ? 1 : 0), true);
+      xhr.open('GET', '/api?sensor=' + (this.checked ? 1 : 0), true);
       xhr.send();
     });
   }
-});
+}
+setupCheckbox('waterCheckbox');
+setupCheckbox('timerCheckbox');
+
+var powerCard = document.getElementById('powerCard');
+var powerNormal = document.getElementById('powerNormal');
+var powerSliderWrap = document.getElementById('powerSliderWrap');
+var powerSlider = document.getElementById('powerSlider');
+var powerLabel = document.querySelector('.power-slider-label');
+if (powerCard && powerNormal && powerSliderWrap && powerSlider) {
+  powerCard.addEventListener('click', function(e) {
+    if (e.target === powerSlider) return;
+    var powerText = svgText('power-label');
+    var val = powerText ? powerText.textContent : 10;
+    powerSlider.value = val;
+    if (powerLabel) powerLabel.textContent = 'Sleep in minutes ' + val;
+    updateSliderFill(powerSlider);
+    powerNormal.style.display = 'none';
+    powerSliderWrap.classList.add('active');
+  });
+  powerSlider.addEventListener('input', function() {
+    if (powerLabel) powerLabel.textContent = 'Sleep in minutes ' + this.value;
+    updateSliderFill(this);
+  });
+  powerSlider.addEventListener('change', function() {
+    var xhr = new XMLHttpRequest();
+    xhr.open('GET', 'nvram.json?offset=21&value=' + this.value, true);
+    xhr.send();
+    var powerText = svgText('power-label');
+    if (powerText) powerText.textContent = this.value;
+    powerSliderWrap.classList.remove('active');
+    powerNormal.style.display = 'flex';
+  });
+}
+
+var timerCard = document.getElementById('timerCard');
+var timerNormal = document.getElementById('timerNormal');
+var timerSliderWrap = document.getElementById('timerSliderWrap');
+var timerSlider = document.getElementById('timerSlider');
+var timerLabel = document.getElementById('timerSliderLabel');
+if (timerCard && timerNormal && timerSliderWrap && timerSlider) {
+    function updateTimerCheckbox(val) {
+      var cb = document.getElementById('timerCheckbox');
+      if (cb) cb.checked = parseInt(val) > 0;
+    }
+    timerCard.addEventListener('click', function(e) {
+      if (e.target === timerSlider) return;
+      var timerText = svgText('timer-label');
+      var val = timerText ? timerText.textContent : 0;
+      timerSlider.value = val;
+      if (timerLabel) {
+        var days = val >= 24 ? ' (' + Math.floor(val / 24) + ' day' + (Math.floor(val / 24) > 1 ? 's' : '') + ')' : '';
+        timerLabel.textContent = 'Water every ' + val + ' hours' + days;
+      }
+      updateSliderFill(timerSlider);
+      timerNormal.style.display = 'none';
+      timerSliderWrap.classList.add('active');
+    });
+    timerSlider.addEventListener('input', function() {
+      updateTimerCheckbox(this.value);
+      var days = this.value >= 24 ? ' (' + Math.floor(this.value / 24) + ' day' + (Math.floor(this.value / 24) > 1 ? 's' : '') + ')' : '';
+      if (timerLabel) timerLabel.textContent = 'Water every ' + this.value + ' hours' + days;
+      updateSliderFill(this);
+    });
+    timerSlider.addEventListener('change', function() {
+      var xhr = new XMLHttpRequest();
+      xhr.open('GET', 'nvram.json?offset=17&value=' + this.value, true);
+      xhr.send();
+      var timerText = svgText('timer-label');
+      if (timerText) timerText.textContent = this.value;
+      updateTimerCheckbox(this.value);
+      timerSliderWrap.classList.remove('active');
+      timerNormal.style.display = 'flex';
+    });
+}
+
+var moistureCard = document.getElementById('moistureCard');
+var moistureNormal = document.getElementById('moistureNormal');
+var moistureSliderWrap = document.getElementById('moistureSliderWrap');
+var moistureSlider = document.getElementById('moistureSlider');
+var moistureLabel = document.getElementById('moistureSliderLabel');
+if (moistureCard && moistureNormal && moistureSliderWrap && moistureSlider) {
+  moistureCard.addEventListener('click', function(e) {
+    if (e.target === moistureSlider) return;
+    var moistureText = svgText('moisture-label');
+    var val = moistureText ? moistureText.textContent : 20;
+    moistureSlider.value = val;
+    if (moistureLabel) moistureLabel.textContent = 'Moisture ' + val;
+    updateSliderFill(moistureSlider);
+    moistureNormal.style.display = 'none';
+    moistureSliderWrap.classList.add('active');
+  });
+  moistureSlider.addEventListener('input', function() {
+    if (moistureLabel) moistureLabel.textContent = 'Moisture ' + this.value;
+    updateSliderFill(this);
+  });
+  moistureSlider.addEventListener('change', function() {
+    var xhr = new XMLHttpRequest();
+    xhr.open('GET', 'nvram.json?offset=16&value=' + this.value, true);
+    xhr.send();
+    var moistureText = svgText('moisture-label');
+    if (moistureText) moistureText.textContent = this.value;
+    moistureSliderWrap.classList.remove('active');
+    moistureNormal.style.display = 'flex';
+  });
+}
+
+/* Wireless helper functions */
+function setWiFiChannels(mode) {
+  var channels = [1,2,3,4,5,6,7,8,9,10,11];
+  if (mode == 4) channels = [36,40,44,48,52,56,60,64,100,104,108,112,116,120,124,128,132,136,140,144,149,153,157,161,165];
+  var sel = document.getElementById('WiFiChannel');
+  if (!sel) return;
+  var val = sel.value;
+  sel.innerHTML = '';
+  channels.forEach(function(c) {
+    var o = document.createElement('option');
+    o.value = c; o.textContent = c;
+    sel.appendChild(o);
+  });
+  sel.value = val;
+}
+setWiFiChannels(1);
+
+function SetWiFiMode() {
+  var mode = document.getElementById('WiFiMode');
+  var info = document.getElementById('AlertWifiInfo');
+  var pwarn = document.getElementById('AlertWiFiPower');
+  if (info) info.classList.add('hidden');
+  if (pwarn) pwarn.classList.add('hidden');
+  var v = parseInt(mode.value);
+  if (v === 0) {
+    if (info) info.classList.remove('hidden');
+  } else {
+    if (pwarn && parseInt(document.getElementById('WiFiPower').value) < 20) pwarn.classList.remove('hidden');
+  }
+  var dhcpWarn = document.getElementById('AlertWiFiDHCP');
+  if (dhcpWarn && document.getElementById('WiFiDHCP').value == 0) dhcpWarn.classList.remove('hidden');
+}
+
+function WarningWiFiMode() {
+  var pwarn = document.getElementById('AlertWiFiPower');
+  var dwarn = document.getElementById('AlertWiFiDHCP');
+  if (pwarn) pwarn.classList.add('hidden');
+  if (dwarn) dwarn.classList.add('hidden');
+  if (parseInt(document.getElementById('WiFiPower').value) < 20 && pwarn) pwarn.classList.remove('hidden');
+  if (document.getElementById('WiFiDHCP').value == 0 && dwarn) dwarn.classList.remove('hidden');
+}
+
+function generateWiFiQR() {
+  var ssid = document.getElementById('WiFiSSID').value;
+  var mode = document.getElementById('WiFiMode').value;
+  var hidden = document.getElementById('WiFiHiddenCheckbox').checked;
+  var user = document.getElementById('WiFiUsername').value;
+  var pass = document.getElementById('WiFiPassword').value;
+  if (!pass) { document.getElementById('qrcode').innerHTML = ''; return; }
+  var enc = 'WPA';
+  if (mode == 2) enc = 'WPA2-EAP;E:PEAP;PH2:MS-CHAPv2;I:' + encodeURIComponent(user);
+  var qrstring = 'WIFI:S:' + encodeURIComponent(ssid) + ';T:' + enc + ';P:' + encodeURIComponent(pass) + ';';
+  if (hidden) qrstring += 'H:true;';
+  var a = document.getElementById('qrcode');
+  a.innerHTML = '';
+  if (typeof QRCode !== 'function') {
+    var s = document.createElement('script');
+    s.onload = function() { var q = new QRCode({msg:qrstring,dim:256,ecl:'M'}); a.appendChild(q); };
+    s.src = '../js/qrcode.js';
+    document.head.appendChild(s);
+  } else {
+    a.appendChild(new QRCode({msg:qrstring,dim:256,ecl:'M'}));
+  }
+}
+
+function autoWiFiPower() {
+  var mode = parseInt(document.getElementById('WiFiMode').value);
+  if (mode === 0) { notify('Auto Tune only in WiFi Client Mode', 'warning'); return; }
+  document.getElementById('WiFiPower').value = 1;
+  WarningWiFiMode();
+}
+
+function HiddenCheck(id, element) {
+  document.getElementById(id).value = element.checked ? 1 : 0;
+}
+
+function loadWirelessNvram() {
+  var nx = new XMLHttpRequest();
+  nx.responseType = 'json';
+  nx.open('GET', 'nvram.json', true);
+  nx.send();
+  nx.onload = function() {
+    if (!nx.response || !nx.response['nvram']) return;
+    try {
+      var d = nx.response['nvram'];
+      document.getElementById('WiFiMode').value = d[1] || 1;
+      document.getElementById('WiFiHidden').value = d[2] || 0;
+      document.getElementById('WiFiHiddenCheckbox').checked = d[2] == 1;
+      var phy = d[3] || 1;
+      setWiFiChannels(phy);
+      document.getElementById('WiFiPhyMode').value = phy;
+      document.getElementById('WiFiPower').value = d[4] || 1;
+      document.getElementById('WiFiChannel').value = d[5] || 1;
+      document.getElementById('WiFiSSID').value = d[6] || '';
+      document.getElementById('WiFiUsername').value = d[7] || '';
+      document.getElementById('EnableLog').value = d[9] || 0;
+      document.getElementById('EnableLogCheckbox').checked = d[9] == 1;
+      document.getElementById('WiFiDHCP').value = d[10] || 0;
+      document.getElementById('WiFiDHCPCheckbox').checked = d[10] == 1;
+      var dhcp = d[10] == 1;
+      document.getElementById('WiFiIP').value = d[11] || '';
+      document.getElementById('WiFiIP').disabled = dhcp;
+      document.getElementById('WiFiSubnet').value = d[12] || '';
+      document.getElementById('WiFiSubnet').disabled = dhcp;
+      document.getElementById('WiFiGateway').value = d[13] || '';
+      document.getElementById('WiFiGateway').disabled = dhcp;
+      document.getElementById('WiFiDNS').value = d[14] || '';
+      document.getElementById('WiFiDNS').disabled = dhcp;
+      SetWiFiMode();
+    } catch(e) {}
+  };
+}
+
+var wifiCard = document.getElementById('wifiCard');
+var wifiModal = document.getElementById('wifiModal');
+var wifiModalClose = document.getElementById('wifiModalClose');
+if (wifiCard && wifiModal) {
+  wifiCard.addEventListener('click', function() { wifiModal.classList.add('active'); document.body.classList.add('modal-open'); loadWirelessNvram(); });
+  if (wifiModalClose) wifiModalClose.addEventListener('click', function() { wifiModal.classList.remove('active'); document.body.classList.remove('modal-open'); });
+  document.querySelector('.modal-btn-cancel').addEventListener('click', function() { wifiModal.classList.remove('active'); document.body.classList.remove('modal-open'); });
+  document.getElementById('wifiSaveBtn').addEventListener('click', function() {
+    var activeTab = document.querySelector('.tab-panel.active');
+    if (activeTab) {
+      if (activeTab.id === 'tab-alerts') {
+        saveAlertsSettings();
+        wifiModal.classList.remove('active');
+        document.body.classList.remove('modal-open');
+        notify('Alert settings saved', 'success');
+        return;
+      }
+      if (activeTab.id === 'tab-security') {
+        saveSecuritySettings();
+        wifiModal.classList.remove('active');
+        document.body.classList.remove('modal-open');
+        notify('Security settings saved', 'success');
+        return;
+      }
+    }
+    var form = document.getElementById('wifiForm');
+    var data = new FormData(form);
+    var params = new URLSearchParams(data).toString();
+    var xhr = new XMLHttpRequest();
+    xhr.open('GET', 'nvram?wifi&' + params, true);
+    xhr.send();
+    wifiModal.classList.remove('active');
+    document.body.classList.remove('modal-open');
+  });
+  wifiModal.addEventListener('click', function(e) { if (e.target === wifiModal) { wifiModal.classList.remove('active'); document.body.classList.remove('modal-open'); } });
+  var wifiPwToggle = document.getElementById('wifiPasswordToggle');
+  var wifiPwInput = document.getElementById('WiFiPassword');
+  if (wifiPwToggle && wifiPwInput) {
+    wifiPwToggle.addEventListener('click', function() {
+      var show = wifiPwInput.type === 'password';
+      wifiPwInput.type = show ? 'text' : 'password';
+      wifiPwToggle.textContent = show ? 'Hide' : 'Show';
+    });
+  }
+  /* Wireless field event handlers */
+  document.getElementById('WiFiMode').addEventListener('change', function() {
+    SetWiFiMode();
+    var phy = document.getElementById('WiFiPhyMode').value;
+    setWiFiChannels(parseInt(phy));
+  });
+  document.getElementById('WiFiHiddenCheckbox').addEventListener('change', function() {
+    HiddenCheck('WiFiHidden', this);
+  });
+  document.getElementById('WiFiPhyMode').addEventListener('change', function() {
+    setWiFiChannels(parseInt(this.value));
+  });
+  document.getElementById('WiFiPower').addEventListener('change', function() {
+    WarningWiFiMode();
+  });
+  document.getElementById('autoWiFiPowerBtn').addEventListener('click', function() {
+    autoWiFiPower();
+  });
+  document.getElementById('EnableLogCheckbox').addEventListener('change', function() {
+    HiddenCheck('EnableLog', this);
+  });
+  document.getElementById('WiFiSSID').addEventListener('input', function() { generateWiFiQR(); });
+  document.getElementById('WiFiPassword').addEventListener('input', function() { generateWiFiQR(); });
+  document.getElementById('WiFiMode').addEventListener('change', function() { generateWiFiQR(); });
+  document.getElementById('WiFiHiddenCheckbox').addEventListener('change', function() { generateWiFiQR(); });
+  document.getElementById('WiFiUsername').addEventListener('input', function() { generateWiFiQR(); });
+  document.getElementById('WiFiDHCPCheckbox').addEventListener('change', function() {
+    HiddenCheck('WiFiDHCP', this);
+    var b = this.checked;
+    var mode = parseInt(document.getElementById('WiFiMode').value);
+    if (b && mode === 0) notify('DHCP works only in WiFi Client mode', 'warning');
+    document.getElementById('WiFiIP').disabled = b;
+    document.getElementById('WiFiSubnet').disabled = b;
+    document.getElementById('WiFiGateway').disabled = b;
+    document.getElementById('WiFiDNS').disabled = b;
+    WarningWiFiMode();
+  });
+  var wifiTabs = document.querySelectorAll('.modal-tab');
+  var modalFooter = document.querySelector('.modal-footer');
+  wifiTabs.forEach(function(tab) {
+    tab.addEventListener('click', function() {
+      wifiTabs.forEach(function(t) { t.classList.remove('active'); });
+      this.classList.add('active');
+      var panels = document.querySelectorAll('.tab-panel');
+      panels.forEach(function(p) { p.classList.remove('active'); });
+      var target = document.getElementById('tab-' + this.dataset.tab);
+      if (target) target.classList.add('active');
+      if (modalFooter) modalFooter.style.display = (this.dataset.tab === 'layout' || this.dataset.tab === 'hardware' || this.dataset.tab === 'firmware') ? 'none' : '';
+    });
+  });
+}
+
+function updateSliderFill(slider) {
+  var min = slider.min ? parseInt(slider.min) : 0;
+  var max = slider.max ? parseInt(slider.max) : 100;
+  var val = parseInt(slider.value);
+  var pct = ((val - min) / (max - min)) * 100;
+  var color = slider.style.getPropertyValue('--slider-color') || '#33b5e5';
+  var isLight = document.documentElement.getAttribute('data-theme') === 'light';
+  var trackBg = isLight ? 'rgba(0,0,0,0.15)' : 'rgba(255,255,255,0.2)';
+  slider.style.background = 'linear-gradient(to right, ' + color + ' ' + pct + '%, ' + trackBg + ' ' + pct + '%)';
+}
+
+var graphCard = document.getElementById('graphCard');
+if (graphCard) {
+  graphCard.addEventListener('click', function() {
+    window.location.href = 'graph.html';
+  });
+}
+
+var soilCard = document.getElementById('soilCard');
+var soilNormal = document.getElementById('soilNormal');
+var soilBoxesWrap = document.getElementById('soilBoxesWrap');
+if (soilCard && soilNormal && soilBoxesWrap) {
+  var soilSelected = null;
+  soilCard.addEventListener('click', function(e) {
+    if (soilBoxesWrap.classList.contains('active')) return;
+    soilNormal.style.display = 'none';
+    soilBoxesWrap.classList.add('active');
+  });
+  soilBoxesWrap.addEventListener('click', function(e) {
+    var box = e.target.closest('.soil-box');
+    if (!box) return;
+    if (box.classList.contains('selected')) {
+      soilBoxesWrap.classList.remove('active');
+      soilNormal.style.display = 'flex';
+      soilBoxesWrap.querySelectorAll('.soil-box').forEach(function(b) {
+        b.classList.remove('selected', 'greyed');
+      });
+      soilSelected = null;
+      return;
+    }
+    soilSelected = box.dataset.soil;
+    soilBoxesWrap.querySelectorAll('.soil-box').forEach(function(b) {
+      b.classList.toggle('selected', b === box);
+      b.classList.toggle('greyed', b !== box);
+    });
+    var xhr = new XMLHttpRequest();
+    xhr.open('GET', 'nvram.json?offset=15&value=' + soilSelected, true);
+    xhr.send();
+  });
+}
+
+var potSizeCard = document.getElementById('potSizeCard');
+var potSizeNormal = document.getElementById('potSizeNormal');
+var potSizeSliderWrap = document.getElementById('potSizeSliderWrap');
+var potSizeSlider = document.getElementById('potSizeSlider');
+var potSizeLabel = document.getElementById('potSizeSliderLabel');
+if (potSizeCard && potSizeNormal && potSizeSliderWrap && potSizeSlider) {
+  potSizeCard.addEventListener('click', function(e) {
+    if (e.target === potSizeSlider) return;
+    var potText = svgText('pot-size-label');
+    var val = potText ? potText.textContent : 4;
+    potSizeSlider.value = val;
+    var mins = val >= 60 ? ' (' + Math.floor(val / 60) + ' minute' + (Math.floor(val / 60) > 1 ? 's' : '') + ')' : '';
+    if (potSizeLabel) potSizeLabel.textContent = 'Water for ' + val + ' seconds' + mins;
+    updateSliderFill(potSizeSlider);
+    potSizeNormal.style.display = 'none';
+    potSizeSliderWrap.classList.add('active');
+  });
+  potSizeSlider.addEventListener('input', function() {
+    var mins = this.value >= 60 ? ' (' + Math.floor(this.value / 60) + ' minute' + (Math.floor(this.value / 60) > 1 ? 's' : '') + ')' : '';
+    if (potSizeLabel) potSizeLabel.textContent = 'Water for ' + this.value + ' seconds' + mins;
+    updateSliderFill(this);
+  });
+  potSizeSlider.addEventListener('change', function() {
+    var xhr = new XMLHttpRequest();
+    xhr.open('GET', 'nvram.json?offset=15&value=' + this.value, true);
+    xhr.send();
+    var potText = svgText('pot-size-label');
+    if (potText) potText.textContent = this.value;
+    potSizeSliderWrap.classList.remove('active');
+    potSizeNormal.style.display = 'flex';
+  });
+}
+
+/* Firmware tab */
+function resetFlash() { window.open('/api?reset=1'); }
+
+(function() {
+  var PNP_ADC = 31;
+  var pnpState = 0; // 0=NPN, 1=PNP
+
+  var pnpToggle = document.getElementById('pnpToggle');
+  var npnLabel = document.getElementById('pnpLabelNPN');
+  var pnpLabel = document.getElementById('pnpLabelPNP');
+
+  function updatePNP(v) {
+    pnpState = v;
+    pnpToggle.classList.toggle('on', v === 1);
+    npnLabel.classList.toggle('active', v === 0);
+    pnpLabel.classList.toggle('active', v === 1);
+  }
+
+  if (pnpToggle) {
+    pnpToggle.addEventListener('click', function() {
+      updatePNP(pnpState === 0 ? 1 : 0);
+      savePNPADC();
+    });
+  }
+
+  function savePNPADC() {
+    var adcVal = document.getElementById('adcSlider') ? document.getElementById('adcSlider').value : 0;
+    var waterLevel = document.getElementById('WaterLevelCheckbox') && document.getElementById('WaterLevelCheckbox').checked ? 1 : 0;
+    var mosfet = document.getElementById('MOSFETCheckbox') && document.getElementById('MOSFETCheckbox').checked ? 1 : 0;
+    var pnpDigit = pnpState === 0 ? 1 : 0; // classic: NPN=1, PNP=0
+    var val = pnpDigit + '' + adcVal + '' + waterLevel + '' + mosfet;
+    var xhr = new XMLHttpRequest();
+    xhr.open('GET', 'nvram.json?offset=' + PNP_ADC + '&value=' + val, true);
+    xhr.send();
+  }
+
+  var adcSlider = document.getElementById('adcSlider');
+  var adcText = document.getElementById('adcSensitivityText');
+  if (adcSlider && adcText) {
+    updateSliderFill(adcSlider);
+    adcSlider.addEventListener('input', function() {
+      adcText.textContent = this.value;
+      updateSliderFill(this);
+    });
+    adcSlider.addEventListener('change', function() {
+      savePNPADC();
+    });
+  }
+
+  var wlCheckbox = document.getElementById('WaterLevelCheckbox');
+  var wlHidden = document.getElementById('WaterLevel');
+  if (wlCheckbox && wlHidden) {
+    wlCheckbox.addEventListener('change', function() {
+      wlHidden.value = this.checked ? 1 : 0;
+      savePNPADC();
+    });
+  }
+
+  var mosfetCheckbox = document.getElementById('MOSFETCheckbox');
+  var mosfetHidden = document.getElementById('MOSFET');
+  if (mosfetCheckbox && mosfetHidden) {
+    mosfetCheckbox.addEventListener('change', function() {
+      mosfetHidden.value = this.checked ? 1 : 0;
+      savePNPADC();
+    });
+  }
+
+  function setupFileBrowse(btnId, fileId, formId) {
+    var btn = document.getElementById(btnId);
+    var file = document.getElementById(fileId);
+    var form = document.getElementById(formId);
+    if (btn && file) {
+      btn.addEventListener('click', function() { file.click(); });
+      file.addEventListener('change', function() {
+        if (form) {
+          form.setAttribute('action', 'http://' + window.location.hostname + '/update');
+          form.submit();
+        }
+      });
+    }
+  }
+  setupFileBrowse('browseLittleFS', 'fileLittleFS', 'formLittleFS');
+  setupFileBrowse('browseFirmware', 'fileFirmware', 'formFirmware');
+
+  var certBtn = document.getElementById('browseCertificate');
+  var certFile = document.getElementById('fileCertificate');
+  var certForm = document.getElementById('formCertificate');
+  if (certBtn && certFile) {
+    certBtn.addEventListener('click', function() { certFile.click(); });
+    certFile.addEventListener('change', function() { if (certForm) certForm.submit(); });
+  }
+
+  var keyBtn = document.getElementById('browsePrivateKey');
+  var keyFile = document.getElementById('filePrivateKey');
+  var keyForm = document.getElementById('formPrivateKey');
+  if (keyBtn && keyFile) {
+    keyBtn.addEventListener('click', function() { keyFile.click(); });
+    keyFile.addEventListener('change', function() { if (keyForm) keyForm.submit(); });
+  }
+
+  /* Fetch nvram.json for initial values */
+  var nvram = new XMLHttpRequest();
+  nvram.responseType = 'json';
+  nvram.open('GET', 'nvram.json', true);
+  nvram.send();
+  nvram.onload = function() {
+    if (nvram.response && nvram.response['nvram']) {
+      var data = nvram.response['nvram'];
+      try {
+        var v = data[0].split('|');
+        var cv = document.getElementById('coreVersion');
+        if (cv) cv.textContent = 'Core Version: ' + v[0];
+        var sv = document.getElementById('sdkVersion');
+        if (sv) sv.textContent = 'SDK Version: ' + v[1];
+        var fsv = document.getElementById('fsVersion');
+        if (fsv) fsv.textContent = 'LittleFS Version: ' + (0xffff & (v[2] >> 16)) + '.' + (0xffff & (v[2] >> 0)) + '.' + (0xffff & (v[2] >> 20));
+        var fwv = document.getElementById('firmwareVersion');
+        if (fwv) fwv.textContent = 'Firmware Version: ' + v[3];
+        var fsr = document.getElementById('fsram');
+        if (fsr) fsr.textContent = 'Flash: ' + Math.round(v[4]/1024) + ' KB (' + v[4] + ')';
+        var dr = document.getElementById('dram');
+        if (dr) dr.textContent = 'Memory: ' + Math.round(v[5]/1024) + ' KB (' + v[5] + ')';
+      } catch(e) {}
+
+      /* Parse PNP_ADC (classic: NPN=1, PNP=0) */
+      var pnp_adc = data[PNP_ADC] + '0000';
+      var pnp_raw = parseInt(pnp_adc.charAt(0));
+      var pnp_val = pnp_raw === 1 ? 0 : 1;
+      var adc_val = parseInt(pnp_adc.charAt(1));
+      var water_val = pnp_adc.charAt(2) === '1';
+      var mosfet_val = pnp_adc.charAt(3) === '1';
+      updatePNP(pnp_val);
+      if (adcSlider && adcText) {
+        adcSlider.value = adc_val;
+        adcText.textContent = adc_val;
+      }
+      if (wlCheckbox) wlCheckbox.checked = water_val;
+      if (wlHidden) wlHidden.value = water_val ? 1 : 0;
+      if (mosfetCheckbox) mosfetCheckbox.checked = mosfet_val;
+      if (mosfetHidden) mosfetHidden.value = mosfet_val ? 1 : 0;
+    }
+  };
+})();
+
+/* Hardware test functions */
+function notify(msg, type) {
+  var n = document.getElementById('notify');
+  if (!n) {
+    n = document.createElement('div');
+    n.id = 'notify';
+    n.style.cssText = 'position:fixed;top:1rem;right:1rem;z-index:10000;display:flex;flex-direction:column;gap:0.3rem;';
+    document.body.appendChild(n);
+  }
+  var t = document.createElement('div');
+  t.style.cssText = 'padding:0.4rem 0.8rem;border-radius:6px;font-size:0.8rem;font-weight:600;color:#fff;animation:fade-in 0.2s ease;' + (type === 'danger' ? 'background:#cc3333;' : type === 'warning' ? 'background:#d4873a;' : 'background:#3d9eaa;');
+  t.textContent = msg;
+  n.appendChild(t);
+  setTimeout(function() { if (t.parentNode) t.parentNode.removeChild(t); }, 3000);
+}
+function progressTimer(speed, bar, callback) {
+  var counter = 0;
+  var tm = setInterval(function() {
+    counter++;
+    if (counter == 100) { clearInterval(tm); if (callback) callback(counter); }
+    var bars = document.getElementsByClassName('progress-fill');
+    if (bars[bar]) bars[bar].style.width = counter + '%';
+  }, speed);
+}
+
+function testPumpRun(tm) {
+  notify('Running Pump ...', 'warning');
+  var timer = setInterval(function() {
+    tm -= 10;
+    notify('... ' + tm + ' Seconds Remaining', 'warning');
+  }, 10000);
+  progressTimer((tm * 10), 1, function() {
+    clearInterval(timer);
+    var log = new XMLHttpRequest();
+    log.open('GET', 'log', true);
+    log.send();
+    log.onload = function() {
+      if (log.status == 200) {
+        if (log.responseText.indexOf('M:') != -1) notify('Pump OK', 'success');
+        else if (log.responseText.indexOf('e:') != -1) notify('Empty Water Protection', 'warning');
+        else notify('Pump Status Unknown', 'warning');
+      }
+      if (document.getElementById('EnableLog') && document.getElementById('EnableLog').value == 0) {
+        var elog = new XMLHttpRequest();
+        elog.open('GET', 'log?end=1', true);
+        elog.send();
+      }
+    };
+  });
+}
+
+function testPump() {
+  var m = document.getElementById('testPumpModal');
+  if (!m) return;
+  m.classList.add('active');
+  document.body.classList.add('modal-open');
+
+  var pumpSlider = document.getElementById('testPumpSlider');
+  var delayTimer = document.getElementById('test-pump-delay-timer');
+  if (pumpSlider) {
+    pumpSlider.value = 1;
+    updateSliderFill(pumpSlider);
+    pumpSlider.oninput = function() {
+      if (delayTimer) delayTimer.textContent = this.value;
+      updateSliderFill(this);
+    };
+  }
+  if (delayTimer) delayTimer.textContent = '1';
+
+  var startBtn = document.getElementById('testPumpStart');
+  var closeBtn = document.getElementById('testPumpClose');
+  var closeModal = function() {
+    m.classList.remove('active');
+    document.body.classList.remove('modal-open');
+  };
+  if (closeBtn) closeBtn.onclick = closeModal;
+  m.addEventListener('click', function(e) { if (e.target === m) closeModal(); });
+
+  if (startBtn) {
+    startBtn.onclick = function() {
+      var t = (pumpSlider ? parseInt(pumpSlider.value) : 1) - 1;
+      var xi = setInterval(function() {
+        if (t == 0) {
+          clearInterval(xi);
+          if (delayTimer) delayTimer.textContent = pumpSlider ? pumpSlider.value : 1;
+          var checkwithlog = 'api?adc=1';
+          var el = document.getElementById('EnableLog');
+          if (el && el.value == 0) checkwithlog = 'log?start=1';
+          var log = new XMLHttpRequest();
+          log.open('GET', checkwithlog, true);
+          log.send();
+          log.onload = function() {
+            if (log.status == 200) {
+              var xhr = new XMLHttpRequest();
+              var wifiOff = document.getElementById('TestNoWifiCheckbox') && document.getElementById('TestNoWifiCheckbox').checked ? 0 : 1;
+              xhr.open('POST', 'appi?pump=1&wifi=' + wifiOff, true);
+              xhr.send();
+              xhr.onload = function() {
+                if (xhr.status == 200) {
+                  if (xhr.responseText == 'Locked') { notify('Locked', 'danger'); return; }
+                  var potText = svgText ? svgText('pot-size-label') : null;
+                  var tm = (potText ? parseInt(potText.textContent) : 4) + 1;
+                  var wl = document.getElementById('WaterLevel');
+                  if (wl && wl.value == 1) {
+                    notify('Water Level Sensor is On', 'warning');
+                    var adc = new XMLHttpRequest();
+                    adc.open('GET', 'api?adc=2', true);
+                    adc.send();
+                    adc.onloadend = function() {
+                      if (adc.status == 200 && adc.responseText > 0) testPumpRun(tm);
+                      else notify('Check Water Level', 'danger');
+                    };
+                  } else {
+                    testPumpRun(tm);
+                  }
+                } else {
+                  notify('Pump Test Failed', 'danger');
+                }
+              };
+            }
+          };
+        } else if (t % 1 == 0 && delayTimer) {
+          delayTimer.textContent = t;
+        }
+        t--;
+      }, 1000);
+    };
+  }
+}
+function testGraph() { var x=new XMLHttpRequest(); x.open('GET','log?clear=1',true); x.send(); x.onload=function(){if(x.responseText=='Locked'){notify('Locked','danger');}else{notify('Graph test started','success');}}; }
+function testBattery() { notify('Battery test','warning'); }
+function testSleep() { var x=new XMLHttpRequest(); x.open('GET','api?esp=1',true); x.send(); notify('Sleep test sent','warning'); }
+function testFlood(water) { var x=new XMLHttpRequest(); x.open('GET','api?water='+water+'&empty=1',true); x.send(); x.onload=function(){notify(water>3?'Flood protection started':'Water set to '+water,x.responseText=='Locked'?'danger':'success');}; }
+function testEmpty(loop,flood) { loop++; var x=new XMLHttpRequest(); x.open('GET','pump',true); x.send(); x.onload=function(){notify('Empty simulation started','success');}; }
+function testRefill() { var x=new XMLHttpRequest(); x.open('GET','api?refill=1',true); x.send(); x.onload=function(){notify('Refill test started','success');}; }
+function testEmail() { var x=new XMLHttpRequest(); x.open('GET','api?smtp=1',true); x.send(); x.onload=function(){notify(x.responseText=='OK'?'Email OK':'Email: '+x.responseText,x.responseText=='OK'?'success':'warning');}; }
+function testLED() { var x=new XMLHttpRequest(); x.open('GET','api?led=3',true); x.send(); x.onload=function(){notify('LED test sent','success');}; }
+function testSoil() { var x=new XMLHttpRequest(); x.open('GET','api?adc=1',true); x.send(); x.onload=function(){notify('Soil: '+x.responseText,'success');}; }
+function testWater() { var x=new XMLHttpRequest(); x.open('GET','api?adc=2',true); x.send(); x.onload=function(){notify('Water: '+x.responseText+'%','success');}; }
+function testNTP() { var x=new XMLHttpRequest(); x.open('GET','api?ntp=1',true); x.send(); x.onload=function(){notify('Timer test sent','success');}; }
+function flushWater() {
+  var m = document.getElementById('flushWaterModal');
+  if (!m) return;
+  m.classList.add('active');
+  document.body.classList.add('modal-open');
+
+  var xhr = new XMLHttpRequest();
+  var timer;
+  var closeModal = function() { m.classList.remove('active'); document.body.classList.remove('modal-open'); };
+  document.getElementById('flushWaterClose').onclick = closeModal;
+  m.addEventListener('click', function(e) { if (e.target === m) closeModal(); });
+
+  document.getElementById('flushWaterStart').onclick = function() {
+    xhr.open('POST', 'appi?pump=2', true);
+    xhr.send();
+    xhr.onload = function() {
+      if (xhr.status == 200) {
+        notify('Flush Started', 'success');
+        timer = setInterval(function() { notify('Running Flush ...', 'warning'); }, 5000);
+      }
+    };
+  };
+  document.getElementById('flushWaterStop').onclick = function() {
+    clearInterval(timer);
+    xhr.open('POST', 'appi?pump=0', true);
+    xhr.send();
+    xhr.onload = function() {
+      if (xhr.status == 200) {
+        clearInterval(timer);
+        notify('Flush Stopped', 'danger');
+      }
+    };
+  };
+}
+
+function getOAuthToken() {
+  notify('OAuth2.0 requires HTTPS - use client-side oauth2.js on a live server', 'warning');
+}
+
+function AlertSet(alerts) {
+  var set = document.querySelectorAll('#tab-alerts .tab-checkbox');
+  for (var i = 0; i < set.length; i++) {
+    if (alerts && alerts[i] == 1) {
+      set[i].checked = true;
+    }
+  }
+}
+
+var EMAIL_ALERT = 22;
+var SMTP_SERVER = 23;
+var SMTP_USERNAME = 24;
+var SMTP_PASSWORD = 25;
+var PLANT_NAME = 26;
+var ALERTS = 27;
+
+function saveAlertField(offset, value) {
+  var xhr = new XMLHttpRequest();
+  xhr.open('GET', 'nvram.json?offset=' + offset + '&value=' + encodeURIComponent(value), true);
+  xhr.send();
+}
+
+function saveAlertsSettings() {
+  var set = document.querySelectorAll('#tab-alerts .tab-checkbox');
+  var bits = '';
+  for (var i = 0; i < set.length; i++) {
+    bits += set[i].checked ? '1' : '0';
+  }
+  bits += '0';
+  document.getElementById('Alerts').value = bits;
+
+  saveAlertField(EMAIL_ALERT, document.getElementById('AlertEmail').value);
+  saveAlertField(SMTP_SERVER, document.getElementById('AlertSMTPServer').value);
+  saveAlertField(SMTP_USERNAME, document.getElementById('AlertSMTPUsername').value);
+  saveAlertField(SMTP_PASSWORD, document.getElementById('AlertSMTPPassword').value);
+  saveAlertField(PLANT_NAME, document.getElementById('AlertPlantName').value);
+  saveAlertField(ALERTS, bits);
+}
+
+/* SMTP password toggle */
+(function() {
+  var pwToggle = document.getElementById('smtpPwToggle');
+  var pwInput = document.getElementById('AlertSMTPPassword');
+  if (pwToggle && pwInput) {
+    pwToggle.addEventListener('click', function() {
+      if (pwInput.type === 'password') {
+        pwInput.type = 'text';
+        pwToggle.textContent = 'Hide';
+      } else {
+        pwInput.type = 'password';
+        pwToggle.textContent = 'Show';
+      }
+    });
+  }
+})();
+
+/* Load alerts data from nvram.json */
+function populateAlertsFromNvram(data) {
+  var d = data['nvram'];
+  if (!d) { return; }
+  document.getElementById('AlertEmail').value = d[EMAIL_ALERT] || '';
+  document.getElementById('AlertSMTPUsername').value = d[SMTP_USERNAME] || '';
+  var smtp = d[SMTP_SERVER] || '';
+  if (smtp != '') {
+    document.getElementById('AlertSMTPServer').value = smtp;
+  }
+  document.getElementById('AlertPlantName').value = d[PLANT_NAME] || '';
+  var alertsStr = d[ALERTS] || '000000000';
+  AlertSet([alertsStr.charAt(0), alertsStr.charAt(1), alertsStr.charAt(2), alertsStr.charAt(3), alertsStr.charAt(4), alertsStr.charAt(5), alertsStr.charAt(6), alertsStr.charAt(7)]);
+}
+
+var DEMO_PASSWORD = 28;
+var TIMEZONE_OFFSET = 29;
+var DEMO_AVAILABILITY = 30;
+
+function AvailabilityWeek(availability) {
+  var week = document.querySelectorAll('#tab-security .tab-checkbox');
+  for (var i = 0; i < week.length; i++) {
+    if (week[i].checked) {
+      availability[i] = 1;
+    } else if (availability[i] == 1) {
+      week[i].checked = true;
+    }
+  }
+  var start = document.getElementById('AvailStart').value;
+  var end = document.getElementById('AvailEnd').value;
+  var availabilityText = availability.join('');
+  availabilityText += (start < 10 ? '0' + start : start);
+  availabilityText += (end < 10 ? '0' + end : end);
+  document.getElementById('DemoAvailability').value = availabilityText;
+  return availabilityText;
+}
+
+function saveSecuritySettings() {
+  var avail = AvailabilityWeek([0,0,0,0,0,0,0]);
+  saveAlertField(DEMO_PASSWORD, document.getElementById('DemoPassword').value);
+  saveAlertField(TIMEZONE_OFFSET, document.getElementById('DemoTimezone').value);
+  saveAlertField(DEMO_AVAILABILITY, avail);
+}
+
+function populateSecurityFromNvram(data) {
+  var d = data['nvram'];
+  if (!d) return;
+  var tz = document.getElementById('DemoTimezone');
+  if (tz && d[TIMEZONE_OFFSET]) tz.value = d[TIMEZONE_OFFSET];
+  if (d[DEMO_AVAILABILITY]) {
+    var a = d[DEMO_AVAILABILITY];
+    var dayBits = [];
+    for (var i = 0; i < 7; i++) dayBits.push(a.charAt(i) == '1' ? 1 : 0);
+    AvailabilityWeek(dayBits);
+    var st = parseInt(a.substring(7,9));
+    var en = parseInt(a.substring(9,11));
+    if (!isNaN(st)) document.getElementById('AvailStart').value = st;
+    if (!isNaN(en)) document.getElementById('AvailEnd').value = en;
+  }
+}
+
+/* Passkey */
+var passkeyBtn = document.getElementById('createPasskey');
+if (passkeyBtn && window.isSecureContext) {
+  passkeyBtn.style.display = 'flex';
+  passkeyBtn.addEventListener('click', async function() {
+    try {
+      var rpId = window.location.hostname;
+      var cred = await navigator.credentials.create({
+        publicKey: {
+          challenge: crypto.getRandomValues(new Uint8Array(32)),
+          rp: { name: 'tinyplant', id: rpId },
+          user: { id: crypto.getRandomValues(new Uint8Array(16)), name: 'tinyplant', displayName: 'Tiny Plant' },
+          pubKeyCredParams: [{ alg: -7, type: 'public-key' }, { alg: -257, type: 'public-key' }],
+          authenticatorSelection: { authenticatorAttachment: 'platform', residentKey: 'required', userVerification: 'required' },
+          timeout: 60000,
+          attestation: 'none'
+        }
+      });
+      notify('Passkey created!', 'success');
+    } catch(e) {
+      notify('Passkey failed: ' + e.message, 'danger');
+    }
+  });
+}
+
+/* Security password toggle */
+(function() {
+  var t = document.getElementById('secPwToggle');
+  var i = document.getElementById('DemoPassword');
+  if (t && i) {
+    t.addEventListener('click', function() {
+      i.type = i.type === 'password' ? 'text' : 'password';
+      t.textContent = i.type === 'password' ? 'Show' : 'Hide';
+    });
+  }
+})();
+
+/* Layout tab */
+(function() {
+  var browseBtn = document.getElementById('browseLayout');
+  var fileInput = document.getElementById('fileLayout');
+  var layoutForm = document.getElementById('formLayout');
+  if (browseBtn && fileInput) {
+    browseBtn.addEventListener('click', function() { fileInput.click(); });
+    fileInput.addEventListener('change', function() {
+      if (layoutForm) layoutForm.submit();
+    });
+  }
+
+  var defaultBtn = document.getElementById('defaultLayout');
+  var removeBtn = document.getElementById('removeLayout');
+  var listDiv = document.getElementById('listLayout');
+
+  /* Fetch SVG list */
+  function loadLayoutList() {
+    var x = new XMLHttpRequest();
+    x.open('GET', 'api?svg=1', true);
+    x.send();
+    x.onload = function() {
+      if (!listDiv) return;
+      listDiv.innerHTML = '';
+      var lines = x.responseText.split('\n');
+      var n = 0;
+      lines.forEach(function(item) {
+        if (item === '') return;
+        if (item.indexOf('soil.') === -1) {
+          var label = document.createElement('label');
+          var cb = document.createElement('input');
+          cb.type = 'checkbox';
+          cb.className = 'tab-checkbox';
+          cb.dataset.index = n;
+          label.appendChild(cb);
+          label.appendChild(document.createTextNode(' ' + item));
+          listDiv.appendChild(label);
+          cb.addEventListener('change', function() {
+            if (this.checked) {
+              listDiv.querySelectorAll('input[type="checkbox"]').forEach(function(c) {
+                if (c !== cb) c.checked = false;
+              });
+            }
+          });
+        }
+        n++;
+      });
+    };
+  }
+  loadLayoutList();
+
+  if (defaultBtn) {
+    defaultBtn.addEventListener('click', function() {
+      var checked = listDiv ? listDiv.querySelector('input[type="checkbox"]:checked') : null;
+      if (!checked) { notify('Select a layout first', 'warning'); return; }
+      saveAlertField(19, checked.dataset.index);
+      notify('Default layout set', 'success');
+    });
+  }
+
+  if (removeBtn) {
+    removeBtn.addEventListener('click', function() {
+      var checked = listDiv ? listDiv.querySelector('input[type="checkbox"]:checked') : null;
+      if (!checked) { notify('Select a layout first', 'warning'); return; }
+      var name = checked.parentNode.textContent.trim();
+      var x = new XMLHttpRequest();
+      x.open('GET', 'api?delete=' + encodeURIComponent('svg/' + name), true);
+      x.send();
+      x.onload = function() {
+        notify('Layout ' + name + ' removed', 'success');
+        loadLayoutList();
+      };
+    });
+  }
+})();
+
+var nx = new XMLHttpRequest();
+nx.responseType = 'json';
+nx.open('GET', 'nvram.json', true);
+nx.send();
+nx.onload = function() {
+  if (nx.response) {
+    populateAlertsFromNvram(nx.response);
+    populateSecurityFromNvram(nx.response);
+  }
+};
 </script>
 
 <script>
 var html = document.documentElement;
 var saved = localStorage.getItem('theme') || 'dark';
 html.setAttribute('data-theme', saved);
-document.getElementById('themeToggle').textContent = saved === 'dark' ? 'Light' : 'Dark';
+document.getElementById('themeToggle').textContent = saved === 'dark' ? '\u2600' : '\u263E';
+
+var fontSizes = ['small', 'medium', 'large'];
+var savedFont = localStorage.getItem('fontSize') || 'medium';
+html.setAttribute('data-font', savedFont);
+document.getElementById('fontToggle').textContent = savedFont === 'small' ? 'A' : savedFont === 'large' ? 'A⁺' : 'A';
 
 document.getElementById('themeToggle').addEventListener('click', function() {
   var current = html.getAttribute('data-theme');
   var next = current === 'dark' ? 'light' : 'dark';
   html.setAttribute('data-theme', next);
   localStorage.setItem('theme', next);
-  this.textContent = next === 'dark' ? 'Light' : 'Dark';
+  this.textContent = next === 'dark' ? '\u2600' : '\u263E';
+  applySvgTheme();
+});
+
+document.getElementById('fontToggle').addEventListener('click', function() {
+  var current = html.getAttribute('data-font') || 'medium';
+  var idx = fontSizes.indexOf(current);
+  var next = fontSizes[(idx + 1) % fontSizes.length];
+  html.setAttribute('data-font', next);
+  localStorage.setItem('fontSize', next);
+  this.textContent = next === 'small' ? 'A' : next === 'large' ? 'A⁺' : 'A';
 });
 </script>
 </body>
