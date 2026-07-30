@@ -1,109 +1,146 @@
 <!DOCTYPE html>
-<html>
-    <head>
-        <title>tiny plant - graph</title>
-        <meta charset="UTF-8" />
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <link rel="stylesheet" type="text/css" href="css/preloader.css">
-        <link rel="stylesheet" type="text/css" href="css/tailwind.css">
-        <link rel="icon" type="image/x-icon" href="favicon.ico">
-        <script src="js/preloader.js"></script>
-        <script src="js/chart.js"></script>
-        <script src="js/chartjs-plugin-datalabels.js"></script>
-        <script src="js/rangeslider.js"></script>
-        <script defer src="js/graph.js"></script>
-    </head>
-    <body class="preloader bg-gray-100 dark:bg-gray-600">
-        <div id="preloader"></div>
-        <div class="fixed top-0 right-0 p-3 z-[2000]" id="notify"></div>
-        <div class="fixed inset-0 bg-black opacity-50 hidden" id="modal-backdrop"></div>
-        <div class="p-4">
-            <div class="flex w-full justify-between">
-                <button type="button" class="bg-green-500 hover:bg-green-600 text-white rounded w-full py-2 mt-4 mr-4" id="graph-start">Start Graph</button>
-                <button type="button" class="bg-red-500 hover:bg-red-600 text-white rounded w-full py-2 mt-4 mr-4" id="graph-stop" onclick="stopChart()">Stop Graph</button>
-                <button type="button" class="bg-yellow-500 hover:bg-yellow-600 text-white rounded w-full py-2 mt-4 mr-4" id="graph-clear">Clear Data</button>
-                <button type="button" class="bg-gray-400 hover:bg-gray-500 text-white rounded w-full py-2 mt-4 mr-4" id="graph-settings">Settings</button>
-                <button type="button" class="bg-gray-400 hover:bg-gray-500 text-white rounded w-full py-2 mt-4 mr-4" id="graph-image" onclick="exportPNG()">Export Image</button>
-                <button type="button" class="bg-gray-400 hover:bg-gray-500 text-white rounded w-full py-2 mt-4 mr-4" id="graph-csv" onclick="exportCSV()">Export CSV</button>
-            </div>
-            <div id="scrollContainer" class="w-full overflow-x-auto">
-                <canvas id="chartCanvas"></canvas>
-            </div>
-            <div class="p-4">
-                <div id="chart-time"></div>
-                <div class="mt-4 text-center text-gray-600 dark:text-gray-300">
-                    <span class="text-lg font-semibold">Refresh in Minutes: </span>
-                    <span class="slider-value text-lg" id="chart-time-text">0</span>
-                </div>
-            </div>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>tiny plant - graph</title>
+  <script>
+  var savedTheme = localStorage.getItem('theme') || 'dark';
+  document.documentElement.setAttribute('data-theme', savedTheme);
+  </script>
+  <link href="svg/bonsai.css" rel="stylesheet" type="text/css" />
+  <link rel="icon" type="image/x-icon" href="favicon.ico">
+  <style>
+  .graph-wrap { width:95vw; max-width:1400px; margin:0 auto; padding:1rem; animation:fade-in 0.6s ease-out; }
+  .graph-btn-row { display:flex; flex-wrap:wrap; gap:0.5rem; margin-bottom:1rem; }
+  .graph-btn {
+    flex:1; min-width:100px; padding:0.5rem 0.8rem;
+    border:none; border-radius:6px; font-size:0.85rem; font-weight:500;
+    cursor:pointer; color:#fff; transition:all 0.15s ease;
+  }
+  .graph-btn-start { background:#33994a; }
+  .graph-btn-start:hover { background:#227738; }
+  .graph-btn-stop { background:#cc3333; }
+  .graph-btn-stop:hover { background:#aa2222; }
+  .graph-btn-clear { background:#d4873a; }
+  .graph-btn-clear:hover { background:#bf7833; }
+  .graph-btn-gray { background:#555; }
+  .graph-btn-gray:hover { background:#444; }
+  #scrollContainer { width:100%; overflow-x:auto; }
+  #scrollContainer canvas { display:block; }
+  .graph-slider-area { padding:1rem 0; }
+  .graph-slider-label { text-align:center; margin-bottom:0.5rem; color:var(--text); font-size:1rem; }
+  .graph-slider-label strong { font-weight:600; }
+  .slider-value { font-size:1rem; }
+  .backdrop { position:fixed; inset:0; background:rgba(0,0,0,0.6); z-index:9997; }
+  .graph-modal { position:fixed; inset:0; display:none; align-items:center; justify-content:center; z-index:9998; }
+  .graph-modal.active { display:flex; }
+  .graph-modal-inner { background:var(--card-bg); border:1px solid var(--card-border); border-radius:12px; padding:1.5rem; width:100%; max-width:28rem; margin:1rem; backdrop-filter:blur(8px); }
+  .graph-modal-header { display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid var(--card-border); margin-bottom:1rem; padding-bottom:0.5rem; }
+  .graph-modal-header h5 { font-size:1rem; font-weight:600; color:var(--text); margin:0; }
+  .graph-modal-close { background:none; border:none; color:var(--text); font-size:1.5rem; cursor:pointer; line-height:1; }
+  .graph-modal-body { display:flex; flex-direction:column; gap:0.5rem; }
+  .graph-check-row { display:flex; align-items:center; gap:0.5rem; font-size:0.9rem; color:var(--text); }
+  .graph-check-row input[type="checkbox"] { width:16px; height:16px; cursor:pointer; accent-color:#62a29a; }
+  .graph-inline-row { display:flex; align-items:center; gap:0.5rem; margin-bottom:0.5rem; }
+  .graph-inline-row label { font-size:0.9rem; color:var(--text); }
+  .graph-inp {
+    background:var(--card-bg); color:var(--text); border:1px solid var(--card-border);
+    border-radius:6px; padding:0.4rem 0.6rem; font-size:0.85rem; width:100%;
+  }
+  .graph-inp:focus { outline:none; border-color:var(--card-hover-border); }
+  .graph-modal-footer { display:flex; gap:0.5rem; margin-top:1rem; padding-top:1rem; border-top:1px solid var(--card-border); }
+  .graph-modal-footer .graph-btn { flex:1; }
+  [data-theme="light"] .graph-modal-inner { background:rgba(255,255,255,0.5); backdrop-filter:blur(12px); }
+  [data-theme="light"] .backdrop { background:rgba(0,0,0,0.3); }
+  .graph-modal-confirm-label { display:block; color:var(--text); font-size:0.9rem; margin-bottom:0.5rem; }
+  #notify { position:fixed; top:0; right:0; padding:0.75rem; z-index:2000; }
+  </style>
+  <script src="js/chart.js"></script>
+  <script src="js/chartjs-plugin-datalabels.js"></script>
+  <script defer src="js/graph.js"></script>
+</head>
+<body>
+  <div id="preloader-overlay"><div id="preloader-bar"><div id="preloader-fill"></div></div></div>
+  <div id="notify"></div>
+  <div class="backdrop hidden" id="modal-backdrop"></div>
+
+  <div class="graph-wrap">
+    <div class="graph-btn-row">
+      <button type="button" class="graph-btn graph-btn-start" id="graph-start">Start Graph</button>
+      <button type="button" class="graph-btn graph-btn-stop" id="graph-stop" onclick="stopChart()">Stop Graph</button>
+      <button type="button" class="graph-btn graph-btn-clear" id="graph-clear">Clear Data</button>
+      <button type="button" class="graph-btn graph-btn-gray" id="graph-settings">Settings</button>
+      <button type="button" class="graph-btn graph-btn-gray" id="graph-image" onclick="exportPNG()">Export Image</button>
+      <button type="button" class="graph-btn graph-btn-gray" id="graph-csv" onclick="exportCSV()">Export CSV</button>
+    </div>
+    <div id="scrollContainer">
+      <canvas id="chartCanvas"></canvas>
+    </div>
+    <div class="graph-slider-area">
+      <div class="graph-slider-label">
+        <strong>Refresh in Minutes: </strong>
+        <span class="slider-value" id="chart-time-text">1</span>
+      </div>
+      <input type="range" min="0" max="20" value="1" class="range-slider" id="chart-time-slider" style="--slider-color:#2196F3">
+    </div>
+  </div>
+  <div class="graph-modal" id="graph-settings-open">
+    <div class="graph-modal-inner">
+      <div class="graph-modal-header">
+        <h5>Graph Settings</h5>
+        <button class="graph-modal-close" onclick="hideModal(this)">&times;</button>
+      </div>
+      <div class="graph-modal-body">
+        <div class="graph-check-row">
+          <input type="checkbox" name="roundEdges" id="roundEdges">
+          <label>Round Sharp Edges</label>
         </div>
-        <div class="fixed inset-0 flex items-center justify-center hidden modal" id="graph-settings-open">
-            <div class="bg-white dark:bg-gray-800 p-4 rounded-lg w-full max-w-md mx-auto">
-                <div class="flex modal-header justify-between items-center border-b mb-4">
-                    <h5 class="text-lg font-semibold text-gray-800 dark:text-white">Graph Settings</h5>
-                    <button id="close-modal" class="text-gray-500 hover:text-gray-800 dark:text-gray-400 dark:hover:text-gray-300 focus:outline-none text-2xl" onclick="hideModal(this)">&times;</button>
-                </div>
-                <div class="flex flex-wrap">
-                    <div class="w-full text-gray-900 dark:text-gray-300">
-                        <div class="flex items-center">
-                            <input type="checkbox" name="roundEdges" id="roundEdges">
-                            <label class="ml-2">Round Sharp Edges</label>
-                        </div>
-                        <div class="flex items-center">
-                            <input type="checkbox" name="dataLabels" id="dataLabels">
-                            <label class="ml-2">Show Data Labels</label>
-                        </div>
-                        <div class="flex items-center">
-                            <input type="checkbox" name="dataScroll" id="dataScroll">
-                            <label class="ml-2">Grid Data Scroll</label>
-                        </div>
-                        <div class="flex items-center">
-                            <input type="checkbox" name="dataAnimation" id="dataAnimation">
-                            <label class="ml-2">Show Animation</label>
-                        </div>
-                    </div>
-                </div>
-                <div class="flex flex-wrap mt-4">
-                    <div class="w-full text-gray-900 dark:text-gray-300 mr-4">
-                        <div class="flex justify-between items-center mb-4">
-                            <div class="w-1/2">Time Segments</div>
-                             <div class="w-1/2">
-                            <input type="text" name="graphDivision" id="graphDivision" class="ml-2 p-2 w-full rounded dark:bg-gray-700 dark:text-white">
-                            </div>
-                        </div>
-                        <div class="flex items-center mb-4">
-                            <div class="w-1/2">Line Width</div>
-                             <div class="w-1/2">
-                            <input type="text" name="lineWidth" id="lineWidth" class="ml-2 p-2 w-full rounded dark:bg-gray-700 dark:text-white">
-                            </div>
-                        </div>
-                        <div class="flex items-center mb-4">
-                            <div class="w-1/2">Max Scroll Pages</div>
-                            <div class="w-1/2">
-                                <input type="text" name="pageLimit" id="pageLimit" class="ml-2 p-2 w-full rounded dark:bg-gray-700 dark:text-white">
-                            </div>
-                        </div>
-                   </div>
-                </div>
-                <div class="flex justify-between">
-                    <button type="button" class="bg-red-500 hover:bg-red-600 text-white rounded w-full py-2 mt-4 mr-2" onclick="hideModal(this)">Cancel</button>
-                    <button type="button" class="bg-green-500 hover:bg-green-600 text-white rounded w-full py-2 mt-4 mr-2" onclick="hideModal(this); saveSettings()">Save</button>
-                </div>
-            </div>
+        <div class="graph-check-row">
+          <input type="checkbox" name="dataLabels" id="dataLabels">
+          <label>Show Data Labels</label>
         </div>
-        <div class="fixed inset-0 flex items-center justify-center hidden modal" id="graph-start-confirm">
-            <div class="bg-white dark:bg-gray-800 p-4 rounded-lg w-full max-w-md mx-auto">
-                <div class="flex modal-header justify-between items-center border-b mb-4">
-                    <h5 class="text-lg font-semibold text-gray-800 dark:text-white">Graph Data Exists</h5>
-                    <button id="close-modal" class="text-gray-500 hover:text-gray-800 dark:text-gray-400 dark:hover:text-gray-300 focus:outline-none text-2xl" onclick="hideModal(this)">&times;</button>
-                </div>
-                <label class="block text-gray-800 dark:text-gray-300">Resume Data Collection?</label>
-                <div class="flex justify-between">
-                    <button type="button" class="bg-red-500 hover:bg-red-600 text-white rounded w-full py-2 mt-4 mr-2" onclick="hideModal(this); startChart()">Start New</button>
-                    <button type="button" class="bg-green-500 hover:bg-green-600 text-white rounded w-full py-2 mt-4 mr-2" onclick="hideModal(this); updateChart()">Yes Resume</button>
-                </div>
-            </div>
+        <div class="graph-check-row">
+          <input type="checkbox" name="dataScroll" id="dataScroll">
+          <label>Grid Data Scroll</label>
         </div>
-        <img class="hidden" src="img/eye-slash.svg" />
-    </body>
+        <div class="graph-check-row">
+          <input type="checkbox" name="dataAnimation" id="dataAnimation">
+          <label>Show Animation</label>
+        </div>
+      </div>
+      <div style="margin-top:0.75rem;">
+        <div class="graph-inline-row">
+          <label style="flex:1">Time Segments</label>
+          <input type="text" name="graphDivision" id="graphDivision" class="graph-inp" style="flex:1">
+        </div>
+        <div class="graph-inline-row">
+          <label style="flex:1">Line Width</label>
+          <input type="text" name="lineWidth" id="lineWidth" class="graph-inp" style="flex:1">
+        </div>
+        <div class="graph-inline-row">
+          <label style="flex:1">Max Scroll Pages</label>
+          <input type="text" name="pageLimit" id="pageLimit" class="graph-inp" style="flex:1">
+        </div>
+      </div>
+      <div class="graph-modal-footer">
+        <button type="button" class="graph-btn graph-btn-stop" onclick="hideModal(this)">Cancel</button>
+        <button type="button" class="graph-btn graph-btn-start" onclick="hideModal(this); saveSettings()">Save</button>
+      </div>
+    </div>
+  </div>
+  <div class="graph-modal" id="graph-start-confirm">
+    <div class="graph-modal-inner">
+      <div class="graph-modal-header">
+        <h5>Graph Data Exists</h5>
+        <button class="graph-modal-close" onclick="hideModal(this)">&times;</button>
+      </div>
+      <label class="graph-modal-confirm-label">Resume Data Collection?</label>
+      <div class="graph-modal-footer">
+        <button type="button" class="graph-btn graph-btn-stop" onclick="hideModal(this); startChart()">Start New</button>
+        <button type="button" class="graph-btn graph-btn-start" onclick="hideModal(this); updateChart()">Yes Resume</button>
+      </div>
+    </div>
+  </div>
+</body>
 </html>

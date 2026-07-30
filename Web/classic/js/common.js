@@ -1,7 +1,19 @@
 var refreshTimer;
 var refreshSpeed = 10000;
+var saveReminder;
 var notifyTimer;
 
+var pot_values = [10, 30, 60];
+var pot_labels = ['Small', 'Medium', 'Large'];
+
+var soil_values = [0, 300, 780];
+var soil_labels = ['Off', 'Dry (Cactus)', 'Wet (Tropical)'];
+
+var timer_values = [0, 86400, 172800, 259200];
+var timer_labels = ['Dynamic', 'Once a Day', 'Every 2nd Day', 'Every 3rd Day'];
+
+var soil_type_values = [420, 700, 580, 680, 740];
+var soil_pot_offsets = [[0,-10,-20], [0,0,0], [0,0,0], [5,10,0], [0,0,0]];
 var soil_type_labels = ['Moss', 'Loam', 'Dirt', 'Clay', 'Sand', 'Rock'];
 var soil_type_color = ['#3d9919', '#000000', '#58280c', '#7b4626', '#d6ca47', '#b4b0a6'];
 

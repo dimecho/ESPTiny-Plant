@@ -23,7 +23,7 @@ var data;
 
 document.addEventListener("DOMContentLoaded", function(event)
 {
-    if(document.documentElement.getAttribute('data-theme') === 'dark') {
+    if((window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
         ctxFontColor = '#E8E8E8';
         ctxGridColor = '#808080';
     }
@@ -132,27 +132,37 @@ document.addEventListener("DOMContentLoaded", function(event)
         return n;
     };
 
-    var chartTimeSlider = document.getElementById('chart-time-slider');
-    chartTimeSlider.addEventListener('input', function() {
-        updateSliderFill(this);
-        document.getElementById('chart-time-text').textContent = this.value;
-    });
-    chartTimeSlider.addEventListener('change', function() {
-        var v = parseInt(this.value);
-        if(v == 0) {
-            refreshSpeed = 1000;
-            dataStream = true;
-        } else {
-            refreshSpeed = v * 1000 * 60;
-        }
-        if(refreshTimer != null) {
-            clearTimeout(refreshTimer);
-            updateChart();
-        }
-    });
-    updateSliderFill(chartTimeSlider);
+    rslider('#chart-time', {
+        min: 0,
+        max: 20,
+        value: 1,
+        dashes: 20,
+        color: '#2196F3',
+        onInput: (v) => {
+            document.getElementById('chart-time-text').textContent = v;
+        },
+        onChange: (v) => {
+            if(v == 0) { // Real-time
+                refreshSpeed = 1000;
+                dataStream = true;
+                //xhr.open('GET', 'log?end=1', true);
+                //xhr.send();
+            }else{
+                refreshSpeed = v;
+                refreshSpeed *= (1000 * 60);
 
-    const modals = document.querySelectorAll('.graph-modal');
+                //TODO: Retrive a page once in a while to prevent WiFi sleep
+            }
+
+            if(refreshTimer != null) {
+                clearTimeout(refreshTimer);
+                updateChart();
+            }
+        }
+    });
+    document.getElementById('chart-time-text').textContent = "1";
+
+    const modals = document.querySelectorAll('.modal');
     modals.forEach(modal => {
         modal.addEventListener('click', function (event) {
             if (event.target === modal) {
@@ -164,7 +174,7 @@ document.addEventListener("DOMContentLoaded", function(event)
     document.getElementById('graph-start').onclick = function() {
         //console.log(chart.data.datasets[0].data);
         if(chart.data.datasets[0].data.length > 0) {
-            document.getElementById('graph-start-confirm').classList.add('active');
+            document.getElementById('graph-start-confirm').classList.remove('hidden');
             document.getElementById('modal-backdrop').classList.remove('hidden');
         }else{
             updateChart();
@@ -187,11 +197,9 @@ document.addEventListener("DOMContentLoaded", function(event)
         };
     }
     document.getElementById('graph-settings').onclick = function() {
-        document.getElementById('graph-settings-open').classList.add('active');
+        document.getElementById('graph-settings-open').classList.remove('hidden');
         document.getElementById('modal-backdrop').classList.remove('hidden');
     }
-
-    document.getElementById('preloader-overlay').classList.add('done');
 });
 
 function scrollToEnd() {
@@ -226,10 +234,14 @@ function saveSettings() {
 }
 
 function hideModal(button) {
-    let modal = button.closest('.graph-modal');
+    let modal = button.closest('.flex');
+    while (modal && !modal.classList.contains('modal')) {
+        modal = modal.parentElement;
+    }
     if (modal) {
-        modal.classList.remove('active');
-        document.getElementById('modal-backdrop').classList.add('hidden');
+        const backdrop = document.getElementById('modal-backdrop');
+        backdrop.classList.add('hidden');
+        modal.classList.add('hidden');
     }
 }
 
@@ -411,17 +423,6 @@ function initChart() {
         data: chartdata,
         options: options
     });
-}
-
-function updateSliderFill(slider) {
-  var min = slider.min ? parseInt(slider.min) : 0;
-  var max = slider.max ? parseInt(slider.max) : 100;
-  var val = parseInt(slider.value);
-  var pct = ((val - min) / (max - min)) * 100;
-  var color = slider.style.getPropertyValue('--slider-color') || '#33b5e5';
-  var isDark = document.documentElement.getAttribute('data-theme') === 'dark';
-  var trackBg = isDark ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.15)';
-  slider.style.background = 'linear-gradient(to right, ' + color + ' ' + pct + '%, ' + trackBg + ' ' + pct + '%)';
 }
 
 function nTrim(n) {

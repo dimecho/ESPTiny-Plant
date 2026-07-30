@@ -1,1719 +1,1269 @@
-var pnp_adc = "0000";
-document.addEventListener('DOMContentLoaded', function(event)
-{
-	if(document.cookie != '') {
-		const params = new URLSearchParams(window.location.search);
-		let oauthCode = params.get('code');
-        let oauthScope = params.get('scope');
-        if (oauthCode && oauthScope) {
-			if (typeof  getOAuthToken !== 'function') {
-		        var script = document.createElement('script');
-		        script.src = 'js/oauth2.js';
-		        script.onload = function(){ getOAuthToken(oauthCode, oauthScope) };
-		        document.head.appendChild(script);
-		    }
-        }else{
-        	var ArrayCookies = {};
-			try {
-				ArrayCookies = document.cookie.split(';');
-				for (i = 0; i < ArrayCookies.length; i++) {
-			        var c_name = ArrayCookies[i].substr(0, ArrayCookies[i].indexOf('='));
-			        var c_value = ArrayCookies[i].substr(ArrayCookies[i].indexOf('=') + 1);
-			        c_name = c_name.replace(/^\s+|\s+$/g, '');
-			        saveSetting(c_name, unescape(c_value));
-			    }
-		   	}catch(error){
-		    	notify('',error, 'danger');
-		    }finally{
-		    	if(ArrayCookies.length > 1) {
-		    		document.getElementById('keep-eeprom-text').textContent = 'Restoring Settings ...';
-					document.getElementById('keep-eeprom-footer').classList.add('hidden');
-					document.getElementById('keep-EEPROM').classList.remove('hidden');
+var preloader = document.getElementById('preloader-overlay');
+var started = Date.now();
 
-				  	progressTimer(62,2,function() {
-			        	document.getElementById('keep-EEPROM').classList.add('hidden');
-			        	document.getElementById('keep-eeprom-footer').classList.remove('hidden');
-			        	notify('','EEPROM restored', 'success');
-			        	setTimeout(function() {
-					   		notify('','Passwords must be set again', 'warning');
-					    }, 4000);
-					});
-				}
-				loadSVG();
-			}
-		}
-		deleteCookies();
-	}else{
-		loadSVG();
-	}
+var svgDoc = null;
+var nvramData = null;
 
-	const modals = document.querySelectorAll('.modal');
-    modals.forEach(modal => {
-        modal.addEventListener('click', function (event) {
-            if (event.target === modal) {
-                hideModal(modal);
-            }
-        });
+function applyNvramToSvg(data) {
+  if (!svgDoc || !data) return;
+  var soilIdx = parseInt(data[PLANT_SOIL_TYPE]);
+  if (!isNaN(soilIdx) && soil_type_color[soilIdx]) {
+    var sc = svgDoc.getElementById('soil-circle');
+    if (sc) sc.setAttribute('fill', soil_type_color[soilIdx]);
+    var st = svgDoc.getElementById('soil-text');
+    if (st) st.style.fill = soil_type_color[soilIdx];
+  }
+  var tl = svgDoc.getElementById('timer-label');
+  if (tl && data[PLANT_MANUAL_TIMER] !== undefined) tl.textContent = data[PLANT_MANUAL_TIMER];
+  var pl = svgDoc.getElementById('power-label');
+  if (pl && data[DEEP_SLEEP] !== undefined) pl.textContent = data[DEEP_SLEEP];
+  var ml = svgDoc.getElementById('moisture-label');
+  if (ml && data[PLANT_SOIL_MOISTURE] !== undefined) ml.textContent = data[PLANT_SOIL_MOISTURE];
+  var psl = svgDoc.getElementById('pot-size-label');
+  if (psl && data[PLANT_POT_SIZE] !== undefined) psl.textContent = data[PLANT_POT_SIZE];
+}
+
+document.getElementById('svgObject').addEventListener('load', function onLoad() {
+  svgDoc = this.contentDocument;
+  if (nvramData) applyNvramToSvg(nvramData);
+  var elapsed = Date.now() - started;
+  var remaining = Math.max(0, 1500 - elapsed);
+  setTimeout(function() {
+    preloader.classList.add('done');
+  }, remaining);
+  if (!svgDoc) return;
+
+  var cards = document.querySelectorAll('.feature-card');
+
+  function findFeatureGroup(name) {
+    return svgDoc.querySelector('[data-feature="' + name + '"]');
+  }
+
+  cards.forEach(function(card) {
+    card.addEventListener('mouseenter', function() {
+      var name = this.dataset.feature;
+      var group = findFeatureGroup(name);
+      if (group) group.classList.add('active');
     });
 
-    document.getElementById('wireless-settings-ok').onclick = function() {
-		if(DEMOLOCK) {
-			PlantLogin();
-		}else{
-	        document.getElementById('wireless-SettingsForm').submit();
-		}
-	};
+    card.addEventListener('mouseleave', function() {
+      var name = this.dataset.feature;
+      var group = findFeatureGroup(name);
+      if (group) group.classList.remove('active');
+    });
+  });
 
-	document.getElementById('alert-settings-ok').onclick = function() {
-		if(DEMOLOCK) {
-			PlantLogin();
-		}else{
-			AlertSet([0, 0, 0, 0, 0, 0, 0, 0]);
-	    	document.getElementById('alert-SettingsForm').submit();
-		}
-	};
+  var soilGroup = findFeatureGroup('soil');
+  if (soilGroup) {
+    soilGroup.addEventListener('click', function(e) {
+      e.stopPropagation();
+      var svgSoil = document.getElementById('svgSoil');
+      if (!svgSoil) return;
+      var xhr = new XMLHttpRequest();
+      xhr.open('GET', 'svg/soil.svg', true);
+      xhr.send();
+      xhr.onload = function() {
+        svgSoil.innerHTML = xhr.responseText;
+        var t = document.documentElement.getAttribute('data-theme');
+        if (t === 'dark') {
+          var g = svgSoil.querySelector('#g3679');
+          if (g) g.setAttribute('fill', 'white');
+        }
+        var tl = svgSoil.querySelector('#soil-timeline');
+        if (tl) {
+          tl.querySelectorAll('[id$="-badge"]').forEach(function(g) { g.classList.add('badge-shrunk'); });
+        }
+        svgSoil.querySelector('#soil-moss').onclick = function() {
+          soilModalSelect(0);
+        };
+        svgSoil.querySelector('#soil-loam').onclick = function() {
+          soilModalSelect(1);
+        };
+        svgSoil.querySelector('#soil-dirt').onclick = function() {
+          soilModalSelect(2);
+        };
+        svgSoil.querySelector('#soil-clay').onclick = function() {
+          soilModalSelect(3);
+        };
+        svgSoil.querySelector('#soil-sand').onclick = function() {
+          soilModalSelect(4);
+        };
+        svgSoil.querySelector('#soil-rock').onclick = function() {
+          soilModalSelect(5);
+        };
+      };
+      document.getElementById('soilModal').classList.add('active');
+    });
+  }
 
-	document.getElementById('demo-settings-ok').onclick = function() {
-		if(DEMOLOCK) {
-			PlantLogin();
-		}else{
-			AvailabilityWeek([0, 0, 0, 0, 0, 0, 0]);
-	    	document.getElementById('demo-SettingsForm').submit();
-		}
-	};
+  /* SVG feature group clicks trigger corresponding card */
+  var groups = svgDoc.querySelectorAll('.feature-group');
+  groups.forEach(function(g) {
+    if (g.dataset.feature === 'soil') return;
+    g.addEventListener('click', function(e) {
+      e.stopPropagation();
+      var card = document.querySelector('[data-feature="' + g.dataset.feature + '"]');
+      if (card) card.click();
+    });
+  });
+
+  /* Background circle opens layout selector */
+  var bg = svgDoc.getElementById('backgroundCircle');
+  if (bg) {
+    bg.addEventListener('click', function(e) {
+      e.stopPropagation();
+      var thumbs = document.getElementById('layoutThumbs');
+      if (!thumbs) return;
+      thumbs.innerHTML = '<span style="color:#888">Loading layouts...</span>';
+      document.getElementById('layoutModal').classList.add('active');
+      var svgUrl = (window.location.hostname === '127.0.0.1' || window.location.hostname.endsWith('github.io')) ? 'svg' : 'api?svg=1';
+      var x = new XMLHttpRequest();
+      x.open('GET', svgUrl, true);
+      x.send();
+      x.onload = function() {
+        var files = x.responseText.split('\n').filter(function(f) { return f !== '' && f.indexOf('soil.') === -1; });
+        thumbs.innerHTML = '';
+        files.forEach(function(file, i) {
+          var xhr = new XMLHttpRequest();
+          xhr.open('GET', 'svg/' + file, true);
+          xhr.send();
+          xhr.onload = function() {
+            var parser = new DOMParser();
+            var doc = parser.parseFromString(xhr.responseText, 'image/svg+xml');
+            var menu = doc.getElementById('menu');
+            if (!menu) {
+              var all = doc.querySelectorAll('*');
+              for (var i = 0; i < all.length; i++) {
+                if (all[i].getAttribute('inkscape:label') === 'menu') {
+                  menu = all[i]; break;
+                }
+              }
+            }
+            if (menu) menu.style.display = 'none';
+            var svgEl = doc.getElementsByTagName('svg')[0];
+            if (!svgEl) return;
+            svgEl.style.width = '100%';
+            svgEl.style.height = 'auto';
+            svgEl.style.cursor = 'pointer';
+            svgEl.style.borderRadius = '6px';
+            svgEl.addEventListener('click', function() {
+              var s = new XMLHttpRequest();
+              s.open('GET', 'nvram.json?offset=' + PLANT_TYPE + '&value=' + i, true);
+              s.send();
+              document.getElementById('layoutModal').classList.remove('active');
+              var obj = document.getElementById('svgObject');
+              if (obj) obj.data = 'svg/' + file;
+            });
+            thumbs.appendChild(svgEl);
+          };
+        });
+      };
+    });
+  }
 });
 
-function svgwaterLevelAdjust(v) {
-	document.getElementById('water').setAttribute('style', 'visibility:visible');
-	var water = new XMLHttpRequest();
-    water.open('GET', 'api?adc=2', true);
-    water.send();
-    water.onloadend = function() {
-	    if(water.status == 200) {
-	    	var a = parseInt(water.responseText);
-			if(!isNaN(a) && a > 0) {
-				document.getElementById('water-text').textContent = a + '%';
-				document.getElementById('water-level').style.visibility = 'visible';
-				document.getElementById('water-shadow').style.visibility = 'visible';
-				document.getElementById('water-reflection').setAttribute('transform', 'matrix(1 0 0 1 0 0)');
-			}else{
-				if(v == 1) {
-					document.getElementById('water-text').textContent = 'Empty';
-				}else{
-					document.getElementById('water-text').textContent = '';
-				}
-				document.getElementById('water-level').style.visibility = 'hidden';
-				document.getElementById('water-shadow').style.visibility = 'hidden';
-				document.getElementById('water-reflection').setAttribute('transform', 'matrix(1 0 0 1 0 -1500)');
-			}
-		}
-	}
+var soil_type_labels = ['Moss', 'Loam', 'Dirt', 'Clay', 'Sand', 'Rock'];
+var soil_type_color = ['#3d9919', '#000000', '#58280c', '#7b4626', '#d6ca47', '#b4b0a6'];
+
+//EEPROM Variables
+var WIFI_MODE = 1;
+var WIFI_HIDE = 2;
+var WIFI_PHY_MODE = 3;
+var WIFI_PHY_POWER = 4;
+var WIFI_CHANNEL = 5;
+var WIFI_SSID = 6;
+var WIFI_USERNAME = 7;
+var WIFI_PASSWORD = 8;
+var LOG_ENABLE = 9;
+//==========
+var NETWORK_DHCP = 10;
+var NETWORK_IP = 11;
+var NETWORK_SUBNET = 12;
+var NETWORK_GATEWAY = 13;
+var NETWORK_DNS = 14;
+//==========
+var PLANT_POT_SIZE = 15;
+var PLANT_SOIL_MOISTURE = 16;
+var PLANT_MANUAL_TIMER = 17;
+var PLANT_SOIL_TYPE = 18;
+var PLANT_TYPE = 19;
+//var RESERVED = 20;
+var DEEP_SLEEP = 21;
+//==========
+var EMAIL_ALERT = 22;
+var SMTP_SERVER = 23;
+var SMTP_USERNAME = 24;
+var SMTP_PASSWORD = 25;
+var PLANT_NAME = 26;
+var ALERTS = 27;
+var DEMO_PASSWORD = 28;
+var TIMEZONE_OFFSET = 29;
+var DEMO_AVAILABILITY = 30;
+var PNP_ADC = 31;
+var DEMOLOCK = false;
+var ESP32 = false;
+
+document.querySelectorAll('.soil-box').forEach(function(box) {
+  var idx = soil_type_labels.indexOf(box.dataset.soil);
+  if (idx > -1) box.style.setProperty('--soil-color', soil_type_color[idx]);
+});
+
+function PlantLogin() {
+  var m = document.getElementById('demoLockModal');
+  if (m) m.classList.add('active');
 }
 
-function updateNTP() {
-	var d = new Date();
-	var epoch = Math.floor(Date.now() / 1000);
-	var ntp = new XMLHttpRequest();
-	ntp.open('GET', 'api?&ntp=1&tz=' + getPOSIXtz() + '&epoch=' + epoch, true);
-	ntp.send();
+function soilModalSelect(idx) {
+  var c = soil_type_color[idx];
+  var soilCircle = svgDoc.getElementById('soil-circle');
+  if (soilCircle) soilCircle.setAttribute('fill', c);
+  var soilTextSvg = svgDoc.getElementById('soil-text');
+  if (soilTextSvg) soilTextSvg.style.fill = c;
+  if (DEMOLOCK) { PlantLogin(); return; }
+  var xhr = new XMLHttpRequest();
+  xhr.open('GET', 'nvram.json?offset=' + PLANT_SOIL_TYPE + '&value=' + idx, true);
+  xhr.send();
+  document.getElementById('soilModal').classList.remove('active');
 }
 
-function getPOSIXtz() {
-	const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
-	const offset = new Date().getTimezoneOffset() / 60;
-	return "UTC" + offset;
+function svgText(id) {
+  return svgDoc ? svgDoc.getElementById(id) : null;
 }
 
-function loadSVG(svgfile) {
-	if(svgfile == undefined)
-		svgfile = 'bonsai.svg';
+var waterCb = document.getElementById('waterCheckbox');
+if (waterCb) {
+  waterCb.addEventListener('change', function() {
+    var wlCb = document.getElementById('WaterLevelCheckbox');
+    var wlHid = document.getElementById('WaterLevel');
+    if (wlHid) wlHid.value = this.checked ? 1 : 0;
+    if (wlCb) { wlCb.checked = this.checked; wlCb.dispatchEvent(new Event('change')); }
+  });
+}
 
-	var nvram = new XMLHttpRequest();
-    nvram.responseType = 'json';
-    //nvram.overrideMimeType('application/json');
-    nvram.open('GET', 'nvram.json', true);
-    nvram.send();
-    nvram.onload = function(e) {
+var powerCard = document.getElementById('powerCard');
+var powerNormal = document.getElementById('powerNormal');
+var powerSliderWrap = document.getElementById('powerSliderWrap');
+var powerSlider = document.getElementById('powerSlider');
+var powerLabel = document.querySelector('.power-slider-label');
+if (powerCard && powerNormal && powerSliderWrap && powerSlider) {
+  powerCard.addEventListener('click', function(e) {
+    if (e.target === powerSlider) return;
+    var powerText = svgText('power-label');
+    var val = powerText ? powerText.textContent : 10;
+    powerSlider.value = val;
+    if (powerLabel) powerLabel.textContent = 'Sleep in minutes ' + val;
+    updateSliderFill(powerSlider);
+    powerNormal.style.display = 'none';
+    powerSliderWrap.classList.add('active');
+  });
+  powerSlider.addEventListener('input', function() {
+    if (powerLabel) powerLabel.textContent = 'Sleep in minutes ' + this.value;
+    updateSliderFill(this);
+  });
+  powerSlider.addEventListener('change', function() {
+    if (DEMOLOCK) { PlantLogin(); powerSliderWrap.classList.remove('active'); powerNormal.style.display = 'flex'; return; }
+    var xhr = new XMLHttpRequest();
+    xhr.open('GET', 'nvram.json?offset=21&value=' + this.value, true);
+    xhr.onload = function() { if (xhr.responseText == 'Locked') { DEMOLOCK = true; PlantLogin(); } };
+    xhr.send();
+    var powerText = svgText('power-label');
+    if (powerText) powerText.textContent = this.value;
+    powerSliderWrap.classList.remove('active');
+    powerNormal.style.display = 'flex';
+  });
+}
 
-		var svg = document.getElementById('svgInteractive');
-		var index = new XMLHttpRequest();
-
-	    // If SVG is supported
-	    if (typeof SVGRect != undefined)
-	    {
-	    	if (nvram.response === null) {
-	    		notify('', 'Invalid JSON format received', 'danger');
-	    		setTimeout(function () {
-			        window.location.href = 'nvram.json';
-			    }, 6000);
-	    	}else{
-	    		
-	    		if(nvram.response['nvram'][0].indexOf('esp32') != -1) {
-	    			ESP32 = true;
-	    		}
-	    		var svgurl = 'api?svg=1';
-	    		if (window.location.hostname.endsWith("github.io") || window.location.hostname === "127.0.0.1")
-	    			svgurl = 'svg';
-
-				index.open('GET', svgurl, true);
-				index.send();
-				index.onload = function(e) {
-					if(index.response != undefined) {
-						try {
-							var list = document.getElementById('listLayout');
-							var n = 0;
-							index.responseText.split('\n').forEach(function (item) {
-								//console.log(item);
-								if (item !== '') {
-									if(n == nvram.response['nvram'][PLANT_TYPE]) {
-										svgfile = item; //match index # to file name
-									}
-									if(item.indexOf('soil.') == -1) {
-										var listdiv = document.createElement('div');
-										listdiv.classList.add('form-check');
-									    var listlabel = document.createElement('label');
-									    listlabel.classList.add('ml-2');
-									    listlabel.textContent = item;
-										var listcheckbox = document.createElement('input');
-										listcheckbox.setAttribute('type', 'checkbox');
-										listcheckbox.classList.add('form-check-input');
-										listdiv.appendChild(listcheckbox);
-										listdiv.appendChild(listlabel);
-										list.appendChild(listdiv);
-									}
-								}
-								n++;
-							});
-						}catch{}
-					}
-					document.getElementById('css-svg').href = 'svg/' + svgfile.replace('.svg', '.css');
-
-				    // Request the SVG file
-				    var xhr = new XMLHttpRequest();
-				    xhr.open('GET', 'svg/' + svgfile, true);
-				    xhr.send();
-
-				    // Append the SVG to the target
-				    xhr.onload = function(e) {
-			            svg.innerHTML = xhr.responseText;
-			            document.getElementById('timer-enabled').classList.add('hidden');
-
-			            if(nvram.response != undefined) {
-			                NVRAMtoSVG(nvram.response);
-
-			                pnp_adc = nvram.response['nvram'][PNP_ADC] + '0000';
-							var bool_value = pnp_adc.charAt(2) == '1' ? true : false;
-		                    document.getElementById('WaterLevel').value = pnp_adc.charAt(2);
-							document.getElementById('WaterLevelCheckbox').checked = bool_value;
-							bool_value = pnp_adc.charAt(3) == '1' ? true : false;
-							document.getElementById('MOSFET').value = pnp_adc.charAt(3);
-							document.getElementById('MOSFETCheckbox').checked = bool_value;
-		                    svgwaterLevelAdjust(pnp_adc.charAt(2));
-		                    adcSoilValue();
-			            }
-			            updateNTP();
-
-				        document.getElementById('background').onclick = function() {
-				            var svgPlant = document.getElementById('svgPlant');
-						    svgPlant.innerHTML = '';
-						    
-				            var xhr = new XMLHttpRequest();
-						    xhr.open('GET', 'svg/', true);
-						    xhr.send();
-						    xhr.onload = function(e) {
-					        	var s = xhr.responseText.split('\n');
-
-					        	var index = [];
-						        for (var i = 0; i < s.length; i++) {
-		                        	(function(i) {
-			                        	index[i] = new XMLHttpRequest();
-						                index[i].open('GET', 'svg/' + s[i], true);
-						                index[i].send();
-						                index[i].onload = function(e) {
-											var parser = new DOMParser();
-											var htmlDoc = parser.parseFromString(index[i].responseText, 'text/html');
-											if (htmlDoc.getElementById('timeline') !== null)
-											{
-												htmlDoc.getElementById('timeline').remove();
-
-												var div = htmlDoc.getElementsByTagName('svg')[0];
-												div.id = s[i];
-												div.className = 'row w-50';
-												div.onclick = function() {
-													var id = this.id;
-													console.log(i);
-													saveSetting(PLANT_TYPE, i, function() { loadSVG(id); hideAllModals(); });
-									            }
-							                	svgPlant.appendChild(div);
-							                }
-						                }
-					                })(i);
-		                        }
-						    }
-						    document.getElementById('plant-Type').classList.remove('hidden');
-				            document.getElementById('modal-backdrop').classList.remove('hidden');
-					    }
-
-		    			document.getElementById('demo-lock-ok').onclick = function() {
-			                document.getElementById('demo-LockForm').submit();
-			            }
-
-			            document.getElementById('graph').onclick = function() {
-			                window.location.href = 'graph.html';
-			            }
-			            if(document.getElementById('led')){
-				            document.getElementById('led').onclick = function() {
-				                var x = document.getElementById('led-enabled');
-							  	if (x.style.display === 'block') {
-							  		x.style.display = 'none';
-							   		//saveSetting(PLANT_LED, 0);
-							   		saveSetting('8&alert=0',0);
-							  	} else {
-							   		x.style.display = 'block';
-							   		//saveSetting(PLANT_LED, 1);
-							   		saveSetting('8&alert=1',1);
-							    	//document.getElementById('power-text').textContent = 8;
-							  	}
-				            }
-				        }
-
-				        document.getElementById('pot-size').onclick = function() {
-				        	var container = document.getElementById('roundslider-knob');
-				        	var slider_color = document.getElementById('pot-size-badge').firstElementChild.getAttribute('fill');
-							var windowSize = Math.min(window.innerWidth, window.innerHeight);
-    						var dynamicRadius = windowSize * 0.3;
-							if (container._roundslider) {
-							   container._roundslider.destroy();
-							}
-							var slider = new RoundSlider(container, {
-							    radius: dynamicRadius,
-							    min: 2, max: 120, value: document.getElementById('pot-size-text').textContent,
-							    color: slider_color, colorEnd: slider_color,
-							    onComplete: function(v) { document.getElementById('pot-size-text').textContent = v; saveSetting(PLANT_POT_SIZE, v) }
-							});
-							container._roundslider = slider;
-				            document.getElementById('roundslider').classList.remove('hidden');
-				        	document.getElementById('modal-backdrop').classList.remove('hidden');
-				        }
-
-				        document.getElementById('water').onclick = function() {
-				        	var container = document.getElementById('roundslider-knob');
-							var windowSize = Math.min(window.innerWidth, window.innerHeight);
-    						var dynamicRadius = windowSize * 0.1;
-							if (container._roundslider) {
-							   container._roundslider.destroy();
-							}
-							var slider = new RoundSlider(container, {
-							    radius: dynamicRadius,
-							    min: 0, max: 1, value: document.getElementById('WaterLevel').value,
-							    color: '#4facfe', colorEnd: '#00f2fe',
-							    onComplete: function(v) {
-							    	saveSetting(PNP_ADC, pnp_adc.charAt(0) + '' + pnp_adc.charAt(1) + '' + v + '' + pnp_adc.charAt(3), function(lock) {
-								    	if (lock != 'Locked') {
-								    		var bool_value = v == '1' ? true : false;
-								    		document.getElementById('WaterLevel').value = v;
-								    		document.getElementById('WaterLevelCheckbox').checked = bool_value;
-								    		svgwaterLevelAdjust(v);
-								        }
-								    });
-							    }
-							});
-							container._roundslider = slider;
-				            document.getElementById('roundslider').classList.remove('hidden');
-				        	document.getElementById('modal-backdrop').classList.remove('hidden');
-				        }
-
-				        document.getElementById('moisture').onclick = function() {
-				            var moistureMin = 20;
-				            var moistureMax = 1000;
-				            var moistureStep = 10;
-				            if(ESP32) {
-				            	moistureMin = 100;
-				            	moistureMax = 2000;
-				            }
-				            var container = document.getElementById('roundslider-knob');
-				        	var slider_color = document.getElementById('moisture-badge').firstElementChild.getAttribute('fill');
-							var windowSize = Math.min(window.innerWidth, window.innerHeight);
-    						var dynamicRadius = windowSize * 0.3;
-							if (container._roundslider) {
-							   container._roundslider.destroy();
-							}
-							var slider = new RoundSlider(container, {
-							    radius: dynamicRadius,
-							    min: moistureMin, max: moistureMax, value: document.getElementById('moisture-text').textContent,
-							    color: slider_color, colorEnd: slider_color,
-							    onComplete: function(v) {
-							    	document.getElementById('moisture-text').textContent = v;
-							    	saveSetting(PLANT_SOIL_MOISTURE, v);
-							    	adcSoilValue();
-							    }
-							});
-							container._roundslider = slider;
-				            document.getElementById('roundslider').classList.remove('hidden');
-				        	document.getElementById('modal-backdrop').classList.remove('hidden');
-				        }
-
-				        document.getElementById('timer').onclick = function() {
-				        	var container = document.getElementById('roundslider-knob');
-				        	var slider_color = document.getElementById('moisture-badge').firstElementChild.getAttribute('fill');
-							var windowSize = Math.min(window.innerWidth, window.innerHeight);
-    						var dynamicRadius = windowSize * 0.3;
-							if (container._roundslider) {
-							   container._roundslider.destroy();
-							}
-							var slider = new RoundSlider(container, {
-							    radius: dynamicRadius,
-							    min: 0, max: 120, value: document.getElementById('timer-text').textContent,
-							    color: slider_color, colorEnd: slider_color,
-							    onComplete: function(v) { 
-								    document.getElementById('timer-text').textContent = v; 
-									saveSetting(PLANT_MANUAL_TIMER, v, function(lock) {
-								    	if (lock != 'Locked') {
-								    		if (v == 0) {
-								                document.getElementById('timer-enabled').classList.add('hidden');
-								                document.getElementById('timer-disabled').classList.remove('hidden');
-
-								                document.getElementById('power-text').textContent = 5;
-								                if (document.getElementById('EnableLogCheckbox').checked === false) {
-								                	saveSetting(DEEP_SLEEP, 5);
-								                }
-								            }else{
-								                document.getElementById('timer-enabled').classList.remove('hidden');
-								                document.getElementById('timer-disabled').classList.add('hidden');
-
-								                //document.getElementById('power-text').textContent = 30;
-								                //if($('#EnableLogCheckbox').prop('checked') == false)
-								                //	saveSetting(DEEP_SLEEP, 30);
-								                notify('', 'Timer disables Soil Sensor', 'danger');
-								                if(v < 8) //less than 8 hours
-								                	notify('', 'Timer is Low! No Overwater protection', 'warning');
-								                notify('', 'Enable when issues with Sensor', 'info');
-								            }
-								        }
-								    });
-								    adcSoilValue();
-								}
-							});
-							container._roundslider = slider;
-				            document.getElementById('roundslider').classList.remove('hidden');
-				        	document.getElementById('modal-backdrop').classList.remove('hidden');
-				        }
-
-						document.getElementById('power').onclick = function() {
-				            var sleepMax = 30;
-				            if(ESP32) {
-				            	sleepMax = 1440;
-				            }
-				            var container = document.getElementById('roundslider-knob');
-				        	var slider_color = document.getElementById('power-badge').firstElementChild.getAttribute('fill');
-							var windowSize = Math.min(window.innerWidth, window.innerHeight);
-    						var dynamicRadius = windowSize * 0.3;
-							if (container._roundslider) {
-							   container._roundslider.destroy();
-							}
-							var slider = new RoundSlider(container, {
-							    radius: dynamicRadius,
-							    min: 0, max: sleepMax, value: document.getElementById('power-text').textContent,
-							    color: slider_color, colorEnd: slider_color,
-							    onComplete: function(v) {
-							    	if (v !== 0 && !isValidSleep(v)) {
-								        notify('', 'Recommended as even clock interval 5,10,20,30', 'warning');
-								    }
-							    	if(v == 0) {
-										notify('', 'Sleep Disabled!', 'danger');
-										notify('', 'Wireless Always On', 'success');
-										//notify('', 'Battery Will Discharge Quickly!', 'warning');
-									}else if(v < 5) {
-										notify('', 'Low Sleep = High Power Consumption!', 'warning');
-										notify('', 'Sleep > 5 Minutes Recommended', 'success');
-									}
-								    document.getElementById('power-text').textContent = v;
-								    saveSetting(DEEP_SLEEP, v);
-							 	}
-							});
-							container._roundslider = slider;
-				            document.getElementById('roundslider').classList.remove('hidden');
-				        	document.getElementById('modal-backdrop').classList.remove('hidden');
-				        }
-
-				        document.getElementById('soil').onclick = function() {
-				            var svgSoil = document.getElementById('svgSoil');
-				            if (typeof SVGRect != undefined) {
-				                var xhr = new XMLHttpRequest();
-				                xhr.open('GET', 'svg/soil.svg', true);
-				                xhr.send();
-				                xhr.onload = function(e) {
-				                	svgSoil.innerHTML = xhr.responseText;
-
-				                	if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
-										document.getElementById('g3679').setAttribute('fill', 'white');
-									}
-				                	document.getElementById('soil-moss').onclick = function() {
-										var moss_color = document.getElementById('soil-rock-badge').firstElementChild.getAttribute('fill');
-										document.getElementById('soil-type-color').style.fill = moss_color;
-								        document.getElementById('soil-type-text').textContent = soil_type_labels[0];
-								        if(document.getElementById('soil-text'))
-								        	document.getElementById('soil-text').style.fill = moss_color;
-								        saveSetting(PLANT_SOIL_TYPE, 0, function() { hideAllModals(); });
-								    }
-								    document.getElementById('soil-loam').onclick = function() {
-								    	var loam_color = document.getElementById('soil-rock-badge').firstElementChild.getAttribute('fill');
-										document.getElementById('soil-type-color').style.fill = loam_color;
-								        document.getElementById('soil-type-text').textContent = soil_type_labels[1];
-								        if(document.getElementById('soil-text'))
-								        	document.getElementById('soil-text').style.fill = loam_color;
-								        saveSetting(PLANT_SOIL_TYPE, 1, function() { hideAllModals(); });
-								    }
-								    document.getElementById('soil-dirt').onclick = function() {
-										var dirt_color = document.getElementById('soil-rock-badge').firstElementChild.getAttribute('fill');
-										document.getElementById('soil-type-color').style.fill = dirt_color;
-								        document.getElementById('soil-type-text').textContent = soil_type_labels[2];
-								        if(document.getElementById('soil-text'))
-								        	document.getElementById('soil-text').style.fill = dirt_color;
-								        saveSetting(PLANT_SOIL_TYPE, 2, function() { hideAllModals(); });
-								    }
-								    document.getElementById('soil-clay').onclick = function() {
-								    	var clay_color = document.getElementById('soil-rock-badge').firstElementChild.getAttribute('fill');
-								    	document.getElementById('soil-type-color').style.fill = clay_color;
-								        document.getElementById('soil-type-text').textContent = soil_type_labels[3];
-								        if(document.getElementById('soil-text'))
-								        	document.getElementById('soil-text').style.fill = clay_color;
-								        saveSetting(PLANT_SOIL_TYPE, 3, function() { hideAllModals(); });
-								    }
-								    document.getElementById('soil-sand').onclick = function() {
-								    	var sand_color = document.getElementById('soil-rock-badge').firstElementChild.getAttribute('fill');
-								    	document.getElementById('soil-type-color').style.fill = sand_color;
-								        document.getElementById('soil-type-text').textContent = soil_type_labels[4];
-								        if(document.getElementById('soil-text'))
-								        	document.getElementById('soil-text').style.fill = sand_color;
-								        saveSetting(PLANT_SOIL_TYPE, 4, function() { hideAllModals(); });
-								    }
-								    document.getElementById('soil-rock').onclick = function() {
-								    	var rock_color = document.getElementById('soil-rock-badge').firstElementChild.getAttribute('fill');
-								    	document.getElementById('soil-type-color').style.fill = rock_color;
-								        document.getElementById('soil-type-text').textContent = soil_type_labels[5];
-								        if(document.getElementById('soil-text'))
-								        	document.getElementById('soil-text').style.fill = rock_color;
-								        saveSetting(PLANT_SOIL_TYPE, 5, function() { hideAllModals(); });
-								    }
-				                }
-				                document.getElementById('soil-Settings').classList.remove('hidden');
-				        		document.getElementById('modal-backdrop').classList.remove('hidden');
-				            }
-				        }
-				        
-				        document.getElementById('wireless').onclick = function() {
-
-				        	document.getElementById('wireless-Settings').classList.remove('hidden');
-				        	document.getElementById('modal-backdrop').classList.remove('hidden');
-
-				            var nvram = new XMLHttpRequest();
-				            nvram.responseType = 'json';
-				            //nvram.overrideMimeType('application/json');
-				            nvram.open('GET', 'nvram.json', true);
-				            nvram.send();
-				            nvram.onload = function(e) {
-				                try {
-				                	var data = nvram.response; //nvram.responseText;
-				                    var v = data['nvram'][0].split('|');
-				                    document.getElementById('coreVersion').textContent = 'Core Version: ' + v[0];
-				                    document.getElementById('sdkVersion').textContent = 'SDK Version: ' + v[1];
-				                    document.getElementById('fsVersion').textContent = 'LittleFS Version: ' + (0xffff & (v[2] >> 16)) + '.' + (0xffff & (v[2] >> 0)) + '.' + (0xffff & (v[2] >> 20));
-				                    document.getElementById('firmwareVersion').textContent = 'Firmware Version: ' + v[3];
-				                    document.getElementById('fsram').textContent = 'Flash: ' + Math.round(v[4]/1024) + ' KB (' + v[4] + ')';
-									document.getElementById('dram').textContent = 'Memory: ' + Math.round(v[5]/1024) + ' KB (' + v[5] + ')';
-
-									if(ESP32) {
-									    const select = document.getElementById("WiFiPhyMode");
-									    const newOption = document.createElement("option");
-									    newOption.value = "4";
-									    newOption.text = "802.11 ax";
-									    select.appendChild(newOption);
-								    }
-				                    if(data['nvram'][WIFI_PHY_MODE] == 3) {
-				                    	var optionObject = document.getElementById('WiFiPower').options;
-				                    	optionObject[17].setAttribute('hidden','true');
-				                    	optionObject[18].setAttribute('hidden','true');
-				                    	optionObject[19].setAttribute('hidden','true');
-				                    	optionObject[20].setAttribute('hidden','true');
-				                    }
-				                    var bool_value = data['nvram'][WIFI_HIDE] == '1' ? true : false;
-									document.getElementById('WiFiHidden').value = data['nvram'][WIFI_HIDE];
-									document.getElementById('WiFiHiddenCheckbox').checked = bool_value;
-
-				                    setWiFiChannels(data['nvram'][WIFI_PHY_MODE]);
-				                    document.getElementById('WiFiPhyMode').addEventListener("change", function () {
-								    	setWiFiChannels(this.value);
-								    });
-								    document.getElementById('WiFiPhyMode').value = data['nvram'][WIFI_PHY_MODE];
-				                    document.getElementById('WiFiPower').value = data['nvram'][WIFI_PHY_POWER];
-									document.getElementById('WiFiChannel').value = data['nvram'][WIFI_CHANNEL];
-									document.getElementById('WiFiSSID').value = data['nvram'][WIFI_SSID];
-									document.getElementById('WiFiUsername').value = data['nvram'][WIFI_USERNAME];
-				                    bool_value = data['nvram'][LOG_ENABLE] == '1' ? true : false;
-				                   	document.getElementById('EnableLog').value = data['nvram'][LOG_ENABLE];
-									document.getElementById('EnableLogCheckbox').checked = bool_value;
-
-				                    bool_value = data['nvram'][NETWORK_DHCP] == '1' ? true : false;
-				                    document.getElementById('WiFiDHCP').value = data['nvram'][NETWORK_DHCP];
-									document.getElementById('WiFiDHCPCheckbox').checked = bool_value;
-									document.getElementById('WiFiIP').disabled = bool_value;
-									document.getElementById('WiFiSubnet').disabled = bool_value;
-									document.getElementById('WiFiGateway').disabled = bool_value;
-									document.getElementById('WiFiDNS').disabled = bool_value;
-									document.getElementById('WiFiIP').value = data['nvram'][NETWORK_IP];
-									document.getElementById('WiFiSubnet').value = data['nvram'][NETWORK_SUBNET];
-									document.getElementById('WiFiGateway').value = data['nvram'][NETWORK_GATEWAY];
-									document.getElementById('WiFiDNS').value = data['nvram'][NETWORK_DNS];
-				                    document.getElementsByName('Mode')[data['nvram'][WIFI_MODE]].checked = true;
-				                    SetWiFiMode();
-
-				                   	document.getElementById('AlertEmail').value = data['nvram'][EMAIL_ALERT];
-									document.getElementById('AlertSMTPUsername').value = data['nvram'][SMTP_USERNAME];
-				                    var smtp = data['nvram'][SMTP_SERVER];
-				                    if(smtp != '') {
-				                    	document.getElementById('AlertSMTPServer').value = smtp;
-					                    if(smtp.indexOf(':') == -1) {
-										    notify('', 'No Email Encryption', 'danger');
-										    notify('', smtp + ':587', 'warning');
-										}
-									}
-									document.getElementById('AlertPlantName').value = data['nvram'][PLANT_NAME];
-									document.getElementById('DemoTimezone').value = data['nvram'][TIMEZONE_OFFSET];
-
-									document.getElementById('fileLayout').addEventListener('change', function() {
-									    if (DEMOLOCK) {
-									        PlantLogin();
-									    } else {
-									        document.getElementById('formLayout').submit();
-									    }
-									});
-
-									document.getElementById('fileLittleFS').addEventListener('change', function() {
-									    if (DEMOLOCK) {
-									        PlantLogin();
-									    } else {
-									        document.getElementById('formLittleFS').setAttribute('action', 'http://' + window.location.hostname + '/update'); // force HTTP
-									        progressTimer(80, 1);
-									        document.getElementById('formLittleFS').submit();
-									    }
-									});
-
-									document.getElementById('fileFirmware').addEventListener('change', function(e) {
-						            	if(DEMOLOCK) {
-											PlantLogin();
-										}else{
-											document.getElementById('formFirmware').setAttribute('action', 'http://' + window.location.hostname + '/update'); // force HTTP
-											//Lookup EEPROM_ID in binary and compare with current firmware
-											const file = e.target.files[0];
-    										if (file) {
-    											console.log(v[6]);
-												const reader = new FileReader();
-											    reader.onload = function(e) {
-											        const arrayBuffer = e.target.result;
-											        const uint8Array = new Uint8Array(arrayBuffer);
-											        const hexTarget = parseInt(v[6], 16) >>> 0;
-											        let hexFound = false;
-											        for (let i = 0; i < uint8Array.length - 3; i++) {
-												        const hexValue = (uint8Array[i]) | (uint8Array[i + 1] << 8) | (uint8Array[i + 2] << 16) | (uint8Array[i + 3] << 24);
-												        if ((hexValue >>> 0) === hexTarget) {
-												            hexFound = true;
-												            break;
-												        }
-												    }
-												    deleteCookies();
-											    	if(data['nvram'][PNP_ADC] != 0) {
-						            					document.cookie = PNP_ADC + '=' + data['nvram'][PNP_ADC];
-						            				}
-											        if(hexFound) {
-											        	progressTimer(20, 1);
-							                			document.getElementById('formFirmware').submit();
-											        }else{
-					    								document.getElementById('keep-eeprom-text').textContent = 'After firmware upgrade, keep current settings?';
-														document.getElementById('wireless-Settings').classList.add('hidden');
-														document.getElementById('keep-EEPROM').classList.remove('hidden');
-														document.getElementById('keep-eeprom-yes').onclick = function() {
-															var skip = [1, 8, 20, 25, 28];
-															for (var i = 1; i <= 31; i++) {
-															    if (skip.indexOf(i) === -1) {
-															        document.cookie = i + '=' + data['nvram'][i];
-																}
-															}
-								                			progressTimer(20, 2);
-										                	document.getElementById('formFirmware').submit();
-								            			}
-								            			document.getElementById('keep-eeprom-no').onclick = function() {
-								            				document.getElementById('keep-EEPROM').classList.add('hidden');
-								            				document.getElementById('wireless-Settings').classList.remove('hidden');
-								                			progressTimer(20, 1);
-										                	document.getElementById('formFirmware').submit();
-							            				}
-											        }
-											    };
-											    reader.readAsArrayBuffer(file);
-											}else{
-												progressTimer(20, 1);
-							                	document.getElementById('formFirmware').submit();
-											}
-							            }
-						            });
-
-						            rslider('#enable-pnp', {
-						            	min: 0,
-      									max: 1,
-								      	value: pnp_adc.charAt(0),
-								      	color: '#FF5722',
-									    onChange: (v) => {
-									        document.getElementById('enable-pnp').value = v;
-										    if (v == 1) {
-										        notify('', 'PNP Transistor! Controlled with LOW (Negative)', 'danger');
-										        notify('', 'If you get this WRONG, Pump will run Non-Stop!', 'warning');
-										    }
-										    pnp_adc = v + '' + document.getElementById('adc-sensitivity').value  + '' + document.getElementById('WaterLevel').value + '' + document.getElementById('MOSFET').value;
-										    saveSetting(PNP_ADC,  pnp_adc.charAt(0) + '' + pnp_adc.charAt(1)  + '' + pnp_adc.charAt(2) + '' + pnp_adc.charAt(3));
-									    }
-								    });
-						            rslider('#adc-sensitivity', {
-						            	min: 0,
-      									max: 9,
-      									dashes: 10,
-								      	value: pnp_adc.charAt(1),
-								      	color: '#2196F3',
-								      	onInput: (v) => {
-								        	document.getElementById('adc-sensitivity-text').textContent = v;
-									    },
-									    onChange: (v) => {
-									        document.getElementById('adc-sensitivity').value = v;
-										   	pnp_adc = document.getElementById('enable-pnp').value  + '' + v + '' + document.getElementById('WaterLevel').value + '' + document.getElementById('MOSFET').value;
-									    	saveSetting(PNP_ADC, pnp_adc.charAt(0) + '' + pnp_adc.charAt(1) + '' + pnp_adc.charAt(2) + '' + pnp_adc.charAt(3));
-									    }
-								    });
-								    
-								    document.getElementById('enable-pnp').value = pnp_adc.charAt(0);
-								    document.getElementById('adc-sensitivity').value = pnp_adc.charAt(1);
-								    document.getElementById('adc-sensitivity-text').textContent = pnp_adc.charAt(1);
-
-								    if (window.isSecureContext)
-								    {
-								    	document.getElementById('createPasskey').classList.remove('hidden');
-								        document.getElementById('createPasskey').addEventListener('click', async () => {
-								    	
-									    if (!window.PublicKeyCredential) {
-									        notify('', 'Web Authentication API is not supported.', 'danger');
-									        return;
-									    }
-									      const isPlatformAvailable = await PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable();
-									      if (!isPlatformAvailable) {
-									        notify('', 'Biometrics/PIN is not available.', 'danger');
-									        return;
-									      }
-									      
-									      try {
-									        const rpId = window.location.hostname === '192.168.8.8' || window.location.hostname === '127.0.0.1' ? 'localhost' : window.location.hostname;
-
-									        // In production: fetch these options from backend
-									        const publicKeyCredentialCreationOptions = {
-									          challenge: crypto.getRandomValues(new Uint8Array(32)), // Better: use server-generated challenge
-									          rp: {
-									            name: "tinyplant",
-									            id: rpId, // Explicit and correct RP ID
-									          },
-									          user: {
-									            id: crypto.getRandomValues(new Uint8Array(16)), // Random unique user ID
-									            name: "tinyplant",
-									            displayName: "Tiny Plant",
-									          },
-									          pubKeyCredParams: [
-									            { alg: -7, type: "public-key" }, // ES256 (preferred by Apple)
-									            { alg: -257, type: "public-key" } // RS256 fallback
-									          ],
-									          authenticatorSelection: {
-									            authenticatorAttachment: "platform",     // Use Face ID / Touch ID
-									            residentKey: "required",                 // Discoverable credential (usernameless login)
-									            userVerification: "required"
-									          },
-									          timeout: 60000,
-									          attestation: "none" // "direct" or "indirect" if you need attestation
-									        };
-
-									        const credential = await navigator.credentials.create({
-									          publicKey: publicKeyCredentialCreationOptions
-									        });
-
-									        console.log(credential);
-									        notify('', 'Passkey created!', 'success');
-
-									        // Send credential.response (AttestationResponse) to backend for verification/storage
-											// Example: fetch('/register', { method: 'POST', body: JSON.stringify(credential) });
-									      } catch (err) {
-									        console.error('Error creating passkey:', err);
-									        notify('', 'Failed to create passkey: ' + err.message, 'danger');
-									      }
-									    });
-								    }
-
-								    const times = Array.from({ length: 25 }, (_, i) => {
-									  const hour = (6 + i) % 24;
-									  const period = hour < 12 ? 'am' : 'pm';
-									  const formattedHour = hour % 12 || 12; // Converts 0 to 12 for 12-hour clock
-									  return `${formattedHour}:00${period}`;
-									});
-									//console.log(times);
-									/*
-								    avslider = {
-								        target: '#availability-slider',
-								        values: times,
-								        range: true,
-								        tooltip: true,
-								        scale: false,
-								        labels: false,
-								        set: ['7:00am', '11:00am'],
-								        onChange: function (e) {
-								        	console.log(e);
-										    //document.getElementById('ADCSensitivity').value = e;
-								        }
-								    };
-								    */
-									/*
-						            $('#Availability-Slider').roundSlider({
-						                svgMode: true,
-						                radius: 100,
-						                width: 16,
-						                handleSize: '34,10',
-						                sliderType: 'range',
-									    value: data['nvram'][DEMO_AVAILABILITY].substring(7,9) + ',' + data['nvram'][DEMO_AVAILABILITY].substring(9,11),
-									    tooltipColor: "text-md text-gray-800 dark:text-white",
-						                min: 0,
-						                max: 24,
-						                startAngle: 90,
-						                tooltipFormat: function (e) {
-										    var val = e.value, content;
-										    if (val < 12) content = val + ' am';
-										    else if (val == 12) content = '12 pm';
-										    else if (val > 12) content = (val - 12) + 'pm';
-										    else if (val == 24) content = '12 am';
-										    return  '<b>' + content + '</b>';
-										}
-						            });
-						            */
-						            AvailabilityWeek([data['nvram'][DEMO_AVAILABILITY].charAt(0), data['nvram'][DEMO_AVAILABILITY].charAt(1), data['nvram'][DEMO_AVAILABILITY].charAt(2), data['nvram'][DEMO_AVAILABILITY].charAt(3), data['nvram'][DEMO_AVAILABILITY].charAt(4), data['nvram'][DEMO_AVAILABILITY].charAt(5), data['nvram'][DEMO_AVAILABILITY].charAt(6)]);
-
-				                } catch (error) {
-				                	notify('', error, 'danger');
-				                }
-				            }
-				            
-							const togglePasswordIcons = document.querySelectorAll('.toggle-password');
-							togglePasswordIcons.forEach(icon => {
-							    icon.addEventListener('click', () => {
-							        const passwordField = document.querySelector(`#${icon.getAttribute('data-target')}`);
-							        const type = passwordField.getAttribute('type') === 'password' ? 'text' : 'password';
-							        passwordField.setAttribute('type', type);
-							        const currentSrc = icon.getAttribute('src');
-							        const newSrc = currentSrc === 'img/eye-slash.svg' ? 'img/eye-slash-fill.svg' : 'img/eye-slash.svg';
-							        icon.setAttribute('src', newSrc);
-							    });
-							});
-
-							document.getElementById('browseLittleFS').addEventListener('click', function() {
-							    if (DEMOLOCK) {
-							        PlantLogin();
-							    } else {
-							        document.getElementById('fileLittleFS').click();
-							    }
-							});
-
-							document.getElementById('browseFirmware').addEventListener('click', function() {
-							    if (DEMOLOCK) {
-							        PlantLogin();
-							    } else {
-							        document.getElementById('fileFirmware').click();
-							    }
-							});
-
-							document.getElementById('browseCertificate').addEventListener('click', function() {
-							    if (DEMOLOCK) {
-							        PlantLogin();
-							    } else {
-							        document.getElementById('fileCertificate').click();
-							    }
-							});
-
-							document.getElementById('browsePrivateKey').addEventListener('click', function() {
-							    if (DEMOLOCK) {
-							        PlantLogin();
-							    } else {
-							        document.getElementById('filePrivateKey').click();
-							    }
-							});
-				        }
-				    }
-				}
-
-				if(nvram.response['nvram'][DEMO_PASSWORD] != '')
-	            {
-	            	DEMOLOCK = true;
-	            }
-
-				if(nvram.response['nvram'][LOG_ENABLE] == 1) {
-					notify('', 'Data collection is enabled.', 'info');
-				}
-			}
-
-	    } else {  // No SVG
-	    	notify('','The browser does not support SVG graphics', 'danger');
-	    }
+var timerCard = document.getElementById('timerCard');
+var timerNormal = document.getElementById('timerNormal');
+var timerSliderWrap = document.getElementById('timerSliderWrap');
+var timerSlider = document.getElementById('timerSlider');
+var timerLabel = document.getElementById('timerSliderLabel');
+if (timerCard && timerNormal && timerSliderWrap && timerSlider) {
+    function updateTimerCheckbox(val) {
+      var cb = document.getElementById('timerCheckbox');
+      if (cb) cb.checked = parseInt(val) > 0;
     }
+    timerCard.addEventListener('click', function(e) {
+      if (e.target === timerSlider) return;
+      var timerText = svgText('timer-label');
+      var val = timerText ? timerText.textContent : 0;
+      timerSlider.value = val;
+      if (timerLabel) {
+        var days = val >= 24 ? ' (' + Math.floor(val / 24) + ' day' + (Math.floor(val / 24) > 1 ? 's' : '') + ')' : '';
+        timerLabel.textContent = 'Water every ' + val + ' hours' + days;
+      }
+      updateSliderFill(timerSlider);
+      timerNormal.style.display = 'none';
+      timerSliderWrap.classList.add('active');
+    });
+    timerSlider.addEventListener('input', function() {
+      updateTimerCheckbox(this.value);
+      var days = this.value >= 24 ? ' (' + Math.floor(this.value / 24) + ' day' + (Math.floor(this.value / 24) > 1 ? 's' : '') + ')' : '';
+      if (timerLabel) timerLabel.textContent = 'Water every ' + this.value + ' hours' + days;
+      updateSliderFill(this);
+    });
+    timerSlider.addEventListener('change', function() {
+      if (DEMOLOCK) { PlantLogin(); timerSliderWrap.classList.remove('active'); timerNormal.style.display = 'flex'; return; }
+      var xhr = new XMLHttpRequest();
+      xhr.open('GET', 'nvram.json?offset=17&value=' + this.value, true);
+      xhr.onload = function() { if (xhr.responseText == 'Locked') { DEMOLOCK = true; PlantLogin(); } };
+      xhr.send();
+      var timerText = svgText('timer-label');
+      if (timerText) timerText.textContent = this.value;
+      updateTimerCheckbox(this.value);
+      timerSliderWrap.classList.remove('active');
+      timerNormal.style.display = 'flex';
+    });
 }
 
+var moistureCard = document.getElementById('moistureCard');
+var moistureNormal = document.getElementById('moistureNormal');
+var moistureSliderWrap = document.getElementById('moistureSliderWrap');
+var moistureSlider = document.getElementById('moistureSlider');
+var moistureLabel = document.getElementById('moistureSliderLabel');
+if (moistureCard && moistureNormal && moistureSliderWrap && moistureSlider) {
+  moistureCard.addEventListener('click', function(e) {
+    if (e.target === moistureSlider) return;
+    var moistureText = svgText('moisture-label');
+    var val = moistureText ? moistureText.textContent : 20;
+    moistureSlider.value = val;
+    if (moistureLabel) moistureLabel.textContent = 'Moisture ' + val;
+    updateSliderFill(moistureSlider);
+    moistureNormal.style.display = 'none';
+    moistureSliderWrap.classList.add('active');
+  });
+  moistureSlider.addEventListener('input', function() {
+    if (moistureLabel) moistureLabel.textContent = 'Moisture ' + this.value;
+    updateSliderFill(this);
+  });
+  moistureSlider.addEventListener('change', function() {
+    if (DEMOLOCK) { PlantLogin(); moistureSliderWrap.classList.remove('active'); moistureNormal.style.display = 'flex'; return; }
+    var xhr = new XMLHttpRequest();
+    xhr.open('GET', 'nvram.json?offset=16&value=' + this.value, true);
+    xhr.onload = function() { if (xhr.responseText == 'Locked') { DEMOLOCK = true; PlantLogin(); } };
+    xhr.send();
+    var moistureText = svgText('moisture-label');
+    if (moistureText) moistureText.textContent = this.value;
+    moistureSliderWrap.classList.remove('active');
+    moistureNormal.style.display = 'flex';
+  });
+}
+
+/* Wireless helper functions */
 function setWiFiChannels(mode) {
-	var channels = [
-      1, 2, 3, 4,
-      5, 6, 7, 8,
-      9, 10, 11
-    ];
-	const select = document.getElementById("WiFiChannel");
-	const value = select.value;
-	if(mode == 4) {
-		channels = [
-	      36, 40, 44, 48,
-	      52, 56, 60, 64,
-	      100, 104, 108, 112, 116,
-	      120, 124, 128, 132, 136, 140, 144,
-	      149, 153, 157, 161, 165
-	    ];
-	}
-	select.innerHTML = "";
-	channels.forEach(channel => {
-		const option = document.createElement("option");
-		option.value = channel;
-		option.textContent = channel;
-		select.appendChild(option);
-    });
-	select.value = value;
+  var channels = [1,2,3,4,5,6,7,8,9,10,11];
+  if (mode == 4) channels = [36,40,44,48,52,56,60,64,100,104,108,112,116,120,124,128,132,136,140,144,149,153,157,161,165];
+  var sel = document.getElementById('WiFiChannel');
+  if (!sel) return;
+  var val = sel.value;
+  sel.innerHTML = '';
+  channels.forEach(function(c) {
+    var o = document.createElement('option');
+    o.value = c; o.textContent = c;
+    sel.appendChild(o);
+  });
+  sel.value = val;
 }
-
-function changeTab(event, tabId) {
-
-    const tabLinks = document.querySelectorAll('.tab-link');
-    tabLinks.forEach(link => {
-        link.classList.remove('border-b-2', 'text-blue-500', 'dark:text-blue-300');
-        link.classList.add('text-gray-600', 'dark:text-gray-400');
-    });
-
-    const tabPanes = document.querySelectorAll('.tab-pane');
-    tabPanes.forEach(pane => {
-        pane.classList.add('hidden');
-    });
-
-    event.currentTarget.classList.add('border-b-2', 'text-blue-500', 'dark:text-blue-300');
-    
-    const activeTab = document.getElementById(tabId);
-    activeTab.classList.remove('hidden');
-}
-
-function HiddenInput(id, value) {
-    if(value == true) {
-        document.getElementById(id).removeAttribute('disabled');
-    }else{
-       	document.getElementById(id).setAttribute('disabled', '');
-    }
-}
-
-function AvailabilityWeek(availability) {
-
-	var week = document.querySelectorAll('#DemoAvailabilityWeek input[type="checkbox"]');
-    for (var i = 0; i <  week.length; i++) {
-    	if (week[i].checked) {
-    		availability[i] = 1;
-    	}else if(availability[i] == 1) {
-    		week[i].checked = true;
-    	}
-    }
-    var availabilityText = availability.join('');
-    var slider = document.getElementById("availability-slider").value.split(',');
-    if(slider[0] < 10) {
-    	availabilityText += '0' + slider[0];
-    }else{
-    	availabilityText += slider[0];
-    }
-	if(slider[1] < 10) {
-    	availabilityText += '0' + slider[1];
-    }else{
-    	availabilityText += slider[1];
-    }
-	document.getElementById('DemoAvailability').value = availabilityText;
-}
-
-function AlertSet(alerts) {
-
-	var set = document.querySelectorAll('#AlertSet input[type="checkbox"]');
-    for (var i = 0; i <  set.length; i++) {
-    	if (set[i].checked) {
-    		alerts[i] = 1;
-    	}else if(alerts[i] == 1) {
-    		set[i].checked = true;
-    	}
-    }
-    var l = '0';
-    var x = document.getElementById('led-enabled');
-    if (x) {
-		if (x.style.display == 'block') {
-			l = '1';
-		}
-	}
-	document.getElementById('Alerts').value = alerts.join('') + l;
-}
+setWiFiChannels(1);
 
 function SetWiFiMode() {
-	document.getElementById('AlertInfo').classList.add('d-none');
-
-	var mode = document.getElementsByName('Mode');
-    if(mode[0].checked) {
-        document.getElementById('WiFiModeAP').checked = true;
-       	document.getElementById('AlertWiFiPower').classList.add('d-none');
-		document.getElementById('AlertWiFiDHCP').classList.add('d-none');
-		document.getElementById('AlertInfo').classList.remove('d-none');
-    }else if(mode[1].checked) {
-    	document.getElementById('WiFiModeClient').checked = true;
-        WarningWiFiMode();
-    }else if(mode[2].checked) {
-    	document.getElementById('WiFiModeClientEnt').checked = true;
-        RequireInput('WiFiUsername',true);
-        WarningWiFiMode();
-    }else if(mode[3].checked) {
-        document.getElementById('WiFiModeClientWEP').checked = true;
-        WarningWiFiMode();
+  var mode = document.getElementById('WiFiMode');
+  var info = document.getElementById('AlertWifiInfo');
+  var pwarn = document.getElementById('AlertWiFiPower');
+  if (info) info.classList.add('hidden');
+  if (pwarn) pwarn.classList.add('hidden');
+  var v = parseInt(mode.value);
+  if (v === 0) {
+    var alertChecks = document.querySelectorAll('#tab-alerts .tab-checkbox');
+    var anyAlert = false;
+    for (var i = 0; i < alertChecks.length; i++) {
+      if (alertChecks[i].checked) { anyAlert = true; break; }
     }
+    if (info && anyAlert) info.classList.remove('hidden');
+  } else {
+    if (pwarn && parseInt(document.getElementById('WiFiPower').value) < 18) pwarn.classList.remove('hidden');
+  }
+  var dhcpWarn = document.getElementById('AlertWiFiDHCP');
+  if (dhcpWarn && v !== 0 && document.getElementById('WiFiDHCP').value == 0) dhcpWarn.classList.remove('hidden');
 }
 
 function WarningWiFiMode() {
-	document.getElementById('AlertWiFiPower').classList.add('d-none');
-	document.getElementById('AlertWiFiDHCP').classList.add('d-none');
+  var pwarn = document.getElementById('AlertWiFiPower');
+  var dwarn = document.getElementById('AlertWiFiDHCP');
+  if (pwarn) pwarn.classList.add('hidden');
+  if (dwarn) dwarn.classList.add('hidden');
+  var mode = parseInt(document.getElementById('WiFiMode').value);
+  if (parseInt(document.getElementById('WiFiPower').value) < 18 && pwarn) pwarn.classList.remove('hidden');
+  if (mode !== 0 && document.getElementById('WiFiDHCP').value == 0 && dwarn) dwarn.classList.remove('hidden');
+}
 
-	if(document.getElementById('WiFiPower').value < 20) {
-		document.getElementById('AlertWiFiPower').classList.remove('d-none');
-	}
-	if(document.getElementById('WiFiDHCP').value == 0) {
-		document.getElementById('AlertWiFiDHCP').classList.remove('d-none');
-	}
+function generateWiFiQR() {
+  var ssid = document.getElementById('WiFiSSID').value;
+  var mode = document.getElementById('WiFiMode').value;
+  var hidden = document.getElementById('WiFiHiddenCheckbox').checked;
+  var user = document.getElementById('WiFiUsername').value;
+  var pass = document.getElementById('WiFiPassword').value;
+  if (!pass) { document.getElementById('qrcode').innerHTML = ''; return; }
+  var enc = 'WPA';
+  if (mode == 2) enc = 'WPA2-EAP;E:PEAP;PH2:MS-CHAPv2;I:' + encodeURIComponent(user);
+  var qrstring = 'WIFI:S:' + encodeURIComponent(ssid) + ';T:' + enc + ';P:' + encodeURIComponent(pass) + ';';
+  if (hidden) qrstring += 'H:true;';
+  var a = document.getElementById('qrcode');
+  a.innerHTML = '';
+  if (typeof QRCode !== 'function') {
+    var s = document.createElement('script');
+    s.onload = function() { var q = new QRCode({msg:qrstring,dim:256,ecl:'M'}); a.appendChild(q); };
+    s.src = '../js/qrcode.js';
+    document.head.appendChild(s);
+  } else {
+    a.appendChild(new QRCode({msg:qrstring,dim:256,ecl:'M'}));
+  }
+}
+
+function autoWiFiPower() {
+  var mode = parseInt(document.getElementById('WiFiMode').value);
+  if (mode === 0) { notify('Auto Tune only in WiFi Client Mode', 'warning'); return; }
+  document.getElementById('WiFiPower').value = 1;
+  WarningWiFiMode();
 }
 
 function HiddenCheck(id, element) {
-    console.log(id);
-
-    if(element.checked) {
-        document.getElementById(id).value = 1;
-    }else{
-        document.getElementById(id).value = 0;
-    }
-
-    if(id == 'WiFiHidden') {
-    	if(element.checked) {
-    		saveSetting(WIFI_HIDE, 1, function(lock) {if (lock != 'Locked') {notify('','WiFi SSID is now Hidden', 'danger')}});
-    	}else{
-    		saveSetting(WIFI_HIDE, 0, function(lock) {if (lock != 'Locked') {notify('','WiFi SSID is now Broadcasting', 'success')}});
-    	}
-	}else if(id == 'EnableLog') {
-    	if(element.checked) {
-    		saveSetting(LOG_ENABLE, 1, function(lock) {if (lock != 'Locked') {notify('','Graph & Log Collection is ON', 'info')}});
-    	}else{
-    		saveSetting(LOG_ENABLE, 0, function(lock) {if (lock != 'Locked') {notify('','Graph & Log Collection is OFF', 'success')}});
-    	}
-    }else if(id == 'WaterLevel') {
-        saveSetting(PNP_ADC, document.getElementById('enable-pnp').value + '' + document.getElementById('adc-sensitivity').value+ '' + document.getElementById('WaterLevel').value + '' + document.getElementById('MOSFET').value, function(lock) {if (lock != 'Locked' && element.checked) {notify('','Check Water Sensor and Water is Full', 'info')}});
-        svgwaterLevelAdjust(document.getElementById('WaterLevel').value);
-    }else if(id == 'MOSFET') {
-        saveSetting(PNP_ADC, document.getElementById('enable-pnp').value + '' + document.getElementById('adc-sensitivity').value + '' + document.getElementById('WaterLevel').value + '' + document.getElementById('MOSFET').value);
-    }else if(id == 'WiFiDHCP') {
-        var b = false;
-
-        if(element.checked){
-        	SetWiFiMode();
-            var wifi_mode = document.getElementsByName('Mode');
-            console.log(wifi_mode[0].checked);
-            if(wifi_mode[0].checked) {
-                notify('','DHCP works only in WiFi Client mode', 'warning');
-            }
-            b = true;
-        }
-        document.getElementById('WiFiIP').setAttribute('disabled', b);
-        document.getElementById('WiFiSubnet').setAttribute('disabled', b);
-        document.getElementById('WiFiGateway').setAttribute('disabled', b);
-        document.getElementById('WiFiDNS').setAttribute('disabled', b);
-    }
+  document.getElementById(id).value = element.checked ? 1 : 0;
 }
 
-function NVRAMtoSVG(data)
-{
-    /*
-    if(data['nvram'][LOG_ENABLE] == '1') {
-        document.getElementById('graph-enabled').style.display = 'block';
-    }else{
-        document.getElementById('graph-enabled').style.display = 'none';
-    } */
-    if(document.getElementById('led-enabled')) {
-	    if(data['nvram'][ALERTS].charAt(8) == '1') {
-	        document.getElementById('led-enabled').classList.remove('hidden');
-	    }else{
-	        document.getElementById('led-enabled').classList.add('hidden');
-	    }
-	}
-    if (data['nvram'][PLANT_MANUAL_TIMER] == '0') {
-    	document.getElementById('timer-enabled').classList.add('hidden');
-		document.getElementById('timer-disabled').classList.remove('hidden');
-    }else{
-    	document.getElementById('timer-enabled').classList.remove('hidden');
-		document.getElementById('timer-disabled').classList.add('hidden');
-    }
-
-    AlertSet([data['nvram'][ALERTS].charAt(0), data['nvram'][ALERTS].charAt(1), data['nvram'][ALERTS].charAt(2), data['nvram'][ALERTS].charAt(3), data['nvram'][ALERTS].charAt(4), data['nvram'][ALERTS].charAt(5), data['nvram'][ALERTS].charAt(6), data['nvram'][ALERTS].charAt(7)]);
-    
-    document.getElementById('timer-text').textContent = data['nvram'][PLANT_MANUAL_TIMER];
-    document.getElementById('moisture-text').textContent = data['nvram'][PLANT_SOIL_MOISTURE];
-    document.getElementById('pot-size-text').textContent = data['nvram'][PLANT_POT_SIZE];
-    document.getElementById('power-text').textContent = data['nvram'][DEEP_SLEEP];
-    document.getElementById('soil-type-color').style.fill = soil_type_color[data['nvram'][PLANT_SOIL_TYPE]];
-    document.getElementById('soil-type-text').textContent = soil_type_labels[data['nvram'][PLANT_SOIL_TYPE]];
-    if(document.getElementById('soil-text'))
-    	document.getElementById('soil-text').style.fill = soil_type_color[data['nvram'][PLANT_SOIL_TYPE]];
+function loadWirelessNvram() {
+  if (!nvramData) return;
+  var d = nvramData;
+  document.getElementById('WiFiMode').value = d[1] || 1;
+  document.getElementById('WiFiHidden').value = d[2] || 0;
+  document.getElementById('WiFiHiddenCheckbox').checked = d[2] == 1;
+  var phy = d[3] || 1;
+  setWiFiChannels(phy);
+  document.getElementById('WiFiPhyMode').value = phy;
+  document.getElementById('WiFiPower').value = d[4] || 1;
+  document.getElementById('WiFiChannel').value = d[5] || 1;
+  document.getElementById('WiFiSSID').value = d[6] || '';
+  document.getElementById('WiFiUsername').value = d[7] || '';
+  document.getElementById('EnableLog').value = d[9] || 0;
+  document.getElementById('EnableLogCheckbox').checked = d[9] == 1;
+  document.getElementById('WiFiDHCP').value = d[10] || 0;
+  document.getElementById('WiFiDHCPCheckbox').checked = d[10] == 1;
+  var dhcp = d[10] == 1;
+  document.getElementById('WiFiIP').value = d[11] || '';
+  document.getElementById('WiFiIP').disabled = dhcp;
+  document.getElementById('WiFiSubnet').value = d[12] || '';
+  document.getElementById('WiFiSubnet').disabled = dhcp;
+  document.getElementById('WiFiGateway').value = d[13] || '';
+  document.getElementById('WiFiGateway').disabled = dhcp;
+  document.getElementById('WiFiDNS').value = d[14] || '';
+  document.getElementById('WiFiDNS').disabled = dhcp;
+  SetWiFiMode();
 }
 
-function testPump()
-{
-	hideAllModals();
-	document.getElementById('test-Pump').classList.remove('hidden');
-	document.getElementById('modal-backdrop').classList.remove('hidden');
-
-	var test_pump_delay = rslider('#test-pump-delay', {
-		min: 1,
-		max: 200,
-		dashes: 10,
-      	value: 1,
-      	onInput: (v) => {
-        	document.getElementById('test-pump-delay-timer').textContent = v;
-	    }
+var wifiCard = document.getElementById('wifiCard');
+var wifiModal = document.getElementById('wifiModal');
+var wifiModalClose = document.getElementById('wifiModalClose');
+if (wifiCard && wifiModal) {
+  wifiCard.addEventListener('click', function() { wifiModal.classList.add('active'); document.body.classList.add('modal-open'); loadWirelessNvram(); });
+  if (wifiModalClose) wifiModalClose.addEventListener('click', function() { wifiModal.classList.remove('active'); document.body.classList.remove('modal-open'); });
+  document.querySelector('.modal-btn-cancel').addEventListener('click', function() { wifiModal.classList.remove('active'); document.body.classList.remove('modal-open'); });
+  document.getElementById('wifiSaveBtn').addEventListener('click', function() {
+    if (DEMOLOCK) { PlantLogin(); return; }
+    var activeTab = document.querySelector('.tab-panel.active');
+    if (activeTab) {
+      if (activeTab.id === 'tab-alerts') {
+        saveAlertsSettings();
+        wifiModal.classList.remove('active');
+        document.body.classList.remove('modal-open');
+        notify('Alert settings saved', 'success');
+        return;
+      }
+      if (activeTab.id === 'tab-security') {
+        saveSecuritySettings();
+        wifiModal.classList.remove('active');
+        document.body.classList.remove('modal-open');
+        notify('Security settings saved', 'success');
+        return;
+      }
+    }
+    var form = document.getElementById('wifiForm');
+    var data = new FormData(form);
+    var params = new URLSearchParams(data).toString();
+    var xhr = new XMLHttpRequest();
+    xhr.open('GET', 'nvram?wifi&' + params, true);
+    xhr.onload = function() { if (xhr.responseText == 'Locked') { DEMOLOCK = true; PlantLogin(); } };
+    xhr.send();
+    wifiModal.classList.remove('active');
+    document.body.classList.remove('modal-open');
+  });
+  wifiModal.addEventListener('click', function(e) { if (e.target === wifiModal) { wifiModal.classList.remove('active'); document.body.classList.remove('modal-open'); } });
+  var wifiPwToggle = document.getElementById('wifiPasswordToggle');
+  var wifiPwInput = document.getElementById('WiFiPassword');
+  if (wifiPwToggle && wifiPwInput) {
+    wifiPwToggle.addEventListener('click', function() {
+      var show = wifiPwInput.type === 'password';
+      wifiPwInput.type = show ? 'text' : 'password';
+      wifiPwToggle.textContent = show ? 'Hide' : 'Show';
     });
-
-	document.getElementById('test-pump-start').onclick = function() {
-		var t = test_pump_delay.getValue()-1;
-    	var x = setInterval(function() {
-			if (t == 0) {
-			    clearInterval(x);
-			    document.getElementById('test-pump-delay-timer').innerHTML = test_pump_delay.getValue();
-
-			    var checkwithlog = 'api?adc=1';
-			    if(document.getElementById('EnableLog').value == 0){
-			    	checkwithlog = 'log?start=1';
-			    }
-			    var log = new XMLHttpRequest();
-				log.open('GET', checkwithlog, true);
-			    log.send();
-			    log.onload = function() {
-			        if (log.status == 200) {
-						var xhr = new XMLHttpRequest();
-						xhr.open('POST', 'appi?pump=1&wifi=' + (document.getElementById('TestNoWifiCheckbox').checked ? 0 : 1), true);
-					    xhr.send();
-					    xhr.onload = function() {
-					        if (xhr.status == 200) {
-					        	var tm = parseInt(document.getElementById('pot-size-text').textContent) + 1;
-					        	if(xhr.responseText == 'Locked') {
-					        		PlantLogin();
-					        	}else if(document.getElementById('WaterLevel').value == 1) {
-					        		notify('', 'Water Level Sensor is On', 'warning');
-							    	var adc = new XMLHttpRequest();
-								    adc.open('GET', 'api?adc=2', true);
-								    adc.send();
-								    adc.onloadend = function() {
-									    if(adc.status == 200) {
-									    	if(adc.responseText > 0) {
-									    		testPumpRun(tm);
-									    	}else{
-									    		notify('', 'Check Water Level', 'danger');
-									    	}
-										}
-									}
-							    }else{
-							    	testPumpRun(tm);
-							    }
-					        }else{
-					        	notify('', 'Pump Test Failed', 'danger');
-					        }
-					    };
-			        }
-			    };
-			}else if (t % 1 == 0) {
-			  	document.getElementById('test-pump-delay-timer').innerHTML = t;
-			}
-			t--;
-		}, 1000);
-	}
+  }
+  /* Wireless field event handlers */
+  document.getElementById('WiFiMode').addEventListener('change', function() {
+    SetWiFiMode();
+    var phy = document.getElementById('WiFiPhyMode').value;
+    setWiFiChannels(parseInt(phy));
+  });
+  document.getElementById('WiFiHiddenCheckbox').addEventListener('change', function() {
+    HiddenCheck('WiFiHidden', this);
+  });
+  document.getElementById('WiFiPhyMode').addEventListener('change', function() {
+    setWiFiChannels(parseInt(this.value));
+  });
+  document.getElementById('WiFiPower').addEventListener('change', function() {
+    WarningWiFiMode();
+  });
+  document.getElementById('autoWiFiPowerBtn').addEventListener('click', function() {
+    autoWiFiPower();
+  });
+  document.getElementById('EnableLogCheckbox').addEventListener('change', function() {
+    HiddenCheck('EnableLog', this);
+  });
+  document.getElementById('WiFiSSID').addEventListener('input', function() { generateWiFiQR(); });
+  document.getElementById('WiFiPassword').addEventListener('input', function() { generateWiFiQR(); });
+  document.getElementById('WiFiMode').addEventListener('change', function() { generateWiFiQR(); });
+  document.getElementById('WiFiHiddenCheckbox').addEventListener('change', function() { generateWiFiQR(); });
+  document.getElementById('WiFiUsername').addEventListener('input', function() { generateWiFiQR(); });
+  document.getElementById('WiFiDHCPCheckbox').addEventListener('change', function() {
+    HiddenCheck('WiFiDHCP', this);
+    var b = this.checked;
+    var mode = parseInt(document.getElementById('WiFiMode').value);
+    if (b && mode === 0) notify('DHCP works only in WiFi Client mode', 'warning');
+    document.getElementById('WiFiIP').disabled = b;
+    document.getElementById('WiFiSubnet').disabled = b;
+    document.getElementById('WiFiGateway').disabled = b;
+    document.getElementById('WiFiDNS').disabled = b;
+    WarningWiFiMode();
+  });
+  var wifiTabs = document.querySelectorAll('.modal-tab');
+  var modalFooter = document.querySelector('.modal-footer');
+  wifiTabs.forEach(function(tab) {
+    tab.addEventListener('click', function() {
+      wifiTabs.forEach(function(t) { t.classList.remove('active'); });
+      this.classList.add('active');
+      var panels = document.querySelectorAll('.tab-panel');
+      panels.forEach(function(p) { p.classList.remove('active'); });
+      var target = document.getElementById('tab-' + this.dataset.tab);
+      if (target) target.classList.add('active');
+      if (modalFooter) modalFooter.style.display = (this.dataset.tab === 'layout' || this.dataset.tab === 'hardware' || this.dataset.tab === 'firmware') ? 'none' : '';
+    });
+  });
 }
 
-function testPumpRun(tm)
-{
-	notify('', 'Running Pump ...', 'warning');
-	var timer = setInterval(function() {
-		tm -= 10;
-	    notify('', '... ' + tm + ' Seconds Remaining', 'warning');
-	}, 10000);
-	progressTimer((tm * 10), 3, function() {
-		clearInterval(timer);
-		var log = new XMLHttpRequest();
-		log.open('GET', 'log', true);
-	    log.send();
-	    log.onload = function() {
-	        if (log.status == 200) {
-				//var s = log.responseText.split('\n');
-	        	//console.log(s[s.length-2]);
-	        	if (log.responseText.indexOf('M:') != -1) {
-	        		notify('', 'Pump OK', 'success');
-	        	}else if (log.responseText.indexOf('e:') != -1) {
-	        		notify('', 'Empty Water Protection', 'warning');
-	        	}else{
-	        		notify('', 'Pump Status Uknown', 'warning');
-	        	}
-				if(document.getElementById('EnableLog').value == 0) {
-					var elog = new XMLHttpRequest();
-					elog.open('GET', 'log?end=1', true);
-					elog.send();
-				}
-	        }
-	    };
-	});
+function updateSliderFill(slider) {
+  var min = slider.min ? parseInt(slider.min) : 0;
+  var max = slider.max ? parseInt(slider.max) : 100;
+  var val = parseInt(slider.value);
+  var pct = ((val - min) / (max - min)) * 100;
+  var color = slider.style.getPropertyValue('--slider-color') || '#33b5e5';
+  var isLight = document.documentElement.getAttribute('data-theme') === 'light';
+  var trackBg = isLight ? 'rgba(0,0,0,0.15)' : 'rgba(255,255,255,0.2)';
+  slider.style.background = 'linear-gradient(to right, ' + color + ' ' + pct + '%, ' + trackBg + ' ' + pct + '%)';
 }
 
-function emailValidate(email)
-{
-	if(email.indexOf('@') == -1 || email.indexOf('.') == -1) {
-		return false;
-	}
-	return true;
+var graphCard = document.getElementById('graphCard');
+if (graphCard) {
+  graphCard.addEventListener('click', function() {
+    window.location.href = 'graph.html';
+  });
 }
 
-function inputValidate(item)
-{
-	if(item.value == '')
-		return;
-
-	clearTimeout(notifyTimer);
-    notifyTimer = setTimeout(function() {
-    	var smtp = document.getElementById('AlertSMTPServer').getAttribute('value');
-
-    	if(item.id == 'WiFiUsername') {
-			if(!emailValidate(item.value)) {
-				notify('', 'EAP PEAP identity requires @<domain.com>', 'danger');
-			}
-    	}else if(item.id == 'AlertEmail') {
-			if(!emailValidate(item.value)) {
-				notify('', 'Email format needs @<domain.com>', 'danger');
-			}
-		}else if(item.id == 'AlertSMTPServer') {
-	    	if(smtp.indexOf(':') == -1) {
-		        document.getElementById('AlertEncryptionInfo').classList.remove('d-none');
-		    }else{
-		    	document.getElementById('AlertEncryptionInfo').classList.add('d-none');
-		    }
-		}else if(item.id == 'AlertSMTPUsername') {
-			if(smtp.indexOf('gmail') != -1 && !emailValidate(item.value)) {
-				notify('', 'Username format needs @domain.com', 'danger');
-			}
-		}else if(item.id == 'AlertSMTPPassword') {
-			if(smtp.indexOf('gmail') != -1 && item.value != '') {
-				document.getElementById('AlertGmailInfo').classList.remove('d-none');
-			}else{
-				document.getElementById('AlertGmailInfo').classList.add('d-none');
-			}
-			document.getElementById('AlertOAuthInfo').classList.remove('d-none');
-		}else if(item.id == 'AlertSMTPToken') {
-			document.getElementById('AlertGmailInfo').classList.add('d-none');
-			document.getElementById('AlertOAuthInfo').classList.add('d-none');
-		}
-    }, 3000);
-}
-
-function testFlood(water)
-{
-	var xhr = new XMLHttpRequest();
-	xhr.open('GET', 'api?water=' + water + '&empty=1', true);
-    xhr.onload = function() {
-        if (xhr.status == 200) {
-        	if(xhr.responseText == 'Locked') {
-        		PlantLogin();
-        	}else if(water > 3) {
-    			notify('', 'Flood Protection Started', 'success');
-        	}
-        }
-    };
-    xhr.send();
-}
-
-function testEmpty(loop, flood)
-{	
-	loop++;
-
-	var xhr = new XMLHttpRequest();
-	xhr.open('GET', 'pump', true);
-    xhr.onload = function() {
-        if (xhr.status == 200) {
-        	if(xhr.responseText == 'Locked') {
-        		PlantLogin();
-        	}else{
-        		if(loop == 1)
-        			notify('', 'Empty Simulation Started', 'success');
-		        if(loop < 3) {
-		        	var p = document.getElementById('pot-size-text').textContent * 1000;
-		        	setTimeout(function() {
-		        		progressTimer(10,0);
-				    	testEmpty(loop,flood);
-				    }, p);
-		        }else{
-		        	var set = document.querySelectorAll('#AlertSet input[type="checkbox"]');
-		        	var email = false;
-		        	notify('', 'Waiting for LED Warning ...', 'danger');
-		        	var timer = setInterval(function() {
-				   		notify('', 'Test Waiting ...', 'warning');
-				    }, 6000);
-
-		        	if(flood == true) {
-						setTimeout(function() {
-							clearInterval(timer);
-			        		testFlood(11);
-						}, interval);
-
-						if (set[4].checked)
-							email = true;
-		        	}else{
-						setTimeout(function() {
-							clearInterval(timer);
-			        		testFlood(0);
-						}, interval);
-
-		        		if (set[5].checked)
-							email = true;
-					}
-
-		        	if (email) {
-			        	setTimeout(function() {
-			        		notify('', 'Check Email for Alert', 'success');
-						}, 8000);
-			        }
-		        }
-        	}
-        }else{
-        	notify('', 'Empty Test Failed', 'danger');
-        }
-    };
-    xhr.send();
-}
-
-function autoWiFiPower()
-{
-	var mode = document.getElementsByName('Mode');
-    if(mode[0].checked) {
-		notify('', 'Auto Tune only in WiFi Client Mode', 'danger');
-    }else{
-    	document.getElementById('WiFiPower').value = 1;
+var soilCard = document.getElementById('soilCard');
+var soilNormal = document.getElementById('soilNormal');
+var soilBoxesWrap = document.getElementById('soilBoxesWrap');
+if (soilCard && soilNormal && soilBoxesWrap) {
+  var soilSelected = null;
+  soilCard.addEventListener('click', function(e) {
+    if (soilBoxesWrap.classList.contains('active')) return;
+    soilNormal.style.display = 'none';
+    soilBoxesWrap.classList.add('active');
+  });
+  soilBoxesWrap.addEventListener('click', function(e) {
+    var box = e.target.closest('.soil-box');
+    if (!box) return;
+    if (box.classList.contains('selected')) {
+      soilBoxesWrap.classList.remove('active');
+      soilNormal.style.display = 'flex';
+      soilBoxesWrap.querySelectorAll('.soil-box').forEach(function(b) {
+        b.classList.remove('selected', 'greyed');
+      });
+      soilSelected = null;
+      return;
     }
-}
-
-function generateRandomNumbers(count, min, max) {
-    const numbers = [];
-    for (let i = 0; i < count; i++) {
-        const randomNumber = Math.floor(Math.random() * (max - min + 1)) + min;
-		numbers.push(randomNumber);
-		var MANUAL_TIMER = parseInt(document.getElementById('moisture-text').textContent);
-		if(randomNumber <= MANUAL_TIMER) {
-        	numbers.push('T:' + MANUAL_TIMER + ',M:' + randomNumber);
-		}
-    }
-    return numbers;
-}
-
-function testGraph()
-{
-	var xhr = new XMLHttpRequest();
-	xhr.open('GET', 'log?clear=1', true);
-    xhr.onload = function() {
-        if (xhr.status == 200) {
-        	if(xhr.responseText == 'Locked') {
-        		PlantLogin();
-        	}else{
-    			notify('', 'Generating Random Graph ...', 'success');
-
-    			const randomNumbers = generateRandomNumbers(100, 500, 1024);
-				const fileContent = randomNumbers.join('\n');
-				const blob = new Blob([fileContent], { type: 'text/plain' });
-				console.log(blob);
-				const file = new File([blob], 'log', { type: 'text/plain' });
-				const formData = new FormData();
-				formData.append('file', file);
-				fetch('/upload', {
-				    method: 'POST',
-				    body: formData
-				})
-				.then(response => response.json())
-				.then(data => console.log('Success:', data))
-				.catch(error => console.error('Error:', error));
-        	}
-        }
-    };
+    soilSelected = box.dataset.soil;
+    soilBoxesWrap.querySelectorAll('.soil-box').forEach(function(b) {
+      b.classList.toggle('selected', b === box);
+      b.classList.toggle('greyed', b !== box);
+    });
+    var xhr = new XMLHttpRequest();
+    xhr.open('GET', 'nvram.json?offset=15&value=' + soilSelected, true);
     xhr.send();
+  });
 }
 
-function adcSoilValue()
-{
-    var adc = new XMLHttpRequest();
-    adc.open('GET', 'api?adc=1', true);
-    adc.send();
-    adc.onloadend = function() {
-	    if(adc.status == 200) {
-	    	let arr = (adc?.responseText || '0|0').split('|');
-	    	var a = parseInt(arr[0]);
-	    	if((ESP32 && a > 4000 && a < 4095) || (!ESP32 && a > 1010 && a < 1024))
-            {
-                notify('', 'Detecting Excess Moisture!', 'danger');
-                if(nvram.response['nvram'][PLANT_SOIL_MOISTURE] > 20) {
-                    notify('', 'Lower Pot Size value', 'info');
-                    notify('', 'Adjust sensor to soil height', 'info');
-                }else{
-                    notify('', 'Compact soil water channels', 'info');
-                    notify('', 'Move sensor away from water', 'info');
+var potSizeCard = document.getElementById('potSizeCard');
+var potSizeNormal = document.getElementById('potSizeNormal');
+var potSizeSliderWrap = document.getElementById('potSizeSliderWrap');
+var potSizeSlider = document.getElementById('potSizeSlider');
+var potSizeLabel = document.getElementById('potSizeSliderLabel');
+if (potSizeCard && potSizeNormal && potSizeSliderWrap && potSizeSlider) {
+  potSizeCard.addEventListener('click', function(e) {
+    if (e.target === potSizeSlider) return;
+    var potText = svgText('pot-size-label');
+    var val = potText ? potText.textContent : 4;
+    potSizeSlider.value = val;
+    var mins = val >= 60 ? ' (' + Math.floor(val / 60) + ' minute' + (Math.floor(val / 60) > 1 ? 's' : '') + ')' : '';
+    if (potSizeLabel) potSizeLabel.textContent = 'Water for ' + val + ' seconds' + mins;
+    updateSliderFill(potSizeSlider);
+    potSizeNormal.style.display = 'none';
+    potSizeSliderWrap.classList.add('active');
+  });
+  potSizeSlider.addEventListener('input', function() {
+    var mins = this.value >= 60 ? ' (' + Math.floor(this.value / 60) + ' minute' + (Math.floor(this.value / 60) > 1 ? 's' : '') + ')' : '';
+    if (potSizeLabel) potSizeLabel.textContent = 'Water for ' + this.value + ' seconds' + mins;
+    updateSliderFill(this);
+  });
+  potSizeSlider.addEventListener('change', function() {
+    if (DEMOLOCK) { PlantLogin(); potSizeSliderWrap.classList.remove('active'); potSizeNormal.style.display = 'flex'; return; }
+    var xhr = new XMLHttpRequest();
+    xhr.open('GET', 'nvram.json?offset=15&value=' + this.value, true);
+    xhr.onload = function() { if (xhr.responseText == 'Locked') { DEMOLOCK = true; PlantLogin(); } };
+    xhr.send();
+    var potText = svgText('pot-size-label');
+    if (potText) potText.textContent = this.value;
+    potSizeSliderWrap.classList.remove('active');
+    potSizeNormal.style.display = 'flex';
+  });
+}
+
+/* Firmware tab */
+function resetFlash() { window.open('/api?reset=1'); }
+
+(function() {
+  var PNP_ADC = 31;
+  var pnpState = 0; // 0=NPN, 1=PNP
+
+  var pnpToggle = document.getElementById('pnpToggle');
+  var npnLabel = document.getElementById('pnpLabelNPN');
+  var pnpLabel = document.getElementById('pnpLabelPNP');
+
+  function updatePNP(v) {
+    pnpState = v;
+    pnpToggle.classList.toggle('on', v === 1);
+    npnLabel.classList.toggle('active', v === 0);
+    pnpLabel.classList.toggle('active', v === 1);
+  }
+
+  if (pnpToggle) {
+    pnpToggle.addEventListener('click', function() {
+      updatePNP(pnpState === 0 ? 1 : 0);
+      savePNPADC();
+    });
+  }
+
+  function savePNPADC() {
+    var adcVal = document.getElementById('adcSlider') ? document.getElementById('adcSlider').value : 0;
+    var waterLevel = document.getElementById('WaterLevelCheckbox') && document.getElementById('WaterLevelCheckbox').checked ? 1 : 0;
+    var mosfet = document.getElementById('MOSFETCheckbox') && document.getElementById('MOSFETCheckbox').checked ? 1 : 0;
+    var pnpDigit = pnpState === 0 ? 1 : 0; // classic: NPN=1, PNP=0
+    var val = pnpDigit + '' + adcVal + '' + waterLevel + '' + mosfet;
+    var xhr = new XMLHttpRequest();
+    xhr.open('GET', 'nvram.json?offset=' + PNP_ADC + '&value=' + val, true);
+    xhr.send();
+  }
+
+  var adcSlider = document.getElementById('adcSlider');
+  var adcText = document.getElementById('adcSensitivityText');
+  if (adcSlider && adcText) {
+    updateSliderFill(adcSlider);
+    adcSlider.addEventListener('input', function() {
+      adcText.textContent = this.value;
+      updateSliderFill(this);
+    });
+    adcSlider.addEventListener('change', function() {
+      savePNPADC();
+    });
+  }
+
+  var wlCheckbox = document.getElementById('WaterLevelCheckbox');
+  var wlHidden = document.getElementById('WaterLevel');
+  if (wlCheckbox && wlHidden) {
+    wlCheckbox.addEventListener('change', function() {
+      wlHidden.value = this.checked ? 1 : 0;
+      if (waterCb) waterCb.checked = this.checked;
+      savePNPADC();
+    });
+  }
+
+  var mosfetCheckbox = document.getElementById('MOSFETCheckbox');
+  var mosfetHidden = document.getElementById('MOSFET');
+  if (mosfetCheckbox && mosfetHidden) {
+    mosfetCheckbox.addEventListener('change', function() {
+      mosfetHidden.value = this.checked ? 1 : 0;
+      savePNPADC();
+    });
+  }
+
+  function setupFileBrowse(btnId, fileId, formId) {
+    var btn = document.getElementById(btnId);
+    var file = document.getElementById(fileId);
+    var form = document.getElementById(formId);
+    if (btn && file) {
+      btn.addEventListener('click', function() { file.click(); });
+      file.addEventListener('change', function() {
+        if (form) {
+          form.setAttribute('action', 'http://' + window.location.hostname + '/update');
+          form.submit();
+        }
+      });
+    }
+  }
+  setupFileBrowse('browseLittleFS', 'fileLittleFS', 'formLittleFS');
+  setupFileBrowse('browseFirmware', 'fileFirmware', 'formFirmware');
+
+  var certBtn = document.getElementById('browseCertificate');
+  var certFile = document.getElementById('fileCertificate');
+  var certForm = document.getElementById('formCertificate');
+  if (certBtn && certFile) {
+    certBtn.addEventListener('click', function() { certFile.click(); });
+    certFile.addEventListener('change', function() { if (certForm) certForm.submit(); });
+  }
+
+  var keyBtn = document.getElementById('browsePrivateKey');
+  var keyFile = document.getElementById('filePrivateKey');
+  var keyForm = document.getElementById('formPrivateKey');
+  if (keyBtn && keyFile) {
+    keyBtn.addEventListener('click', function() { keyFile.click(); });
+    keyFile.addEventListener('change', function() { if (keyForm) keyForm.submit(); });
+  }
+
+  /* Fetch nvram.json for initial values */
+  var nvram = new XMLHttpRequest();
+  nvram.responseType = 'json';
+  nvram.open('GET', 'nvram.json', true);
+  nvram.send();
+  nvram.onload = function() {
+    if (nvram.response && nvram.response['nvram']) {
+      var data = nvram.response['nvram'];
+      try {
+        var v = data[0].split('|');
+        var cv = document.getElementById('coreVersion');
+        if (cv) cv.textContent = 'Core Version: ' + v[0];
+        var sv = document.getElementById('sdkVersion');
+        if (sv) sv.textContent = 'SDK Version: ' + v[1];
+        var fsv = document.getElementById('fsVersion');
+        if (fsv) fsv.textContent = 'LittleFS Version: ' + (0xffff & (v[2] >> 16)) + '.' + (0xffff & (v[2] >> 0)) + '.' + (0xffff & (v[2] >> 20));
+        var fwv = document.getElementById('firmwareVersion');
+        if (fwv) fwv.textContent = 'Firmware Version: ' + v[3];
+        var fsr = document.getElementById('fsram');
+        if (fsr) fsr.textContent = 'Flash: ' + Math.round(v[4]/1024) + ' KB (' + v[4] + ')';
+        var dr = document.getElementById('dram');
+        if (dr) dr.textContent = 'Memory: ' + Math.round(v[5]/1024) + ' KB (' + v[5] + ')';
+      } catch(e) {}
+
+      /* Parse PNP_ADC (classic: NPN=1, PNP=0) */
+      var pnp_adc = data[PNP_ADC] + '0000';
+      var pnp_raw = parseInt(pnp_adc.charAt(0));
+      var pnp_val = pnp_raw === 1 ? 0 : 1;
+      var adc_val = parseInt(pnp_adc.charAt(1));
+      var water_val = pnp_adc.charAt(2) === '1';
+      var mosfet_val = pnp_adc.charAt(3) === '1';
+      updatePNP(pnp_val);
+      if (adcSlider && adcText) {
+        adcSlider.value = adc_val;
+        adcText.textContent = adc_val;
+      }
+      if (wlCheckbox) wlCheckbox.checked = water_val;
+      if (wlHidden) wlHidden.value = water_val ? 1 : 0;
+      if (mosfetCheckbox) mosfetCheckbox.checked = mosfet_val;
+      if (mosfetHidden) mosfetHidden.value = mosfet_val ? 1 : 0;
+
+      nvramData = data;
+      applyNvramToSvg(data);
+      populateAlertsFromNvram({ nvram: data });
+      populateSecurityFromNvram({ nvram: data });
+
+      if (data[DEMO_PASSWORD] && data[DEMO_PASSWORD] != '') {
+        DEMOLOCK = true;
+      }
+    }
+  };
+
+  /* Demo-lock modal */
+  var demoLockModal = document.getElementById('demoLockModal');
+  var demoLockClose = document.getElementById('demoLockClose');
+  var demoLockForm = document.getElementById('demo-lock-form');
+  if (demoLockClose) {
+    demoLockClose.onclick = function() {
+      if (demoLockModal) demoLockModal.classList.remove('active');
+    };
+  }
+  if (demoLockForm) {
+    demoLockForm.addEventListener('submit', function(e) {
+      e.preventDefault();
+      var xhr = new XMLHttpRequest();
+      xhr.open('POST', 'login', true);
+      xhr.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');
+      xhr.onload = function() {
+        if (xhr.status == 200) {
+          DEMOLOCK = false;
+          if (demoLockModal) demoLockModal.classList.remove('active');
+        }
+      };
+      xhr.send('password=' + encodeURIComponent(document.getElementById('DemoPassword').value));
+    });
+  }
+})();
+
+/* Hardware test functions */
+function notify(msg, type) {
+  var n = document.getElementById('notify');
+  if (!n) {
+    n = document.createElement('div');
+    n.id = 'notify';
+    n.style.cssText = 'position:fixed;top:1rem;right:1rem;z-index:10000;display:flex;flex-direction:column;gap:0.3rem;';
+    document.body.appendChild(n);
+  }
+  var t = document.createElement('div');
+  t.style.cssText = 'padding:0.4rem 0.8rem;border-radius:6px;font-size:0.8rem;font-weight:600;color:#fff;animation:fade-in 0.2s ease;' + (type === 'danger' ? 'background:#cc3333;' : type === 'warning' ? 'background:#d4873a;' : 'background:#3d9eaa;');
+  t.textContent = msg;
+  n.appendChild(t);
+  setTimeout(function() { if (t.parentNode) t.parentNode.removeChild(t); }, 3000);
+}
+function progressTimer(speed, bar, callback) {
+  var counter = 0;
+  var tm = setInterval(function() {
+    counter++;
+    if (counter == 100) { clearInterval(tm); if (callback) callback(counter); }
+    var bars = document.getElementsByClassName('progress-fill');
+    if (bars[bar]) bars[bar].style.width = counter + '%';
+  }, speed);
+}
+
+function testPumpRun(tm) {
+  notify('Running Pump ...', 'warning');
+  var timer = setInterval(function() {
+    tm -= 10;
+    notify('... ' + tm + ' Seconds Remaining', 'warning');
+  }, 10000);
+  progressTimer((tm * 10), 1, function() {
+    clearInterval(timer);
+    var log = new XMLHttpRequest();
+    log.open('GET', 'log', true);
+    log.send();
+    log.onload = function() {
+      if (log.status == 200) {
+        if (log.responseText.indexOf('M:') != -1) notify('Pump OK', 'success');
+        else if (log.responseText.indexOf('e:') != -1) notify('Empty Water Protection', 'warning');
+        else notify('Pump Status Unknown', 'warning');
+      }
+      if (document.getElementById('EnableLog') && document.getElementById('EnableLog').value == 0) {
+        var elog = new XMLHttpRequest();
+        elog.open('GET', 'log?end=1', true);
+        elog.send();
+      }
+    };
+  });
+}
+
+function testPump() {
+  var m = document.getElementById('testPumpModal');
+  if (!m) return;
+  m.classList.add('active');
+  document.body.classList.add('modal-open');
+
+  var pumpSlider = document.getElementById('testPumpSlider');
+  var delayTimer = document.getElementById('test-pump-delay-timer');
+  if (pumpSlider) {
+    pumpSlider.value = 1;
+    updateSliderFill(pumpSlider);
+    pumpSlider.oninput = function() {
+      if (delayTimer) delayTimer.textContent = this.value;
+      updateSliderFill(this);
+    };
+  }
+  if (delayTimer) delayTimer.textContent = '1';
+
+  var startBtn = document.getElementById('testPumpStart');
+  var closeBtn = document.getElementById('testPumpClose');
+  var closeModal = function() {
+    m.classList.remove('active');
+    document.body.classList.remove('modal-open');
+  };
+  if (closeBtn) closeBtn.onclick = closeModal;
+  m.addEventListener('click', function(e) { if (e.target === m) closeModal(); });
+
+  if (startBtn) {
+    startBtn.onclick = function() {
+      var t = (pumpSlider ? parseInt(pumpSlider.value) : 1) - 1;
+      var xi = setInterval(function() {
+        if (t == 0) {
+          clearInterval(xi);
+          if (delayTimer) delayTimer.textContent = pumpSlider ? pumpSlider.value : 1;
+          var checkwithlog = 'api?adc=1';
+          var el = document.getElementById('EnableLog');
+          if (el && el.value == 0) checkwithlog = 'log?start=1';
+          var log = new XMLHttpRequest();
+          log.open('GET', checkwithlog, true);
+          log.send();
+          log.onload = function() {
+            if (log.status == 200) {
+              var xhr = new XMLHttpRequest();
+              var wifiOff = document.getElementById('TestNoWifiCheckbox') && document.getElementById('TestNoWifiCheckbox').checked ? 0 : 1;
+              xhr.open('POST', 'appi?pump=1&wifi=' + wifiOff, true);
+              xhr.send();
+              xhr.onload = function() {
+                if (xhr.status == 200) {
+                  if (xhr.responseText == 'Locked') { notify('Locked', 'danger'); return; }
+                  var potText = svgText ? svgText('pot-size-label') : null;
+                  var tm = (potText ? parseInt(potText.textContent) : 4) + 1;
+                  var wl = document.getElementById('WaterLevel');
+                  if (wl && wl.value == 1) {
+                    notify('Water Level Sensor is On', 'warning');
+                    var adc = new XMLHttpRequest();
+                    adc.open('GET', 'api?adc=2', true);
+                    adc.send();
+                    adc.onloadend = function() {
+                      if (adc.status == 200 && adc.responseText > 0) testPumpRun(tm);
+                      else notify('Check Water Level', 'danger');
+                    };
+                  } else {
+                    testPumpRun(tm);
+                  }
+                } else {
+                  notify('Pump Test Failed', 'danger');
                 }
-            //}else{
-            	//notify('', 'Current Moisture: ' + a, 'info');
+              };
             }
-            var adc_time = parseInt(document.getElementById('timer-text').textContent);
-			if (adc_time == 0) {
-                document.getElementById('moisture-adc').textContent = a;
-
-                var ts = new XMLHttpRequest();
-	            ts.open('GET', 'api?temp=1', true);
-	            ts.send();
-	            ts.onloadend = function() {
-				    if(adc.status == 200) {
-				    	var t = parseInt(ts.responseText) - 18;
-				    	if(t > 0) {
-	                    	document.getElementById('moisture-adc').textContent = document.getElementById('moisture-adc').textContent + ' (' + t + '°C)';
-		                    if(t < 4) {
-		                        notify('', 'Water Freeze Warning', 'danger');
-		                    }
-	                	}
-					}
-				}
-		    }else{
-		  		var deepsleep = document.getElementById('power-text').textContent;
-		    	var time_countdown = (adc_time * 60 * 60) - arr[1];
-			    const days = Math.floor(time_countdown / 86400);
-			    const hours = Math.floor((time_countdown % 86400) / 3600);
-			    if(days > 0) {
-			    	document.getElementById('moisture-adc').textContent = `${days}d ${hours}h`;
-			    }else if(hours > 0) {
-			    	const minutes = Math.floor((time_countdown % 3600) / 60);
-			    	document.getElementById('moisture-adc').textContent = `${hours}h ${minutes}m`;
-			    }else{
-				    const time_countdown_interval = setInterval(() => {
-					    if (time_countdown <= 0) {
-					        clearInterval(time_countdown_interval);
-					        return;
-					    }
-					    const minutes = Math.floor((time_countdown % 3600) / 60);
-				    	const seconds = time_countdown % 60;
-				    	document.getElementById('moisture-adc').textContent = `${minutes}m ${seconds}s`;
-			    	    time_countdown--;
-					}, 1000);
-			    }
-		    }
-		}
-	}
+          };
+        } else if (t % 1 == 0 && delayTimer) {
+          delayTimer.textContent = t;
+        }
+        t--;
+      }, 1000);
+    };
+  }
 }
+function testGraph() { var x=new XMLHttpRequest(); x.open('GET','log?clear=1',true); x.send(); x.onload=function(){if(x.responseText=='Locked'){notify('Locked','danger');}else{notify('Graph test started','success');}}; }
+function testBattery() { notify('Battery test','warning'); }
+function testSleep() { var x=new XMLHttpRequest(); x.open('GET','api?esp=1',true); x.send(); notify('Sleep test sent','warning'); }
+function testFlood(water) { var x=new XMLHttpRequest(); x.open('GET','api?water='+water+'&empty=1',true); x.send(); x.onload=function(){notify(water>3?'Flood protection started':'Water set to '+water,x.responseText=='Locked'?'danger':'success');}; }
+function testEmpty(loop,flood) { loop++; var x=new XMLHttpRequest(); x.open('GET','pump',true); x.send(); x.onload=function(){notify('Empty simulation started','success');}; }
+function testRefill() { var x=new XMLHttpRequest(); x.open('GET','api?refill=1',true); x.send(); x.onload=function(){notify('Refill test started','success');}; }
+function testEmail() { var x=new XMLHttpRequest(); x.open('GET','api?smtp=1',true); x.send(); x.onload=function(){notify(x.responseText=='OK'?'Email OK':'Email: '+x.responseText,x.responseText=='OK'?'success':'warning');}; }
+function testLED() { var x=new XMLHttpRequest(); x.open('GET','api?led=3',true); x.send(); x.onload=function(){notify('LED test sent','success');}; }
+function testSoil() { var x=new XMLHttpRequest(); x.open('GET','api?adc=1',true); x.send(); x.onload=function(){notify('Soil: '+x.responseText,'success');}; }
+function testWater() { var x=new XMLHttpRequest(); x.open('GET','api?adc=2',true); x.send(); x.onload=function(){notify('Water: '+x.responseText+'%','success');}; }
+function testNTP() { var x=new XMLHttpRequest(); x.open('GET','api?ntp=1',true); x.send(); x.onload=function(){notify('Timer test sent','success');}; }
+function flushWater() {
+  var m = document.getElementById('flushWaterModal');
+  if (!m) return;
+  m.classList.add('active');
+  document.body.classList.add('modal-open');
 
-function testSoil()
-{
-    var adc = new XMLHttpRequest();
-    adc.open('GET', 'api?adc=1', true);
-    adc.send();
-    adc.onloadend = function() {
-	    if(adc.status == 200) {
-	    	let arr = (adc?.responseText || '0|0').split('|');
-			var a = parseInt(arr[0]);
-			var m = 1024;
-			if(ESP32) {
-				m = 4096;
-			}
-	    	notify('', 'Soil Moisture at ' + a + ' of ' + m, 'success');
-		}
-	}
-}
+  var xhr = new XMLHttpRequest();
+  var timer;
+  var closeModal = function() { m.classList.remove('active'); document.body.classList.remove('modal-open'); };
+  document.getElementById('flushWaterClose').onclick = closeModal;
+  m.addEventListener('click', function(e) { if (e.target === m) closeModal(); });
 
-function testWater()
-{
-    if(document.getElementById('WaterLevel').value == 0)
-    {
-    	notify('', 'Enable Water Sensor in Firmware', 'danger');
-    	notify('', 'Hardware Mod is Required!', 'warning');
-    }else{
-    	var adc = new XMLHttpRequest();
-	    adc.open('GET', 'api?adc=2', true);
-	    adc.send();
-	    adc.onloadend = function() {
-		    if(adc.status == 200) {
-		    	notify('', 'Water Level at ' + adc.responseText + '%', 'success');
-			}
-		}
-    }
-}
-
-function flushWater()
-{
-	hideAllModals();
-	document.getElementById('flush-Water').classList.remove('hidden');
-	document.getElementById('modal-backdrop').classList.remove('hidden');
-
-	var timer;
-	var xhr = new XMLHttpRequest();
-	document.getElementById('flush-water-start').onclick = function() {
-    	xhr.open('POST', 'appi?pump=2', true);
-	    xhr.send();
-	    xhr.onload = function() {
-	        if (xhr.status == 200) {
-	        	notify('', 'Flush Started', 'success');
-	        	timer = setInterval(function() {
-	        		notify('', 'Running Flush ...', 'warning');
-			    }, 5000);
-	        }
-	    }
-	}
-	document.getElementById('flush-water-stop').onclick = function() {
-		clearInterval(timer);
-    	xhr.open('POST', 'appi?pump=0', true);
-	    xhr.send();
-	    xhr.onload = function() {
-	        if (xhr.status == 200) {
-	        	clearInterval(timer);
-	        	notify('', 'Flush Stopped', 'danger');
-	        }
-	    }
-	}
-}
-
-function testBattery()
-{
-
-}
-
-function testLED()
-{
-	xhr.open('GET', 'api?led=3', true);
+  document.getElementById('flushWaterStart').onclick = function() {
+    xhr.open('POST', 'appi?pump=2', true);
     xhr.send();
     xhr.onload = function() {
-        if (xhr.status == 200) {
-        	notify('', 'LED OK', 'danger');
+      if (xhr.status == 200) {
+        notify('Flush Started', 'success');
+        timer = setInterval(function() { notify('Running Flush ...', 'warning'); }, 5000);
+      }
+    };
+  };
+  document.getElementById('flushWaterStop').onclick = function() {
+    clearInterval(timer);
+    xhr.open('POST', 'appi?pump=0', true);
+    xhr.send();
+    xhr.onload = function() {
+      if (xhr.status == 200) {
+        clearInterval(timer);
+        notify('Flush Stopped', 'danger');
+      }
+    };
+  };
+}
+
+function getOAuthToken() {
+  notify('OAuth2.0 requires HTTPS - use client-side oauth2.js on a live server', 'warning');
+}
+
+function AlertSet(alerts) {
+  var set = document.querySelectorAll('#tab-alerts .tab-checkbox');
+  for (var i = 0; i < set.length; i++) {
+    if (alerts && alerts[i] == 1) {
+      set[i].checked = true;
+    }
+  }
+}
+
+var EMAIL_ALERT = 22;
+var SMTP_SERVER = 23;
+var SMTP_USERNAME = 24;
+var SMTP_PASSWORD = 25;
+var PLANT_NAME = 26;
+var ALERTS = 27;
+
+function saveAlertField(offset, value) {
+  var xhr = new XMLHttpRequest();
+  xhr.open('GET', 'nvram.json?offset=' + offset + '&value=' + encodeURIComponent(value), true);
+  xhr.send();
+}
+
+function saveAlertsSettings() {
+  var set = document.querySelectorAll('#tab-alerts .tab-checkbox');
+  var bits = '';
+  for (var i = 0; i < set.length; i++) {
+    bits += set[i].checked ? '1' : '0';
+  }
+  bits += '0';
+  document.getElementById('Alerts').value = bits;
+
+  saveAlertField(EMAIL_ALERT, document.getElementById('AlertEmail').value);
+  saveAlertField(SMTP_SERVER, document.getElementById('AlertSMTPServer').value);
+  saveAlertField(SMTP_USERNAME, document.getElementById('AlertSMTPUsername').value);
+  saveAlertField(SMTP_PASSWORD, document.getElementById('AlertSMTPPassword').value);
+  saveAlertField(PLANT_NAME, document.getElementById('AlertPlantName').value);
+  saveAlertField(ALERTS, bits);
+}
+
+/* SMTP password toggle */
+(function() {
+  var pwToggle = document.getElementById('smtpPwToggle');
+  var pwInput = document.getElementById('AlertSMTPPassword');
+  if (pwToggle && pwInput) {
+    pwToggle.addEventListener('click', function() {
+      if (pwInput.type === 'password') {
+        pwInput.type = 'text';
+        pwToggle.textContent = 'Hide';
+      } else {
+        pwInput.type = 'password';
+        pwToggle.textContent = 'Show';
+      }
+    });
+  }
+})();
+
+/* Load alerts data from nvram.json */
+function populateAlertsFromNvram(data) {
+  var d = data['nvram'];
+  if (!d) { return; }
+  document.getElementById('AlertEmail').value = d[EMAIL_ALERT] || '';
+  document.getElementById('AlertSMTPUsername').value = d[SMTP_USERNAME] || '';
+  var smtp = d[SMTP_SERVER] || '';
+  if (smtp != '') {
+    document.getElementById('AlertSMTPServer').value = smtp;
+  }
+  document.getElementById('AlertPlantName').value = d[PLANT_NAME] || '';
+  var alertsStr = d[ALERTS] || '000000000';
+  AlertSet([alertsStr.charAt(0), alertsStr.charAt(1), alertsStr.charAt(2), alertsStr.charAt(3), alertsStr.charAt(4), alertsStr.charAt(5), alertsStr.charAt(6), alertsStr.charAt(7)]);
+}
+
+function AvailabilityWeek(availability) {
+  var week = document.querySelectorAll('#tab-security .tab-checkbox');
+  for (var i = 0; i < week.length; i++) {
+    if (week[i].checked) {
+      availability[i] = 1;
+    } else if (availability[i] == 1) {
+      week[i].checked = true;
+    }
+  }
+  var start = document.getElementById('AvailStart').value;
+  var end = document.getElementById('AvailEnd').value;
+  var availabilityText = availability.join('');
+  availabilityText += (start < 10 ? '0' + start : start);
+  availabilityText += (end < 10 ? '0' + end : end);
+  document.getElementById('DemoAvailability').value = availabilityText;
+  return availabilityText;
+}
+
+function saveSecuritySettings() {
+  var avail = AvailabilityWeek([0,0,0,0,0,0,0]);
+  saveAlertField(DEMO_PASSWORD, document.getElementById('DemoPassword').value);
+  saveAlertField(TIMEZONE_OFFSET, document.getElementById('DemoTimezone').value);
+  saveAlertField(DEMO_AVAILABILITY, avail);
+}
+
+function populateSecurityFromNvram(data) {
+  var d = data['nvram'];
+  if (!d) return;
+  var tz = document.getElementById('DemoTimezone');
+  if (tz && d[TIMEZONE_OFFSET]) tz.value = d[TIMEZONE_OFFSET];
+  if (d[DEMO_AVAILABILITY]) {
+    var a = d[DEMO_AVAILABILITY];
+    var dayBits = [];
+    for (var i = 0; i < 7; i++) dayBits.push(a.charAt(i) == '1' ? 1 : 0);
+    AvailabilityWeek(dayBits);
+    var st = parseInt(a.substring(7,9));
+    var en = parseInt(a.substring(9,11));
+    if (!isNaN(st)) document.getElementById('AvailStart').value = st;
+    if (!isNaN(en)) document.getElementById('AvailEnd').value = en;
+  }
+}
+
+/* Passkey */
+var passkeyBtn = document.getElementById('createPasskey');
+if (passkeyBtn && window.isSecureContext) {
+  passkeyBtn.style.display = 'flex';
+  passkeyBtn.addEventListener('click', async function() {
+    try {
+      var rpId = window.location.hostname;
+      var cred = await navigator.credentials.create({
+        publicKey: {
+          challenge: crypto.getRandomValues(new Uint8Array(32)),
+          rp: { name: 'tinyplant', id: rpId },
+          user: { id: crypto.getRandomValues(new Uint8Array(16)), name: 'tinyplant', displayName: 'Tiny Plant' },
+          pubKeyCredParams: [{ alg: -7, type: 'public-key' }, { alg: -257, type: 'public-key' }],
+          authenticatorSelection: { authenticatorAttachment: 'platform', residentKey: 'required', userVerification: 'required' },
+          timeout: 60000,
+          attestation: 'none'
         }
+      });
+      notify('Passkey created!', 'success');
+    } catch(e) {
+      notify('Passkey failed: ' + e.message, 'danger');
     }
+  });
 }
 
-function testEmail()
-{
-	if($('#AlertSMTPServer').val() == '') {
-		notify('', 'Missing SMTP Server', 'danger');
-	}else{
-		var xhr = new XMLHttpRequest();
-		xhr.open('GET', 'api?smtp=1', true);
-	    xhr.send();
-	    xhr.onload = function() {
-	        if (xhr.status == 200) {
-	        	if(xhr.responseText == 'Locked') {
-	        		PlantLogin();
-	        	}else{
-		            progressTimer(62,0,function() {
-		            	if(xhr.responseText == 'OK') {
-							notify('', 'SMTP OK', 'success');
-						}else if(xhr.responseText == 'AUTH') {
-							notify('', 'SMTP Bad Authentication', 'danger');
-						}else{
-							notify('', 'SMTP Error ' + xhr.responseText, 'warning');
-						}
-					});
-	        	}
-	        }else{
-	        	notify('', 'SMTP Test Failed', 'danger');
-	        }
-	    };
-	}
-}
+/* Security password toggle */
+(function() {
+  var t = document.getElementById('secPwToggle');
+  var i = document.getElementById('DemoPassword');
+  if (t && i) {
+    t.addEventListener('click', function() {
+      i.type = i.type === 'password' ? 'text' : 'password';
+      t.textContent = i.type === 'password' ? 'Show' : 'Hide';
+    });
+  }
+})();
 
-function infoOAuthToken()
-{
-	var token = $('#AlertSMTPToken').val();
-	if(token == '')
-		return;
+/* Layout tab */
+(function() {
+  var browseBtn = document.getElementById('browseLayout');
+  var fileInput = document.getElementById('fileLayout');
+  var layoutForm = document.getElementById('formLayout');
+  if (browseBtn && fileInput) {
+    browseBtn.addEventListener('click', function() { fileInput.click(); });
+    fileInput.addEventListener('change', function() {
+      if (layoutForm) layoutForm.submit();
+    });
+  }
 
-	var smtp = $('#AlertSMTPServer').val();
-	if(smtp.indexOf('gmail.com') != -1) {
-		//https://oauth2.googleapis.com/tokeninfo?access_token=ACCESS_TOKEN
-	}else if(smtp.indexOf('office365.com') != -1) {
-	}
-}
+  var defaultBtn = document.getElementById('defaultLayout');
+  var removeBtn = document.getElementById('removeLayout');
+  var listDiv = document.getElementById('listLayout');
 
-function getOAuthToken()
-{
-	if(location.protocol == 'http:') {
-		notify('', 'OAuth2.0 only supported with HTTPS', 'danger');
-		return;
-	}
-	if (typeof getAuthorizationCode !== 'function') {
-        var script = document.createElement('script');
-        script.src = 'js/oauth2.js';
-        script.onload = function(){ getAuthorizationCode() };
-        document.head.appendChild(script);
-    } else {
-        getAuthorizationCode();
-    }
-}
-
-function isValidSleep(v) {
-    if (v <= 0) return false;
-
-    // Small values: must divide evenly into 60
-    if (v < 60) {
-        return (60 % v === 0);
-    }
-
-    // Large values: must be whole hours
-    return (v % 60 === 0);
-}
-
-function calcNextWaterCycle(start, stop, size)
-{
-    /* All calculations are approximate */
-
-	var days = 0;
-	if((start - stop) > 0) {
-
-		//Calculate Days
-		while (start > stop) {
-			var c = 180;
-			if(start >= 850) { //...slow start
-				c = 24;
-			}else if(start >= 800) {
-				c = 40 + size;
-			}else if(start >= 700) {
-				c = 50 + size;
-			}else if(start >= 600) {
-				c = 80 + size;
-			}else if(start >= 500) { //..faster ending
-				c = 100 + size;
-			}
-			start -= c;
-			days++;
-
-            //Calculate Hours
-            //TODO:
- 		}
- 		console.log('Days: ' + days);
- 	
- 		var hours = Math.abs(start-stop);
-		console.log('Hours: ' + hours);
-	}
-	return days;
-}
-
-function checkFirmwareUpdates(v)
-{
-	var split = v.split('.');
-	var _version = parseFloat(split[0]);
-    var _build = parseFloat(split[1]);
-    
-    /*
-    var check = Math.random() >= 0.5;
-    if (check === true)
-    {
-    	var xhr = new XMLHttpRequest();
-        xhr.responseType = 'json';
-        xhr.onload = function() {
-            if (xhr.status == 200) {
-                try {
-                    var release = xhr.response.tag_name.replace('v','').replace('.R','');
-                    var split = release.split('.');
-                    var version = parseFloat(split[0]);
-                    var build = parseFloat(split[1]);
-
-                    //console.log('Old Firmware:' + _version + ' Build:' + _build);
-                    //console.log('New Firmware:' + version + ' Build:' + build);
-
-                    if(version > _version || build > _build)
-                    {
-                        var url = 'https://github.com/dimecho/ESPTiny-Plant/releases/download/';
-                        url += version + 'Tiny.Plant.zip';
-                        $.notify({
-                            icon: 'icon icon-download',
-                            title: 'New Firmware',
-                            message: 'Available <a href="' + url + '" target="_blank">Download</a>'
-                        }, {
-                            type: 'success'
-                        });
-                    }
-                } catch(e) {}
+  /* Fetch SVG list */
+  function loadLayoutList() {
+    var x = new XMLHttpRequest();
+    var svgUrl = (window.location.hostname === '127.0.0.1' || window.location.hostname.endsWith('github.io')) ? 'svg' : 'api?svg=1';
+    x.open('GET', svgUrl, true);
+    x.send();
+    x.onload = function() {
+      if (!listDiv) return;
+      listDiv.innerHTML = '';
+      var lines = x.responseText.split('\n');
+      var n = 0;
+      lines.forEach(function(item) {
+        if (item === '') return;
+        if (item.indexOf('soil.') === -1) {
+          var label = document.createElement('label');
+          var cb = document.createElement('input');
+          cb.type = 'checkbox';
+          cb.className = 'tab-checkbox';
+          cb.dataset.index = n;
+          label.appendChild(cb);
+          label.appendChild(document.createTextNode(' ' + item));
+          listDiv.appendChild(label);
+          cb.addEventListener('change', function() {
+            if (this.checked) {
+              listDiv.querySelectorAll('input[type="checkbox"]').forEach(function(c) {
+                if (c !== cb) c.checked = false;
+              });
             }
-        };
-        xhr.open('GET', 'https://api.github.com/repos/dimecho/ESPTiny-Plant/releases/latest', true);
-        xhr.send();
-    }
-    */
-}
+          });
+        }
+        n++;
+      });
+    };
+  }
+  loadLayoutList();
 
-function deleteCookies()
-{
-	var result = document.cookie;
-	var cookieArray = result.split(';');
-	for(var i=0;i<cookieArray.length;i++){
-	   var keyValArr = cookieArray[i].split('=');
-	   document.cookie=keyValArr[0]+'=; expires=Thu, 01 Jan 1970 00:00:00 UTC; SameSite=Lax';
-	}
-}
+  if (defaultBtn) {
+    defaultBtn.addEventListener('click', function() {
+      var checked = listDiv ? listDiv.querySelector('input[type="checkbox"]:checked') : null;
+      if (!checked) { notify('Select a layout first', 'warning'); return; }
+      saveAlertField(19, checked.dataset.index);
+      notify('Default layout set', 'success');
+    });
+  }
 
-function generateWiFiQR()
-{
-	var enc = 'WPA'; //WPA, WEP, nopass
-    var ssid = document.getElementById('WiFiSSID').getAttribute('value');
-    var mode = document.getElementsByName('Mode');
-    var hidden = document.getElementById('WiFiHiddenCheckbox').checked;
-    var user = document.getElementById('WiFiUsername').getAttribute('value');
-    var pass = document.getElementById('WiFiPassword').getAttribute('value');
-    if(mode[2].checked) {
-    	//WIFI:T:WPA2-EAP;S:[network SSID];E:[EAP method];PH2:[Phase 2 method];A:[anonymous identity];I:[username];P:[password];;
-    	enc = 'WPA2-EAP;E:PEAP;PH2:MS-CHAPv2;I:' + escape(user);
-    }
-    var qrstring = 'WIFI:S:' + escape(ssid) + ';T:' + enc + ';P:' + escape(pass) + ';';
-    if (hidden) {
-        qrstring += 'H:true';
-    }
-    qrstring += ';';
-    //console.log(qrstring);
+  if (removeBtn) {
+    removeBtn.addEventListener('click', function() {
+      var checked = listDiv ? listDiv.querySelector('input[type="checkbox"]:checked') : null;
+      if (!checked) { notify('Select a layout first', 'warning'); return; }
+      var name = checked.parentNode.textContent.trim();
+      var x = new XMLHttpRequest();
+      x.open('GET', 'api?delete=' + encodeURIComponent('svg/' + name), true);
+      x.send();
+      x.onload = function() {
+        notify('Layout ' + name + ' removed', 'success');
+        loadLayoutList();
+      };
+    });
+  }
+})();
 
-    var qroptions = {
-		msg   :  qrstring
-		,dim   :   256
-		,ecl   :  'M'
-	};
+/* Theme and font toggles */
+var html = document.documentElement;
+var saved = localStorage.getItem('theme') || 'dark';
+html.setAttribute('data-theme', saved);
+document.getElementById('themeToggle').textContent = saved === 'dark' ? '\u2600' : '\u263E';
 
-	var a = document.getElementById('qrcode');
-	a.innerHTML = '';
-    
-	if (typeof QRCode !== 'function') {
-	    var script = document.createElement('script');
-		script.onload = function() { var qrcode = new QRCode(qroptions); a.appendChild(qrcode) };
-		script.src = 'js/qrcode.js';
-		document.head.appendChild(script);
-	}else{
-		var qrcode = new QRCode(qroptions);
-		a.appendChild(qrcode);
-	}
-}
+var fontSizes = ['small', 'medium', 'large'];
+var savedFont = localStorage.getItem('fontSize') || 'medium';
+html.setAttribute('data-font', savedFont);
+document.getElementById('fontToggle').textContent = savedFont === 'small' ? 'A' : savedFont === 'large' ? 'A\u207A' : 'A';
 
-/*
-function sleep(ms) {
-  return new Promise(resolve => setTimeout(resolve, ms));
-}
-*/
+document.getElementById('themeToggle').addEventListener('click', function() {
+  var current = html.getAttribute('data-theme');
+  var next = current === 'dark' ? 'light' : 'dark';
+  html.setAttribute('data-theme', next);
+  localStorage.setItem('theme', next);
+  this.textContent = next === 'dark' ? '\u2600' : '\u263E';
+  applySvgTheme();
+});
+
+document.getElementById('fontToggle').addEventListener('click', function() {
+  var current = html.getAttribute('data-font') || 'medium';
+  var idx = fontSizes.indexOf(current);
+  var next = fontSizes[(idx + 1) % fontSizes.length];
+  html.setAttribute('data-font', next);
+  localStorage.setItem('fontSize', next);
+  this.textContent = next === 'small' ? 'A' : next === 'large' ? 'A\u207A' : 'A';
+});
+
+/* Soil modal close */
+document.getElementById('soilModalClose').addEventListener('click', function() {
+  document.getElementById('soilModal').classList.remove('active');
+});
+
+/* Layout modal close */
+document.getElementById('layoutModalClose').addEventListener('click', function() {
+  document.getElementById('layoutModal').classList.remove('active');
+});

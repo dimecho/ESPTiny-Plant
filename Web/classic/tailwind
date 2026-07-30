@@ -2,4 +2,4 @@
 
 cd "$(dirname "$0")"
 #npx @tailwindcss/upgrade@next
-npx tailwindcss -o ./Web/css/tailwind.css --watch --minify
+npx tailwindcss -o ./css/tailwind.css --watch --minify
