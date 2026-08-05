@@ -8,3 +8,19 @@ build/*
 sdk/*
 data/*
 tools/*
+
+# FreeCAD artifacts
+*.brp
+*.FCBak
+*.FCStd.zip
+*Shape.Map.txt
+*AddSubShape.Map.txt
+*InternalShape.brp
+*SuppressedShape.brp
+LineColorArray*
+PointColorArray*
+ShapeAppearance*
+StringHasher.Table.txt
+CNC/Document.xml
+CNC/GuiDocument.xml
+CNC/thumbnails/
