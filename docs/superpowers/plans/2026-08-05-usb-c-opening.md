@@ -25,6 +25,7 @@
   - The square cavity (355.0) starts at z≈54; the slot top (53.5) clears it by 0.5mm.
 - Verification tolerances: volume ±0.1, cross-section area ±0.1, bbox ±0.01.
 - Commit convention: `feat(cad): …` for `CNC/case.FCStd`, `docs: …` for plan/spec files. Stage ONLY the intended file (`CNC/case.FCStd` or the plan/spec doc). Keep everything on `master`; do NOT push.
+- **Before committing `CNC/case.FCStd`, save the model first:** run `doc.save()` in FreeCAD MCP `execute_code` on document `case` BEFORE `git status`/`git add`. The FreeCAD MCP host does not auto-persist between tasks, so without an explicit save git captures a stale on-disk file.
 - In-memory scratch documents (`yztest`, `usbctest`, `xminus*`, `xmtest*`) from design verification are not part of the model — they are already closed; confirm only `case` is open before/after each task.
 
 ---
@@ -158,6 +159,13 @@ All values must be within tolerance (volume ±0.1, cross-section ±0.1, bbox ±0
 
 - [ ] **Step 4: Commit**
 
+First save the model — the FreeCAD MCP host does not auto-persist between tasks, so without `doc.save()` the on-disk file would be stale:
+
+```python
+import FreeCAD as App
+App.getDocument("case").save()
+```
+
 ```bash
 git status --porcelain
 git add CNC/case.FCStd
@@ -270,6 +278,13 @@ print("plate:", round(doc.getObject("Body002").Shape.Volume, 3))             # E
 All values within tolerance; unchanged bodies match exactly.
 
 - [ ] **Step 4: Commit**
+
+First save the model — the FreeCAD MCP host does not auto-persist between tasks, so without `doc.save()` the on-disk file would be stale:
+
+```python
+import FreeCAD as App
+App.getDocument("case").save()
+```
 
 ```bash
 git status --porcelain

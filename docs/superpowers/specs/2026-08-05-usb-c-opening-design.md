@@ -14,7 +14,7 @@ design.
 ## Goal
 
 Add a USB-C receptacle opening (a pass-through slot) on the **X- side wall**
-(x=-19) of both `body_full_wood` (`old_body`) and `body_top_wood`, cutting
+(x=-19) of both `old_body` and `body_top_wood`, cutting
 through the wall into the cylindrical bore chamber, positioned **near the top of
 the shared bore chamber (z=49..53.5)** so the cable exits near the top of the
 assembled case.
@@ -62,7 +62,7 @@ outside). No recess/counterbore for a connector flange (YAGNI).
 
 | Body | Slot bottom (z) | Slot spans z | Wall depth |
 |------|-----------------|--------------|------------|
-| `body_full_wood` (`old_body`) | 49 | 49 → 53.5 | 2.5mm (bore at x=-16.5) |
+| `old_body` | 49 | 49 → 53.5 | 2.5mm (bore at x=-16.5) |
 | `body_top_wood` | 49 | 49 → 53.5 | 2.5mm (bore at x=-16.5) |
 
 ## Construction
