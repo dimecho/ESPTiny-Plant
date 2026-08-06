@@ -1,49 +1,225 @@
 <!DOCTYPE html>
-<html>
-<header>
-</header>
-    <body>
-        <script>
-        let foundGlobal = false;
-        async function scanRange(startIP, endIP) {
-            const startIPInt = ipToInt(startIP);
-            const endIPInt = ipToInt(endIP);
-            for (let currentIPInt = startIPInt; currentIPInt <= endIPInt; currentIPInt++) {
-                if(foundGlobal) {
-                    break;
-                }else{
-                    const currentIP = intToIp(currentIPInt);
-                    fetch('http://' + currentIP + '/update', { method: 'GET' })
-                    .then(response => {
-                        if (response.ok) {
-                            foundGlobal = true;
-                            document.write('Found IP: ' + currentIP);
-                            window.location.href = 'http://' + currentIP;
-                        }
-                    });
-                }
-            }
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Find Plant</title>
+<style>
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #16181d;
+    color: #e8e6e3;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  }
+  .card {
+    width: 100%;
+    max-width: 360px;
+    margin: 16px;
+    padding: 24px;
+    background: #1e2126;
+    border-radius: 12px;
+    box-shadow: 0 8px 24px rgba(0,0,0,.35);
+  }
+  .card h1 { margin: 0 0 12px; font-size: 20px; }
+  .card p { margin: 8px 0; font-size: 14px; color: #a8a6a2; }
+  .status { font-weight: 600; color: #d4b84c; }
+  .found { color: #62a29a; font-weight: 600; }
+  .card input {
+    width: 100%;
+    padding: 10px 12px;
+    margin: 8px 0 12px;
+    border: 1px solid #3a3f47;
+    border-radius: 8px;
+    background: #16181d;
+    color: #e8e6e3;
+    font-size: 15px;
+  }
+  .card button {
+    width: 100%;
+    padding: 10px 12px;
+    border: 0;
+    border-radius: 8px;
+    background: #4a8257;
+    color: #fff;
+    font-size: 15px;
+    cursor: pointer;
+  }
+  .card button:hover { background: #3f714a; }
+  #stopBtn { background: #a34a4a; margin-top: 8px; }
+  #stopBtn:hover { background: #8f3f3f; }
+  @media (prefers-color-scheme: light) {
+    body { background: #f2f2f4; color: #222; }
+    .card { background: #fff; box-shadow: 0 8px 24px rgba(0,0,0,.12); }
+    .card p { color: #555; }
+    .card input { border-color: #ccc; background: #fff; color: #222; }
+  }
+</style>
+</head>
+<body>
+  <div class="card">
+    <h1>Find Plant</h1>
+    <p class="status" id="status">Rebooting ...</p>
+    <button id="stopBtn" type="button" hidden>Stop</button>
+    <div id="prompt" hidden>
+      <p>Enter your router IP prefix (1-3 octets, e.g. 192.168.1, 10, or 172.20).</p>
+      <input id="subnet" type="text" inputmode="decimal" value="192.168.1">
+      <button id="scanBtn" type="button">Scan</button>
+    </div>
+    <p class="found" id="found" hidden></p>
+  </div>
+  <script>
+  let foundGlobal = false;
+  let isScanning = false;
+  let stopRequested = false;
+  const PROBE_TIMEOUT_MS = 1000;
+
+  function ipToInt(ip) {
+    return ip.split('.').reduce((int, octet) => (int << 8) + parseInt(octet), 0);
+  }
+  function intToIp(int) {
+    return [(int >> 24) & 255, (int >> 16) & 255, (int >> 8) & 255, int & 255].join('.');
+  }
+  function isPrivate(ip) {
+    return /^(10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.)/.test(ip);
+  }
+  function prefixOf(ip, len) {
+    return ip.split('.').slice(0, len || 3).join('.');
+  }
+  function prefixLenOf(ip) {
+    if (/^10\./.test(ip)) return 1;
+    if (/^172\.(1[6-9]|2\d|3[01])\./.test(ip)) return 2;
+    return 3;
+  }
+  function validPrefix(prefix) {
+    const parts = prefix.split('.');
+    return parts.length >= 1 && parts.length <= 3 && parts.every((o) => /^\d{1,3}$/.test(o) && parseInt(o, 10) <= 255);
+  }
+  function setStatus(text) {
+    document.getElementById('status').textContent = text;
+  }
+  function probeIP(ipInt, signal) {
+    const currentIP = intToIp(ipInt);
+    const controller = signal ? null : new AbortController();
+    const timer = controller ? setTimeout(() => controller.abort(), PROBE_TIMEOUT_MS) : null;
+    return fetch('http://' + currentIP + '/update', { method: 'GET', signal: controller ? controller.signal : signal })
+      .then((response) => {
+        if (response.ok && !foundGlobal) {
+          foundGlobal = true;
+          try {
+            localStorage.setItem('lastSubnet', prefixOf(currentIP));
+          } catch (e) {}
+          const foundEl = document.getElementById('found');
+          foundEl.textContent = 'Found IP: ' + currentIP;
+          foundEl.hidden = false;
+          document.getElementById('prompt').hidden = true;
+          window.location.href = 'http://' + currentIP;
         }
-        function ipToInt(ip) {
-            return ip.split('.').reduce((int, octet) => (int << 8) + parseInt(octet), 0);
-        }
-        function intToIp(int) {
-            return [
-                (int >> 24) & 255,
-                (int >> 16) & 255,
-                (int >> 8) & 255,
-                int & 255
-            ].join('.');
-        }
-        fetch('/reboot');
-        document.write('Rebooting ... ')
-        setTimeout(() => {
-            scanRange('192.168.8.8', '192.168.8.8');
-            scanRange('10.0.0.2', '10.0.0.254');
-            scanRange('192.168.0.2', '192.168.0.254');
-            scanRange('192.168.1.2', '192.168.1.254');
-            scanRange('192.168.50.2', '192.168.1.254');
-        }, 15000);
-        </script>
-    </body>
+      })
+      .catch(() => {})
+      .finally(() => { if (timer) clearTimeout(timer); });
+  }
+  async function scanRange(startIP, endIP) {
+    if (isScanning) return foundGlobal;
+    isScanning = true;
+    stopRequested = false;
+    document.getElementById('stopBtn').hidden = false;
+    const startIPInt = ipToInt(startIP);
+    const endIPInt = ipToInt(endIP);
+    const CONCURRENCY = 12;
+    let currentIPInt = startIPInt;
+    while (currentIPInt <= endIPInt && !foundGlobal && !stopRequested) {
+      const batch = [];
+      for (let i = 0; i < CONCURRENCY && currentIPInt <= endIPInt; i++) {
+        batch.push(currentIPInt);
+        currentIPInt++;
+      }
+      setStatus('Scanning ' + intToIp(batch[batch.length - 1]) + ' ...');
+      await Promise.all(batch.map(probeIP));
+    }
+    isScanning = false;
+    document.getElementById('stopBtn').hidden = true;
+    return foundGlobal;
+  }
+  function scanPrefix(prefix) {
+    const parts = prefix.split('.');
+    if (parts.length === 1) return scanRange(prefix + '.0.0.2', prefix + '.255.255.254');
+    if (parts.length === 2) return scanRange(prefix + '.0.2', prefix + '.255.254');
+    return scanRange(prefix + '.2', prefix + '.254');
+  }
+  function scanEndUI() {
+    if (stopRequested) setStatus('Scan stopped.');
+    else setStatus('No device found on that subnet.');
+    document.getElementById('prompt').hidden = false;
+  }
+  function getLocalIP(timeoutMs) {
+    return new Promise((resolve) => {
+      let pc;
+      try {
+        pc = new RTCPeerConnection({ iceServers: [] });
+        pc.createDataChannel('');
+        pc.createOffer()
+          .then((o) => pc.setLocalDescription(o))
+          .catch(() => { if (pc) pc.close(); resolve(null); });
+        pc.onicecandidate = (e) => {
+          if (!e.candidate) { if (pc) pc.close(); resolve(null); return; }
+          const m = /(\d{1,3}\.){3}\d{1,3}/.exec(e.candidate.candidate);
+          if (m && isPrivate(m[0])) { if (pc) pc.close(); resolve(m[0]); }
+        };
+      } catch (err) {
+        if (pc) pc.close();
+        resolve(null);
+        return;
+      }
+      setTimeout(() => { if (pc) pc.close(); resolve(null); }, timeoutMs);
+    });
+  }
+
+  fetch('/reboot');
+
+  setTimeout(async () => {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 3000);
+    setStatus('Trying default IP 192.168.8.8 ...');
+    await probeIP(ipToInt('192.168.8.8'), controller.signal);
+    clearTimeout(timer);
+    if (foundGlobal) return;
+    setStatus('Looking for the plant ...');
+    const ip = await getLocalIP(2000);
+    if (ip) {
+      let found = await scanPrefix(prefixOf(ip));
+      if (!found && !stopRequested && prefixLenOf(ip) < 3) {
+        found = await scanPrefix(prefixOf(ip, prefixLenOf(ip)));
+      }
+      if (found) return;
+      scanEndUI();
+      return;
+    }
+    const saved = localStorage.getItem('lastSubnet');
+    if (saved && validPrefix(saved)) {
+      const found = await scanPrefix(saved);
+      if (found) return;
+      scanEndUI();
+      return;
+    }
+    setStatus('Enter your router IP');
+    document.getElementById('prompt').hidden = false;
+  }, 15000);
+
+  document.getElementById('scanBtn').addEventListener('click', async () => {
+    const value = document.getElementById('subnet').value.trim();
+    if (!validPrefix(value)) {
+      setStatus('Enter 1-3 octets, e.g. 192.168.1');
+      return;
+    }
+    document.getElementById('prompt').hidden = true;
+    if (!(await scanPrefix(value))) scanEndUI();
+  });
+  document.getElementById('stopBtn').addEventListener('click', () => { stopRequested = true; });
+  </script>
+</body>
 </html>
