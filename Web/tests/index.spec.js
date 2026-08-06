@@ -69,5 +69,13 @@ assert(sends.some(u => u === 'nvram.json?offset=22&value=x%40y.z'), 'EMAIL_ALERT
 assert(sends.some(u => u === 'nvram.json?offset=27&value=100000010'), 'ALERTS via nvramGet');
 assert(sends.some(u => u === 'nvram.json?offset=24&value=u'), 'SMTP_USERNAME via nvramGet');
 
+assert(typeof getPOSIXtz === 'function', 'getPOSIXtz defined');
+assert(typeof updateNTP === 'function', 'updateNTP defined');
+assert(/^UTC-?\d+(\.\d+)?$/.test(getPOSIXtz()), 'getPOSIXtz format: ' + getPOSIXtz());
+var sendCount = sends.length;
+updateNTP();
+assert(sends.length === sendCount + 1, 'updateNTP fires exactly one request');
+assert(/^api\?&ntp=1&tz=UTC-?\d+(\.\d+)?&epoch=\d+$/.test(sends[sends.length - 1]), 'updateNTP URL: ' + sends[sends.length - 1]);
+
 console.log('ALL index.spec assertions PASS');
 process.exit(0);

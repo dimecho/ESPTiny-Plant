@@ -740,6 +740,8 @@ if (potSizeCard && potSizeNormal && potSizeSliderWrap && potSizeSlider) {
       if (data[DEMO_PASSWORD] && data[DEMO_PASSWORD] != '') {
         DEMOLOCK = true;
       }
+
+      updateNTP();
     }
   };
 
@@ -909,6 +911,17 @@ function testLED() { var x=new XMLHttpRequest(); x.open('GET','api?led=3',true);
 function testSoil() { var x=new XMLHttpRequest(); x.open('GET','api?adc=1',true); x.send(); x.onload=function(){notify('Soil: '+x.responseText,'success');}; }
 function testWater() { var x=new XMLHttpRequest(); x.open('GET','api?adc=2',true); x.send(); x.onload=function(){notify('Water: '+x.responseText+'%','success');}; }
 function testNTP() { var x=new XMLHttpRequest(); x.open('GET','api?ntp=1',true); x.send(); x.onload=function(){notify('Timer test sent','success');}; }
+function getPOSIXtz() {
+  var tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+  var offset = new Date().getTimezoneOffset() / 60;
+  return "UTC" + offset;
+}
+function updateNTP() {
+  var epoch = Math.floor(Date.now() / 1000);
+  var x = new XMLHttpRequest();
+  x.open('GET', 'api?&ntp=1&tz=' + getPOSIXtz() + '&epoch=' + epoch, true);
+  x.send();
+}
 function flushWater() {
   var m = document.getElementById('flushWaterModal');
   if (!m) return;
