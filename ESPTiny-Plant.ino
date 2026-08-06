@@ -14,7 +14,7 @@ Remember: Brand new ESP-12 short GPIO0 to GND (flash mode) then UART TX/RX
 #define ASYNCSERVER_DNS 0
 #define SYNCSERVER_mDNS 0
 #define WPA2ENTERPRISE 0
-#define EEPROM_ID 0x6B05AB02  //Identify Sketch by NVS/EEPROM
+#define EEPROM_ID 0x6B05AB01  //Identify Sketch by NVS/EEPROM
 #if defined(ESP32)
 #define EEPROM_NVS 0  //(Non-Volatile Storage)
 #endif
@@ -471,9 +471,9 @@ uint8_t WIRELESS_PHY_MODE = 3;  //WIRELESS_PHY_MODE_11N = 3
 #endif
 uint8_t WIRELESS_PHY_POWER = 10;  //Max = 20.5dBm (some ESP modules 24.0dBm) should be multiples of 0.25
 uint8_t WIRELESS_CHANNEL = 11;
-char WIRELESS_SSID[12] = "Plant";
-char WIRELESS_USERNAME[] = "";
-char WIRELESS_PASSWORD[] = "";
+char WIRELESS_SSID[32] = "Plant";
+char WIRELESS_USERNAME[96] = "";
+char WIRELESS_PASSWORD[48] = "";
 uint8_t LOG_ENABLE = 0;  //data logger (enable/disable)
 uint8_t NETWORK_DHCP = 0;
 char NETWORK_IP[64] = "192.168.8.8";  //IPv4
@@ -774,13 +774,6 @@ void setupWiFi(uint8_t timeout) {
   strncpy(WIRELESS_PASSWORD, NVRAMRead(_WIRELESS_PASSWORD), sizeof(WIRELESS_PASSWORD));
 
   WiFi.persistent(false);  //Do not write settings to memory
-  //0    (for lowest RF power output, supply current ~ 70mA
-  //20.5 (for highest RF power output, supply current ~ 80mA
-#if defined(ESP8266)
-  WiFi.setOutputPower(WIRELESS_PHY_POWER);
-#else
-  WiFi.setTxPower((wifi_power_t)WIRELESS_PHY_POWER);
-#endif
 
   if (WIRELESS_MODE == 0) {
     //=====================
@@ -826,10 +819,8 @@ void setupWiFi(uint8_t timeout) {
     //================
     //WiFi Client Mode
     //================
-
-    //WiFi.enableSTA(true);
-    //WiFi.enableAP(false);
     WiFi.mode(WIFI_STA);
+    /*
 #if defined(ESP8266)
     WiFi.setAutoConnect(false);
 #else
@@ -837,6 +828,7 @@ void setupWiFi(uint8_t timeout) {
     WiFi.setAutoReconnect(false);
 #endif
     WiFi.disconnect();
+    */
 
     NETWORK_DHCP = atoi(NVRAMRead(_NETWORK_DHCP));
     if (NETWORK_DHCP == 0) {
@@ -933,11 +925,7 @@ void setupWiFi(uint8_t timeout) {
       WiFi.begin(WIRELESS_SSID, WIRELESS_PASSWORD);  //Connect to the WiFi network
     }
 #else  //ESP32
-    //char hname[19]; // 5+12+1 - don't forget the \0
-    //snprintf(hname, 19, "ESP32-%012llX", ESP.getEfuseMac());
-    //char hname[] = "Plant"; // the compiler will append a null automagically.
-    //WiFi.setHostname(hname);
-    //WiFi.setHostname(PLANT_NAME.c_str());
+    WiFi.setHostname(PLANT_NAME);
 
 #if WPA2ENTERPRISE
     if (WIRELESS_MODE == 2) {  // WPA2-Enterprise
@@ -1026,6 +1014,13 @@ void setupWiFi(uint8_t timeout) {
   if (NETWORK_DHCP == 1) {
     WiFi.localIP().toString().toCharArray(NETWORK_IP, sizeof(NETWORK_IP));
   }
+  //0    (for lowest RF power output, supply current ~ 70mA
+  //20.5 (for highest RF power output, supply current ~ 80mA
+#if defined(ESP8266)
+  WiFi.setOutputPower(WIRELESS_PHY_POWER);
+#else
+  WiFi.setTxPower((wifi_power_t)WIRELESS_PHY_POWER);
+#endif
 #if EMAILCLIENT_SMTP
     if (ALERTS[0] == '1')
       smtpSend("DHCP IP", NETWORK_IP, 1);
@@ -1084,8 +1079,8 @@ void setupWebServer() {
       }
     } else if (request->hasParam("wifi")) {
       if(request->getParam("wifi")->value() == "dhcp") {
-        thread[0].detach();
-        thread[0].attach(3, []() {
+        thread[1].detach();
+        thread[1].once(2, []() {
           //Try WiFi STA Mode (capturing NETWORK_IP)
           setupWiFi(0);
           //Temporarily Set WiFi back to AP (until reboot)
@@ -1172,8 +1167,8 @@ void setupWebServer() {
       if (request->hasParam("reset")) {
         NVRAM_Erase();
         NVRAMWrite(_PNP_ADC, PNP_ADC);
-        //thread[0].detach();
-        thread[0].attach(3, []() {
+        thread[1].detach();
+        thread[1].once(3, []() {
           ESP.restart();
         });
         response->addHeader(FPSTR(refresh_http), "6;url=/");
@@ -1284,8 +1279,8 @@ void setupWebServer() {
     if (strlen(DEMO_PASSWORD) > 0) {
       request->send(200, FPSTR(text_plain), FPSTR(locked_html));
     } else {
-      //thread[0].detach();
-      thread[0].attach(3, []() {
+      thread[1].detach();
+      thread[1].once(3, []() {
         ESP.restart();
       });
       request->send(200, FPSTR(text_plain), F("..."));
@@ -1383,8 +1378,8 @@ void setupWebServer() {
         const AsyncWebParameter *modeParam = request->getParam("Mode", true);
         const AsyncWebParameter *dhcpParam = request->getParam("DHCP", true);
         if (modeParam->value() == "0") {
-          //thread[0].detach();
-          thread[0].attach(4, []() {
+          thread[1].detach();
+          thread[1].once(3, []() {
             ESP.restart();
           });
         } else if (dhcpParam->value() == "1") {
@@ -1495,8 +1490,8 @@ void setupWebServer() {
       } else {
         response->print(F("Update Success! ..."));
       }
-      //thread[0].detach();
-      thread[0].attach(2, []() {
+      thread[0].detach();
+      thread[0].once(2, []() {
         ESP.restart();
       });
       response->addHeader(FPSTR(refresh_http), "6;url=/");
@@ -2265,11 +2260,13 @@ uint16_t sensorRead(uint8_t enablePin, sensorMode mode) {
   digitalWrite(enablePin, LOW);  //OFF
   pinMode(enablePin, INPUT);     //Prevent from leaving floating to GND
 #if DEBUG
+  /*
   Serial.printf("Sensor Pin: %u\n", enablePin);
   Serial.printf("Analog Pin: %u\n", analogDigitalPin);
   Serial.printf("Deep Sleep: %u\n", DEEP_SLEEP);
   Serial.printf("Plant Timer: %u\n", PLANT_MANUAL_TIMER);
   Serial.printf("Sensor: %u\n", result);
+  */
 #endif
 
   return result;

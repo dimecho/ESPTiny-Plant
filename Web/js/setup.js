@@ -107,6 +107,7 @@ function openScanPassword(item) {
   btn.addEventListener('click', function() {
     nvramGet(WIFI_SSID, item.getAttribute('data-ssid'));
     if (input.value) nvramGet(WIFI_PASSWORD, input.value);
+    nvramGet(WIFI_HIDE, 0);
     nvramGet(NETWORK_DHCP, 1);
     showStep('step-alerts');
   });
@@ -156,6 +157,7 @@ function openOtherNetwork(item) {
     }
     nvramGet(WIFI_SSID, ssid);
     nvramGet(WIFI_PASSWORD, passInput.value);
+    nvramGet(WIFI_HIDE, 1);
     nvramGet(NETWORK_DHCP, 1);
     showStep('step-alerts');
   });
