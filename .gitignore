@@ -8,7 +8,7 @@ build/*
 sdk/*
 data/*
 tools/*
-docs/
+docs/*
 
 # FreeCAD artifacts
 *.brp
