@@ -641,3 +641,18 @@ body.modal-open { overflow:hidden; }
   }
 }
 
+
+.run-setup-footer {
+  text-align: center;
+  padding: 1rem 0 1.5rem;
+}
+.run-setup-link {
+  font-size: 0.75rem;
+  letter-spacing: 1px;
+  color: var(--card-title);
+  opacity: 0.45;
+  text-decoration: none;
+}
+.run-setup-link:hover {
+  opacity: 0.9;
+}

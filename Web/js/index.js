@@ -187,7 +187,7 @@ var PLANT_SOIL_MOISTURE = 16;
 var PLANT_MANUAL_TIMER = 17;
 var PLANT_SOIL_TYPE = 18;
 var PLANT_TYPE = 19;
-//var RESERVED = 20;
+var FIRST_SETUP = 20;
 var DEEP_SLEEP = 21;
 //==========
 var EMAIL_ALERT = 22;
@@ -753,6 +753,7 @@ function resetFlash() { window.open('/api?reset=1'); }
   nvram.onload = function() {
     if (nvram.response && nvram.response['nvram']) {
       var data = nvram.response['nvram'];
+      if (data[FIRST_SETUP] === '') { location.replace('setup.html'); return; }
       try {
         var v = data[0].split('|');
         var cv = document.getElementById('coreVersion');

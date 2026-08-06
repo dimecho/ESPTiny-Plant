@@ -29,7 +29,7 @@ var PLANT_SOIL_MOISTURE = 16;
 var PLANT_MANUAL_TIMER = 17;
 var PLANT_SOIL_TYPE = 18;
 var PLANT_TYPE = 19;
-//var RESERVED = 20;
+var FIRST_SETUP = 20;
 var DEEP_SLEEP = 21;
 //==========
 var EMAIL_ALERT = 22;

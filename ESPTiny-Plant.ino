@@ -78,7 +78,7 @@ const int EEPROM_MAP[] = {
   552,   //_PLANT_MANUAL_TIMER 16
   568,   //_PLANT_SOIL_TYPE 8
   576,   //_PLANT_TYPE 8
-  584,   //_RESERVED 8
+  584,   //_FIRST_SETUP 8
   592,   //_DEEP_SLEEP 32
   624,   //_EMAIL_ALERT 64
   688,   //_SMTP_SERVER 64
@@ -445,7 +445,7 @@ unsigned long delayBetweenWiFi = 1000;
 #define _PLANT_MANUAL_TIMER 17
 #define _PLANT_SOIL_TYPE 18
 #define _PLANT_TYPE 19
-//#define _RESERVED 20
+#define _FIRST_SETUP 20
 #define _DEEP_SLEEP 21
 #define _EMAIL_ALERT 22
 #define _SMTP_SERVER 23
@@ -1076,6 +1076,11 @@ void setupWebServer() {
 #endif
       } else {
         response->printf("%u", waterLevelRead(adc));
+      }
+    } else if (request->hasParam("wifi")) {
+      uint8_t n = WiFi.scanNetworks();
+      for (uint8_t i = 0; i < n; ++i) {
+        response->println(WiFi.SSID(i));
       }
     } else if (request->hasParam("led")) {
       uint8_t led = atoi(request->getParam("led")->value().c_str());
