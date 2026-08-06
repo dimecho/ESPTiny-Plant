@@ -14,7 +14,7 @@ Remember: Brand new ESP-12 short GPIO0 to GND (flash mode) then UART TX/RX
 #define ASYNCSERVER_DNS 0
 #define SYNCSERVER_mDNS 0
 #define WPA2ENTERPRISE 0
-#define EEPROM_ID 0x6B05AB01  //Identify Sketch by NVS/EEPROM
+#define EEPROM_ID 0x6B05AB02  //Identify Sketch by NVS/EEPROM
 #if defined(ESP32)
 #define EEPROM_NVS 0  //(Non-Volatile Storage)
 #endif
@@ -476,10 +476,11 @@ char WIRELESS_USERNAME[96] = "";
 char WIRELESS_PASSWORD[48] = "";
 uint8_t LOG_ENABLE = 0;  //data logger (enable/disable)
 uint8_t NETWORK_DHCP = 0;
+char NETWORK_DHCPIP[64] = "0.0.0.0";  //IPv4
 char NETWORK_IP[64] = "192.168.8.8";  //IPv4
 char NETWORK_SUBNET[64] = "255.255.255.0";
-//char NETWORK_GATEWAY[] = "";
-//char NETWORK_DNS[] = "";
+char NETWORK_GATEWAY[64] = "";
+char NETWORK_DNS[64] = "";
 static uint16_t PLANT_POT_SIZE = 4;  //pump run timer - seconds
 #if defined(ESP32)
 static uint16_t PLANT_SOIL_MOISTURE = 600;  //ADC value
@@ -487,8 +488,8 @@ static uint16_t PLANT_SOIL_MOISTURE = 600;  //ADC value
 static uint16_t PLANT_SOIL_MOISTURE = 400;  //ADC value
 #endif
 static uint32_t PLANT_MANUAL_TIMER = 0;  //manual sleep timer - seconds (saved in hours)
-static uint8_t PLANT_SOIL_TYPE = 2;     //['Sand', 'Clay', 'Dirt', 'Loam', 'Moss'];
-static uint8_t PLANT_TYPE = 0;          //['Bonsai', 'Monstera', 'Palm'];
+static uint8_t PLANT_SOIL_TYPE = 2;      //['Sand', 'Clay', 'Dirt', 'Loam', 'Moss'];
+static uint8_t PLANT_TYPE = 0;           //['Bonsai', 'Monstera', 'Palm'];
 static uint32_t DEEP_SLEEP = 10;         //auto sleep timer - seconds (saved in minutes)
 //=============================
 //String EMAIL_ALERT = "";
@@ -506,16 +507,18 @@ uint16_t delayBetweenAlertEmails = 1 * 3600;   //2 hours = 2 x 60 = 120 minutes 
 uint16_t delayBetweenRefillReset = 2 * 3600;   //2 hours = 2 x 60 = 120 minutes = x4 30 min loops
 uint16_t delayBetweenDrySoilReset = 4 * 3600;  //4 hours = 4 x 60 = 240 minutes = x8 30 min loops
 uint16_t delayBetweenOverfloodReset = 8 * 3600;
-;                               //8 hours = 8 x 60 = 480 minutes = x16 30 min loops
-static uint8_t ON_TIME = 0;     //from 6am
-static uint8_t OFF_TIME = 0;    //to 6pm
+;                                //8 hours = 8 x 60 = 480 minutes = x16 30 min loops
+static uint8_t ON_TIME = 0;      //from 6am
+static uint8_t OFF_TIME = 0;     //to 6pm
 static char PNP_ADC[] = "0100";  //(0=NPN|1=PNP)(ADC sensitivity)(Water Level Sensor 0=Disable|1=Enable)(0=Transistor/Relay|1=MOSFET)
 //uint8_t ADC_ERROR_OFFSET = 64;           //WAKE_RF_DISABLED offset
 const uint8_t sand[] = { 1, 1, 0, 0 };
 const uint8_t loam[] = { 1, 1, 0, 1 };
 const uint8_t moss[] = { 1, 0, 1, 0 };
 const uint8_t dirt[] = { 1, 1, 1, 1 };
-enum sensorMode { MIN, MAX, AVG };
+enum sensorMode { MIN,
+                  MAX,
+                  AVG };
 uint16_t sensorRead(uint8_t enablePin, sensorMode mode = MIN);
 /*
 #if (CONFIG_IDF_TARGET_ESP32S2 && ARDUINO_ESP32_MAJOR >= 3)
@@ -671,9 +674,9 @@ void setup() {
 #else
   if (rtcData.runTime > 0) {
     time_t epoch = rtcData.runTime;
-  #if DEBUG
+#if DEBUG
     Serial.printf("Time calibration (milliseconds):%u\n", rtcData.runTime_ms);
-  #endif
+#endif
     if (rtcData.runTime_ms >= 60000) {  //recycle millis into seconds (1 min drift)
       epoch += rtcData.runTime_ms / 1000;
       rtcData.runTime_ms = 0;
@@ -706,11 +709,11 @@ void setup() {
 #if defined(ESP32)
   if (wakeupReason == ESP_RST_DEEPSLEEP) {  //ESP_RST_DEEPSLEEP (8)
 #else
-  if (wakeupReason == 5) {                  //REASON_DEEP_SLEEP_AWAKE (5)
+  if (wakeupReason == 5) {                   //REASON_DEEP_SLEEP_AWAKE (5)
 #endif
     delayBetweenWiFi = 0;
 #if defined(ESP32)
-  } else if (wakeupReason == ESP_RST_BROWNOUT) { //ESP_RST_BROWNOUT (9)
+  } else if (wakeupReason == ESP_RST_BROWNOUT) {  //ESP_RST_BROWNOUT (9)
     snprintf(logbuffer, sizeof(logbuffer), "v:2.7");
     dataLog(logbuffer);
 #if EMAILCLIENT_SMTP
@@ -719,6 +722,8 @@ void setup() {
 #endif
   } else {
     //Emergency Recover (RST to GND)
+    setupWiFi();
+    setupWebServer();
 #if defined(ESP32)
     if (wakeupReason == ESP_RST_EXT) {  //ESP_RST_EXT (2) ESP_RST_SW (3)
 #else
@@ -726,18 +731,14 @@ void setup() {
       memset(&rtcData, 0, sizeof(rtcData));  //reset RTC memory (set all zero)
 #endif
 #if DEBUG
-  Serial.printf("EMERGENCY RESET: %u\n", wakeupReason);
+      Serial.printf("EMERGENCY RESET: %u\n", wakeupReason);
 #endif
       delayBetweenWiFi = 600000;
       ALERTS[0] = '1';  //email DHCP IP
       ALERTS[1] = '0';  //low voltage
-      setupWiFi(22);
       blinky(1200, 1);
       //ArduinoOTA.begin();
-      setupWebServer();
     } else {
-      setupWiFi(0);
-      setupWebServer();
       strncpy(DEMO_PASSWORD, NVRAMRead(_DEMO_PASSWORD), sizeof(DEMO_PASSWORD));
     }
   }
@@ -745,41 +746,49 @@ void setup() {
   Serial.printf("Boot calibration (milliseconds):%u\n", millis());
 #endif
 }
-
+void setupWiFi() {
+  setupWiFi(1);
+}
 //This is a power expensive function 80+mA
-void setupWiFi(uint8_t timeout) {
+void setupWiFi(uint8_t nvram) {
 
   delayBetweenWiFi = DEEP_SLEEP * 1000;  //ms
   blinky(200, 3);                        //Alive blink
 
-  WIRELESS_MODE = atoi(NVRAMRead(_WIRELESS_MODE));
-  WIRELESS_CHANNEL = atoi(NVRAMRead(_WIRELESS_CHANNEL));
-  WIRELESS_PHY_MODE = atoi(NVRAMRead(_WIRELESS_PHY_MODE));
-  WIRELESS_PHY_POWER = atoi(NVRAMRead(_WIRELESS_PHY_POWER));
-  strncpy(NETWORK_IP, NVRAMRead(_NETWORK_IP), sizeof(NETWORK_IP));
+  if (nvram == 1) {
+    WIRELESS_MODE = atoi(NVRAMRead(_WIRELESS_MODE));
+    WIRELESS_HIDE = atoi(NVRAMRead(_WIRELESS_HIDE));
+    WIRELESS_CHANNEL = atoi(NVRAMRead(_WIRELESS_CHANNEL));
+    WIRELESS_PHY_MODE = atoi(NVRAMRead(_WIRELESS_PHY_MODE));
+    WIRELESS_PHY_POWER = atoi(NVRAMRead(_WIRELESS_PHY_POWER));
+
+    strncpy(WIRELESS_SSID, NVRAMRead(_WIRELESS_SSID), sizeof(WIRELESS_SSID));
+    strncpy(WIRELESS_PASSWORD, NVRAMRead(_WIRELESS_PASSWORD), sizeof(WIRELESS_PASSWORD));
+
+    NETWORK_DHCP = atoi(NVRAMRead(_NETWORK_DHCP));
+    strncpy(NETWORK_IP, NVRAMRead(_NETWORK_IP), sizeof(NETWORK_IP));
+    strncpy(NETWORK_SUBNET, NVRAMRead(_NETWORK_SUBNET), sizeof(NETWORK_SUBNET));
+    strncpy(NETWORK_GATEWAY, NVRAMRead(_NETWORK_GATEWAY), sizeof(NETWORK_GATEWAY));
+    strncpy(NETWORK_DNS, NVRAMRead(_NETWORK_DNS), sizeof(NETWORK_DNS));
+  }
 
   //Forcefull Wakeup
   //-------------------
-  //WiFi.persistent(false);
   //WiFi.setSleepMode(WIRELESS_NONE_SLEEP);
   //WiFi.forceSleepWake();
   //-------------------
+  //WiFi.persistent(false);  //Do not write settings to memory
+
   IPAddress ip, gateway, subnet, dns;
   ip.fromString(NETWORK_IP);
-  subnet.fromString(NVRAMRead(_NETWORK_SUBNET));
-  gateway.fromString(NVRAMRead(_NETWORK_GATEWAY));
-  dns.fromString(NVRAMRead(_NETWORK_DNS));
-  //-------------------
-  strncpy(WIRELESS_SSID, NVRAMRead(_WIRELESS_SSID), sizeof(WIRELESS_SSID));
-  strncpy(WIRELESS_PASSWORD, NVRAMRead(_WIRELESS_PASSWORD), sizeof(WIRELESS_PASSWORD));
-
-  WiFi.persistent(false);  //Do not write settings to memory
+  subnet.fromString(NETWORK_SUBNET);
+  gateway.fromString(NETWORK_GATEWAY);
+  dns.fromString(NETWORK_DNS);
 
   if (WIRELESS_MODE == 0) {
     //=====================
     //WiFi Access Point Mode
     //=====================
-    WIRELESS_HIDE = atoi(NVRAMRead(_WIRELESS_HIDE));
 
     //WiFi.enableSTA(false);
     //WiFi.enableAP(true);
@@ -813,8 +822,9 @@ void setupWiFi(uint8_t timeout) {
     MDNS.begin(PLANT_NAME);
 #endif
 #endif
-    //delay(100);  //Wait 100 ms for AP_START
-    //WiFi.softAPIP().toString().toCharArray(NETWORK_IP, sizeof(NETWORK_IP));
+    if (nvram == 1) {
+      strncpy(NETWORK_DHCPIP, NETWORK_IP, sizeof(NETWORK_DHCPIP));
+    }
   } else {
     //================
     //WiFi Client Mode
@@ -827,13 +837,16 @@ void setupWiFi(uint8_t timeout) {
     esp_wifi_set_protocol(WIFI_IF_STA, WIRELESS_PHY_MODE);
     WiFi.setAutoReconnect(false);
 #endif
-    WiFi.disconnect();
+  WiFi.disconnect();
     */
-
-    NETWORK_DHCP = atoi(NVRAMRead(_NETWORK_DHCP));
-    if (NETWORK_DHCP == 0) {
-      WiFi.config(ip, gateway, subnet, dns);
-    }
+    //0    (for lowest RF power output, supply current ~ 70mA
+    //20.5 (for highest RF power output, supply current ~ 80mA
+    #if defined(ESP8266)
+          WiFi.setOutputPower(WIRELESS_PHY_POWER);
+    #else
+          WiFi.setTxPower((wifi_power_t)WIRELESS_PHY_POWER);
+    #endif
+    
 #if defined(ESP8266)
     WiFi.hostname(PLANT_NAME);
 
@@ -951,44 +964,50 @@ void setupWiFi(uint8_t timeout) {
     WiFi.begin(WIRELESS_SSID, WIRELESS_PASSWORD);
 #endif
 #endif
-
     //No wifi-scan required when RF channel and AP mac-address is provided
     //uint8_t WIRELESS_BSSID[6] = { 0xF8, 0x1E, 0xDF, 0xFE, 0xE9, 0x39 };
     //WiFi.begin(WIRELESS_SSID, WIRELESS_PASSWORD, WIRELESS_CHANNEL, WIRELESS_BSSID, true);
-
-    if (WiFi.waitForConnectResult() != WL_CONNECTED) {
+    /*
+    while (WiFi.waitForConnectResult() != WL_CONNECTED) {
 #if DEBUG
-      /*
-      0 = WL_IDLE_STATUS
-      1 = WL_NO_SSID_AVAIL
-      6 = WL_WRONG_PASSWORD
-      */
+      //0 = WL_IDLE_STATUS
+      //1 = WL_NO_SSID_AVAIL
+      //6 = WL_WRONG_PASSWORD
       Serial.println(WiFi.status());
       //WiFi.printDiag();
 #endif
-      delay(500);
+      delay(100);
 
-      if (timeout > 21) {
+      if (WIRELESS_PHY_POWER > 19) {
 #if DEBUG
         Serial.println("Connection Failed! Rebooting...");
 #endif
         //If client mode fails ESP8266 will not be accessible
         //Set Emergency AP SSID for re-configuration
-        NVRAMWrite(_WIRELESS_MODE, "0");
-        NVRAMWrite(_WIRELESS_HIDE, "0");
-        NVRAMWrite(_WIRELESS_SSID, PLANT_NAME);
-        NVRAMWrite(_WIRELESS_PASSWORD, "");
-        NVRAMWrite(_NETWORK_DHCP, "0");
-        //delay(100);
-        ESP.restart();
+        WIRELESS_MODE = 0;
+        WIRELESS_HIDE = 0;
+        NETWORK_DHCP = 0;
+        strncpy(WIRELESS_SSID, "Plant", sizeof(WIRELESS_SSID));
+        strncpy(WIRELESS_PASSWORD, "", sizeof(WIRELESS_PASSWORD));
+        setupWiFi(0);
+        break;
       }
       WIRELESS_PHY_POWER++;  //auto tune wifi power (minimum power to reach AP)
-      setupWiFi(timeout++);
-      return;
     }
     NVRAMWrite(_WIRELESS_PHY_POWER, WIRELESS_PHY_POWER);  //save auto tuned wifi power
-
+    */
     WiFi.setAutoReconnect(true);
+
+    if (NETWORK_DHCP == 0) {
+      WiFi.config(ip, gateway, subnet, dns);
+    }else{
+      unsigned long dhcpTimeout = millis() + 10000;
+      while (WiFi.localIP() == IPAddress(0, 0, 0, 0) && millis() < dhcpTimeout) {
+        delay(100);
+      }
+    }
+    ip = WiFi.localIP();
+    snprintf(NETWORK_DHCPIP, sizeof(NETWORK_DHCPIP), "%u.%u.%u.%u", ip[0], ip[1], ip[2], ip[3]);
 
     //NTP Client to get time
 #if TIMECLIENT_NTP
@@ -1011,22 +1030,12 @@ void setupWiFi(uint8_t timeout) {
     Serial.printf("Current time: %s", ctime(&now));
 #endif
 #endif
-  if (NETWORK_DHCP == 1) {
-    WiFi.localIP().toString().toCharArray(NETWORK_IP, sizeof(NETWORK_IP));
-  }
-  //0    (for lowest RF power output, supply current ~ 70mA
-  //20.5 (for highest RF power output, supply current ~ 80mA
-#if defined(ESP8266)
-  WiFi.setOutputPower(WIRELESS_PHY_POWER);
-#else
-  WiFi.setTxPower((wifi_power_t)WIRELESS_PHY_POWER);
-#endif
 #if EMAILCLIENT_SMTP
     if (ALERTS[0] == '1')
-      smtpSend("DHCP IP", NETWORK_IP, 1);
+      smtpSend("DHCP IP", NETWORK_DHCPIP, 1);
 #endif
 #if DEBUG
-    Serial.println(WiFi.localIP().toString());
+    Serial.println(NETWORK_DHCPIP);
 #endif
   }
 }
@@ -1078,23 +1087,27 @@ void setupWebServer() {
         response->printf("%u", waterLevelRead(adc));
       }
     } else if (request->hasParam("wifi")) {
-      if(request->getParam("wifi")->value() == "dhcp") {
+      if (request->getParam("wifi")->value() == "dhcp") {
         thread[1].detach();
-        thread[1].once(2, []() {
-          //Try WiFi STA Mode (capturing NETWORK_IP)
-          setupWiFi(0);
-          //Temporarily Set WiFi back to AP (until reboot)
-          WIRELESS_MODE = 0;
-          WIRELESS_HIDE = 0;
-          NETWORK_DHCP = 0;
-          strncpy(WIRELESS_SSID, "Plant", sizeof(WIRELESS_SSID));
-          strncpy(WIRELESS_PASSWORD, "", sizeof(WIRELESS_PASSWORD));
-          setupWiFi(0);
+        thread[1].attach(2, []() {
+          //setupWiFi();
+          if (WiFi.getMode() == WIFI_STA) {
+            thread[1].detach();
+            //Temporarily Set WiFi back to AP (until reboot)
+            WIRELESS_MODE = 0;
+            WIRELESS_HIDE = 0;
+            NETWORK_DHCP = 0;
+            strncpy(WIRELESS_SSID, "Plant", sizeof(WIRELESS_SSID));
+            strncpy(WIRELESS_PASSWORD, "", sizeof(WIRELESS_PASSWORD));
+            setupWiFi(0);
+          } else {
+            setupWiFi();
+          }
         });
         response->println("...");
-      }else if(request->getParam("wifi")->value() == "ip") {
-        response->printf("%s", NETWORK_IP);
-      }else{
+      } else if (request->getParam("wifi")->value() == "ip") {
+        response->printf("%s", NETWORK_DHCPIP);
+      } else {
         uint8_t n = WiFi.scanNetworks();
         for (uint8_t i = 0; i < n; ++i) {
           response->println(WiFi.SSID(i));
@@ -1213,14 +1226,14 @@ void setupWebServer() {
 #if defined(ESP32)
             esp_wifi_start();
 #else
-            WiFi.mode(WIFI_AP);
+                WiFi.mode(WIFI_AP);
 #endif
           });
 #if defined(ESP32)
-        esp_wifi_stop();
+          esp_wifi_stop();
 #else
-        WiFi.disconnect(true);  //disassociate properly (easier to reconnect)
-        WiFi.mode(WIFI_OFF);
+            WiFi.disconnect(true);  //disassociate properly (easier to reconnect)
+            WiFi.mode(WIFI_OFF);
 #endif
         }
         //0 = stop, 1= run (timed), 2 = run (continues)
@@ -1444,7 +1457,7 @@ void setupWebServer() {
       const char *labels[] = { "Firmware", "Filesystem" };
       for (uint8_t i = 0; i < 2; i++) {
         response->print(F("<form action=http://"));
-        response->print(NETWORK_IP);
+        response->print(NETWORK_DHCPIP);
         response->print(request->url());
         response->print(F(" method=post enctype='multipart/form-data'><input type=file accept='.bin,.signed' name="));
         response->print(labels[i]);
@@ -1490,8 +1503,8 @@ void setupWebServer() {
       } else {
         response->print(F("Update Success! ..."));
       }
-      thread[0].detach();
-      thread[0].once(2, []() {
+      thread[1].detach();
+      thread[1].once(2, []() {
         ESP.restart();
       });
       response->addHeader(FPSTR(refresh_http), "6;url=/");
@@ -1543,11 +1556,11 @@ void setupWebServer() {
   //anchored start to ^ improves performance
   //server.on("(?is)^\\/(\bhotspot-detect\b|\bgenerate_204\b|\bconnecttest\b)", HTTP_GET, [](AsyncWebServerRequest *request) {
   server.on("(hotspot-detect\.html+)|(generate_204+)|(connecttest\.txt+)$", HTTP_GET, [](AsyncWebServerRequest *request) {
-    request->send(200, FPSTR(text_html), "<center><h1>http://" + String(NETWORK_IP) + "</h1></center>");
+    request->send(200, FPSTR(text_html), "<center><h1>http://" + String(NETWORK_DHCPIP) + "</h1></center>");
   });
   //server.on("(?is)^\\/(\bredirect\b|\bcaptive-portal\b)", HTTP_GET, [](AsyncWebServerRequest *request) {
   server.on("(redirect+)|(captive-portal+)$", HTTP_GET, [](AsyncWebServerRequest *request) {
-    request->redirect("http://" + String(NETWORK_IP));
+    request->redirect("http://" + String(NETWORK_DHCPIP));
   });
   server.on("^\\/regex\\/([0-9]+)$", HTTP_GET, [](AsyncWebServerRequest *request) {
     request->send(200, FPSTR(text_plain), "OK");
@@ -1564,10 +1577,10 @@ void setupWebServer() {
 #if !ASYNCWEBSERVER_REGEX
     if (strstr(file, "detect") != 0 || strstr(file, "generate_204") != 0) {  //|| strstr(file, "test") != 0) {
       //if (!LittleFS.exists("/index.html")) {
-      request->send(200, FPSTR(text_html), "<center><h1>http://" + String(NETWORK_IP) + "</h1></center>");
+      request->send(200, FPSTR(text_html), "<center><h1>http://" + String(NETWORK_DHCPIP) + "</h1></center>");
       //}
     } else if (strstr(file, "redirect") != 0 || strstr(file, "portal") != 0) {
-      request->redirect("http://" + String(NETWORK_IP));
+      request->redirect("http://" + String(NETWORK_DHCPIP));
     } else
 #endif
       if (LittleFS.exists(file)) {
@@ -1658,7 +1671,7 @@ void setupWebServer() {
   // Cache SSL sessions to accelerate the TLS handshake.
   secureServer.getServer().setCache(&secureCache);
   secureServer.on("/", []() {
-    secureServer.sendHeader("Location", String("http://" + String(NETWORK_IP)), true);
+    secureServer.sendHeader("Location", String("http://" + String(NETWORK_DHCPIP)), true);
     secureServer.send(302, FPSTR(text_plain), "");
   });
   //secureServer.onNotFound(handleNotFound);
@@ -1678,7 +1691,7 @@ void setupWebServer() {
     .uri = "/",  //"/*",
     .method = HTTP_GET,
     .handler = root_get_handler,
-    .user_ctx = (void *)NETWORK_IP  //.c_str()
+    .user_ctx = (void *)NETWORK_DHCPIP  //.c_str()
   };
   httpd_ssl_start(&secureServer, &configSSL);
   httpd_register_uri_handler(secureServer, &root);
@@ -1734,7 +1747,7 @@ void loop() {
 #endif
 */
   if (!thread[1].active() && (millis() - webTimer) > delayBetweenWiFi) {  //track web activity for 5 minutes
-                                                   /*
+                                                                          /*
   //Measure voltage every 10000s runtime (~2.5 hours)
   if (ALERTS[1] == '1' && rtcData.runTime % 10000 == 0) {
     if (ADCMODE == ADC_TOUT) {
@@ -1803,11 +1816,11 @@ void readySleep() {
     time_t now;
     time(&now);
     uint32_t deepsleep_offset = PLANT_MANUAL_TIMER - (now - rtcData.waterTime);
-    if(deepsleep_offset < DEEP_SLEEP) {
+    if (deepsleep_offset < DEEP_SLEEP) {
       DEEP_SLEEP = deepsleep_offset;
     }
 #if DEBUG
-  Serial.printf("Deep Sleep: %u\n", DEEP_SLEEP);
+    Serial.printf("Deep Sleep: %u\n", DEEP_SLEEP);
 #endif
 #if defined(ESP32)
     uint64_t sleep_us = (uint64_t)DEEP_SLEEP * 1000000ULL;
@@ -2070,7 +2083,7 @@ void readyPump(uint16_t moisture) {
 void runPumpFinish() {
   turnNPNorPNP(0);  // OFF
 #ifdef RTC_CNTL_BROWN_OUT_REG
-  WRITE_PERI_REG(RTC_CNTL_BROWN_OUT_REG, 1); //enable brownout detector
+  WRITE_PERI_REG(RTC_CNTL_BROWN_OUT_REG, 1);  //enable brownout detector
 #endif
   rtcData.emptyBottle++;  // Sensorless Empty Detection
   snprintf(logbuffer, sizeof(logbuffer), "T:%u,M:%u", PLANT_MANUAL_TIMER, PLANT_SOIL_MOISTURE);
@@ -2102,7 +2115,7 @@ void runPump(uint16_t duration) {
     else pattern = dirt;
 
 #if DEBUG
-  Serial.printf("PATTERN: %u%u%u%u\n", pattern[0], pattern[1], pattern[2], pattern[3]);
+    Serial.printf("PATTERN: %u%u%u%u\n", pattern[0], pattern[1], pattern[2], pattern[3]);
 #endif
     //blinky(1000, 1); //Prevents Deep Sleep with readySleep() until next loop()
 
@@ -2110,11 +2123,11 @@ void runPump(uint16_t duration) {
     //mutable allows the lambda to modify its own copy of the captured variables:
     thread[1].attach(1, [duration, pattern, idx]() mutable {
 #if DEBUG
-  Serial.printf("THREAD: %u - ", duration);
+      Serial.printf("THREAD: %u - ", duration);
 #endif
       if (duration == 0) {
         thread[1].detach();
-        runPumpFinish(); //Note: Ticker callback has low stack (~768 bytes)
+        runPumpFinish();  //Note: Ticker callback has low stack (~768 bytes)
       } else {
         turnNPNorPNP(pattern[idx]);  // ON or OFF
         idx = (idx + 1) & 0x03;      // fast modulo 4
@@ -2122,8 +2135,8 @@ void runPump(uint16_t duration) {
       }
     });
 #if EMAILCLIENT_SMTP
-  if (ALERTS[3] == '1')
-    smtpSend("Run Pump", (char *)PLANT_POT_SIZE, 0);
+    if (ALERTS[3] == '1')
+      smtpSend("Run Pump", (char *)PLANT_POT_SIZE, 0);
 #endif
     /*
     while (duration--) {
@@ -2203,27 +2216,27 @@ uint16_t sensorRead(uint8_t enablePin, sensorMode mode) {
 
 #if defined(ESP32)
   analogReadResolution(12);  // Sets the sample bits and read resolution, default is 12-bit (0 - 4095), range is 9 - 12 bits
-// 9-bit gives an ADC range of 0-511
-// 10-bit gives an ADC range of 0-1023
-// 11-bit gives an ADC range of 0-2047
-// 12-bit gives an ADC range of 0-4095
-//analogSetCycles(8);                 // Set number of cycles per sample, default is 8 and provides an optimal result, range is 1 - 255
-//analogSetSamples(1);                // Set number of samples in the range, default is 1, it has an effect on sensitivity has been multiplied
-//analogSetClockDiv(1);               // Set the divider for the ADC clock, default is 1, range is 1 - 255
-//analogSetPinAttenuation(analogDigitalPin, ADC_6db);  // Sets the input attenuation, default is ADC_11db, range is ADC_0db, ADC_2_5db, ADC_6db, ADC_11db
-// ADC_0db provides no attenuation so IN/OUT = 1 / 1 an input of 3 volts remains at 3 volts before ADC measurement
-// ADC_2_5db provides an attenuation so that IN/OUT = 1 / 1.34 an input of 3 volts is reduced to 2.238 volts before ADC measurement
-// ADC_6db provides an attenuation so that IN/OUT = 1 / 2 an input of 3 volts is reduced to 1.500 volts before ADC measurement
-// ADC_11db provides an attenuation so that IN/OUT = 1 / 3.6 an input of 3 volts is reduced to 0.833 volts before ADC measurement
-//analogSetVRefPin(25);               // Set pin to use for ADC calibration if the esp is not already calibrated (25, 26 or 27)
-//analogSetClockDiv(255);             // Set the divider for the ADC clock. Default is 1, Range is 1 - 255
-//adcAttachPin(analogDigitalPin);     // Attach a pin to ADC (also clears any other analog mode that could be on), returns TRUE/FALSE result
-//adcStart(analogDigitalPin);         // Starts an ADC conversion on attached pin's bus
-//adcBusy(analogDigitalPin);          // Check if conversion on the pin's ADC bus is currently running, returns TRUE/FALSE result
-//adcEnd(analogDigitalPin);           // Get the result of the conversion (will wait if it have not finished), returns 16-bit integer result
-//digitalWrite(analogDigitalPin, HIGH);  //Internal pull-up ON (20k resistor)
+                             // 9-bit gives an ADC range of 0-511
+                             // 10-bit gives an ADC range of 0-1023
+                             // 11-bit gives an ADC range of 0-2047
+                             // 12-bit gives an ADC range of 0-4095
+                             //analogSetCycles(8);                 // Set number of cycles per sample, default is 8 and provides an optimal result, range is 1 - 255
+                             //analogSetSamples(1);                // Set number of samples in the range, default is 1, it has an effect on sensitivity has been multiplied
+                             //analogSetClockDiv(1);               // Set the divider for the ADC clock, default is 1, range is 1 - 255
+                             //analogSetPinAttenuation(analogDigitalPin, ADC_6db);  // Sets the input attenuation, default is ADC_11db, range is ADC_0db, ADC_2_5db, ADC_6db, ADC_11db
+                             // ADC_0db provides no attenuation so IN/OUT = 1 / 1 an input of 3 volts remains at 3 volts before ADC measurement
+                             // ADC_2_5db provides an attenuation so that IN/OUT = 1 / 1.34 an input of 3 volts is reduced to 2.238 volts before ADC measurement
+                             // ADC_6db provides an attenuation so that IN/OUT = 1 / 2 an input of 3 volts is reduced to 1.500 volts before ADC measurement
+                             // ADC_11db provides an attenuation so that IN/OUT = 1 / 3.6 an input of 3 volts is reduced to 0.833 volts before ADC measurement
+                             //analogSetVRefPin(25);               // Set pin to use for ADC calibration if the esp is not already calibrated (25, 26 or 27)
+                             //analogSetClockDiv(255);             // Set the divider for the ADC clock. Default is 1, Range is 1 - 255
+                             //adcAttachPin(analogDigitalPin);     // Attach a pin to ADC (also clears any other analog mode that could be on), returns TRUE/FALSE result
+                             //adcStart(analogDigitalPin);         // Starts an ADC conversion on attached pin's bus
+                             //adcBusy(analogDigitalPin);          // Check if conversion on the pin's ADC bus is currently running, returns TRUE/FALSE result
+                             //adcEnd(analogDigitalPin);           // Get the result of the conversion (will wait if it have not finished), returns 16-bit integer result
+                             //digitalWrite(analogDigitalPin, HIGH);  //Internal pull-up ON (20k resistor)
 
-// Sets the input attenuation for ALL ADC inputs, default is ADC_11db, range is ADC_0db, ADC_2_5db, ADC_6db, ADC_11db
+  // Sets the input attenuation for ALL ADC inputs, default is ADC_11db, range is ADC_0db, ADC_2_5db, ADC_6db, ADC_11db
   if (enablePin == sensorPin) {
     analogSetAttenuation(ADC_11db);
   } else {
@@ -2242,9 +2255,9 @@ uint16_t sensorRead(uint8_t enablePin, sensorMode mode) {
     result = analogRead(analogDigitalPin);
     if (mode == MIN && result < finalResult) {  //Lowest
       finalResult = result;
-    } else if (mode == MAX && result > finalResult) { //Highest
+    } else if (mode == MAX && result > finalResult) {  //Highest
       finalResult = result;
-    } else if (mode == AVG) { //Average
+    } else if (mode == AVG) {  //Average
       finalResult += result;
     }
   }
@@ -2528,26 +2541,26 @@ void turnNPNorPNP(const uint8_t state) {
 #if DEBUG
   Serial.printf("[%u]\n", state);
 #endif
-//#if defined(ESP32)
-//  gpio_hold_dis((gpio_num_t)pumpPin);  //Safety: Hold pin state disable
-//#endif
+  //#if defined(ESP32)
+  //  gpio_hold_dis((gpio_num_t)pumpPin);  //Safety: Hold pin state disable
+  //#endif
   pinMode(pumpPin, OUTPUT);
 #ifdef RTC_CNTL_BROWN_OUT_REG
-    WRITE_PERI_REG(RTC_CNTL_BROWN_OUT_REG, 0); //disable brownout detector
+  WRITE_PERI_REG(RTC_CNTL_BROWN_OUT_REG, 0);  //disable brownout detector
 #endif
-  if (PNP_ADC[0] == '1') { //PNP
+  if (PNP_ADC[0] == '1') {  //PNP
     digitalWrite(pumpPin, !state);
-  } else { //NPN
+  } else {  //NPN
     digitalWrite(pumpPin, state);
   }
-  if(PNP_ADC[3] == '1' && state == 0) {
-    if(PNP_ADC[0] == '1') { //PNP
+  if (PNP_ADC[3] == '1' && state == 0) {
+    if (PNP_ADC[0] == '1') {           //PNP
       pinMode(pumpPin, INPUT_PULLUP);  //True high-impedance via internal 40k - May affect deep sleep power consumption - internal pull-ups can leak current
-    }else{ //NPN Gate Discharge
+    } else {                           //NPN Gate Discharge
 #ifdef ESP32
-     pinMode(pumpPin, INPUT_PULLDOWN);  //Internal 40k pulldown (ESP32 only)
+      pinMode(pumpPin, INPUT_PULLDOWN);  //Internal 40k pulldown (ESP32 only)
 #else
-      pinMode(pumpPin, INPUT);  //Use external pulldown 10k resistor to GND
+      pinMode(pumpPin, INPUT);                              //Use external pulldown 10k resistor to GND
 #endif
     }
   }

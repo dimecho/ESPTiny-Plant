@@ -106,7 +106,7 @@ function openScanPassword(item) {
   btn.textContent = 'Connect';
   btn.addEventListener('click', function() {
     nvramGet(WIFI_SSID, item.getAttribute('data-ssid'));
-    if (input.value) nvramGet(WIFI_PASSWORD, input.value);
+    nvramGet(WIFI_PASSWORD, input.value);
     nvramGet(WIFI_HIDE, 0);
     nvramGet(NETWORK_DHCP, 1);
     showStep('step-alerts');
@@ -234,7 +234,7 @@ document.getElementById('wifiSetupForm').addEventListener('submit', function(e) 
   setupSsid = ssid;
   setupWifiPass = pass;
   nvramGet(WIFI_SSID, ssid);
-  if (pass) nvramGet(WIFI_PASSWORD, pass);
+  nvramGet(WIFI_PASSWORD, pass);
   nvramGet(WIFI_HIDE, document.getElementById('setupHiddenSSID').checked ? 1 : 0);
   showStep('step-plant-password');
 });
@@ -262,9 +262,17 @@ document.getElementById('plantPasswordForm').addEventListener('submit', function
       xhr.open('GET', 'api?wifi=ip', true);
       xhr.send();
       xhr.onload = function() {
-        console.log(xhr.responseText);
+        var ip = (xhr.responseText || '').trim();
+        if (ip && ip !== '0.0.0.0') {
+          document.getElementById('ipFoundMsg').textContent = 'IP Found: ' + ip;
+          document.getElementById('ipFoundMsg').classList.remove('hidden');
+          var xhr = new XMLHttpRequest();
+          xhr.open('GET', 'reboot', true);
+          xhr.send();
+          //setTimeout(function() { window.location.href = 'http://' + ip + 'index.html'; }, 6000);
+        }
       };
-     }, 6000);
+     }, 10000);
     //setTimeout(function() { window.location.href = 'find.html'; }, 6000);
   } else {
     document.getElementById('reconnectMsg').textContent = 'Reconnect to Plant WiFi (SSID: ' + setupSsid + ')';
@@ -275,11 +283,11 @@ document.getElementById('plantPasswordForm').addEventListener('submit', function
     xhr.open('GET', 'reboot', true);
     xhr.send();
     if (setupSsid === 'Plant' && !setupWifiPass) {
-      document.getElementById('progressBar').style.animationDuration = '4s';
-      setTimeout(function() { window.location.href = 'index.html'; }, 4000);
+      document.getElementById('progressBar').style.animationDuration = '6s';
+      setTimeout(function() { window.location.href = 'http://192.168.8.8/index.html'; }, 6000);
     } else {
       document.getElementById('progressBar').style.animationDuration = '20s';
-      setTimeout(function() { window.location.href = 'index.html'; }, 20000);
+      setTimeout(function() { window.location.href = 'http://192.168.8.8/index.html'; }, 20000);
     }
   }
 });
