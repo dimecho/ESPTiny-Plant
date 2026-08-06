@@ -29,7 +29,7 @@ Key insight: by scan time the browser has reconnected to the router (the device 
 
 ## Changes
 
-Only `Web/find.html` changes.
+Only `Web/find.html` changes (script + inline style; no new files).
 
 ### New helper: `getLocalIP(timeoutMs)`
 
@@ -85,6 +85,14 @@ On success (`response.ok`): store `localStorage['lastSubnet'] = <prefix of found
 - Minimal UI: label "Router IP (first 3 octets)", an `<input>` pre-filled with `192.168.1`, and a "Scan" button. The input is sanitized/validated to `/^\d{1,3}\.\d{1,3}\.\d{1,3}$/` before scanning.
 - Reuse `foundGlobal` guard: once a host responds, stop scanning (existing behavior), show "Found IP: ...", store the subnet, and redirect.
 
+### Layout modernization (standalone inline CSS)
+
+- Add a small `<style>` block to `find.html`. No external assets (no bonsai.css, no SVG).
+- Dark background, a single centered card containing: a status line ("Rebooting ...", then detection/progress/error messages), the prompt (label + input + button when needed), and the found-IP line.
+- Simple readability styling: system font stack, comfortable padding, rounded input/button, accent color consistent with the app's palette. A `prefers-color-scheme: light` override keeps text readable on light backgrounds if desired — keep to a few rules.
+- Responsive: card max-width so it fits phone screens.
+- The page stays a single static HTML file with inline JS + CSS; no build step.
+
 ## Error handling / edge cases
 
 - WebRTC unavailable or blocked (`RTCPeerConnection` throws) → resolves `null` → falls through to prompt.
@@ -102,4 +110,5 @@ On success (`response.ok`): store `localStorage['lastSubnet'] = <prefix of found
 
 - Changing the `/update` probe or the redirect target.
 - Changing the reboot wait or the wizard/firmware flow.
-- Any change to `classic/` pages or other `Web/` pages.
+- Any change to `classic/` pages or other `Web/` pages (including not reusing bonsai.css).
+- Adding external CSS/JS libraries or a build step.
