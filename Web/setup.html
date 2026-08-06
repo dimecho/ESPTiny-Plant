@@ -152,6 +152,18 @@ document.documentElement.setAttribute('data-font', savedFont);
       flex-direction: column;
       gap: 0.8rem;
     }
+    .scan-spinner {
+      width: 2.5rem;
+      height: 2.5rem;
+      margin: 1.5rem auto;
+      border: 3px solid var(--card-border);
+      border-top-color: #62a29a;
+      border-radius: 50%;
+      animation: scan-spin 0.8s linear infinite;
+    }
+    @keyframes scan-spin {
+      to { transform: rotate(360deg); }
+    }
     .setup-scan-item {
       display: flex;
       align-items: center;
@@ -187,6 +199,20 @@ document.documentElement.setAttribute('data-font', savedFont);
     }
     .setup-scan-expand .tab-input {
       flex: 1;
+    }
+    .setup-other-expand {
+      flex-direction: column;
+    }
+    .setup-other-expand .tab-input {
+      flex: none;
+      width: 100%;
+    }
+    .setup-other-expand .tab-btn {
+      width: 100%;
+    }
+    .scan-other-hint {
+      font-size: 0.8rem;
+      color: #ff8f8f;
     }
     .setup-scan-warning {
       display: flex;
@@ -303,6 +329,7 @@ document.documentElement.setAttribute('data-font', savedFont);
 
 <div class="setup-step" id="step-scan">
   <div class="setup-scan">
+    <div id="scanSpinner" class="scan-spinner hidden"></div>
     <div id="scanWarning" class="setup-scan-warning hidden">
       <p>No wireless networks were detected. Verify the device is within range of a router or access point, then try again.</p>
       <button type="button" class="tab-btn" id="scanRefresh">Refresh</button>
@@ -344,6 +371,8 @@ document.documentElement.setAttribute('data-font', savedFont);
 
 <script defer src="js/common.js"></script>
 <script defer src="js/setup.js"></script>
+
+<div class="run-setup-footer"><a href="/update" class="run-setup-link">Update Firmware</a></div>
 
 </body>
 </html>

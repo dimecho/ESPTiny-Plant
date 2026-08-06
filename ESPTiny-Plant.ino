@@ -14,7 +14,7 @@ Remember: Brand new ESP-12 short GPIO0 to GND (flash mode) then UART TX/RX
 #define ASYNCSERVER_DNS 0
 #define SYNCSERVER_mDNS 0
 #define WPA2ENTERPRISE 0
-#define EEPROM_ID 0x6B05AB01  //Identify Sketch by NVS/EEPROM
+#define EEPROM_ID 0x6B05AB02  //Identify Sketch by NVS/EEPROM
 #if defined(ESP32)
 #define EEPROM_NVS 0  //(Non-Volatile Storage)
 #endif
@@ -459,7 +459,7 @@ unsigned long delayBetweenWiFi = 1000;
 #define _PNP_ADC 31
 
 uint8_t WIRELESS_MODE = 0;  //WIRELESS_AP = 0, WIRELESS_STA(WPA2) = 1, WIRELESS_STA(WPA2 ENT) = 2, WIRELESS_STA(WEP) = 3
-//uint8_t WIRELESS_HIDE = 0;
+uint8_t WIRELESS_HIDE = 0;
 #if defined(ARDUINO_ESP8266_NODEMCU_ESP12) || defined(ARDUINO_ESP8266_NODEMCU_ESP12E)
 uint8_t WIRELESS_PHY_MODE = 1;  //WIRELESS_PHY_MODE_11B = 1
 #elif defined(ESP8266)
@@ -471,11 +471,11 @@ uint8_t WIRELESS_PHY_MODE = 3;  //WIRELESS_PHY_MODE_11N = 3
 #endif
 uint8_t WIRELESS_PHY_POWER = 10;  //Max = 20.5dBm (some ESP modules 24.0dBm) should be multiples of 0.25
 uint8_t WIRELESS_CHANNEL = 11;
-char WIRELESS_SSID[16] = "Plant";
+char WIRELESS_SSID[12] = "Plant";
 char WIRELESS_USERNAME[] = "";
 char WIRELESS_PASSWORD[] = "";
 uint8_t LOG_ENABLE = 0;  //data logger (enable/disable)
-//uint8_t NETWORK_DHCP = 0;
+uint8_t NETWORK_DHCP = 0;
 char NETWORK_IP[64] = "192.168.8.8";  //IPv4
 char NETWORK_SUBNET[64] = "255.255.255.0";
 //char NETWORK_GATEWAY[] = "";
@@ -606,7 +606,7 @@ void setup() {
     NVRAM_Erase();
     NVRAMWrite(_EEPROM_ID, EEPROM_ID);
     NVRAMWrite(_WIRELESS_MODE, WIRELESS_MODE);
-    NVRAMWrite(_WIRELESS_HIDE, "0");
+    NVRAMWrite(_WIRELESS_HIDE, WIRELESS_HIDE);
     NVRAMWrite(_WIRELESS_PHY_MODE, WIRELESS_PHY_MODE);
     NVRAMWrite(_WIRELESS_PHY_POWER, WIRELESS_PHY_POWER);
     NVRAMWrite(_WIRELESS_CHANNEL, WIRELESS_CHANNEL);
@@ -725,6 +725,9 @@ void setup() {
     if (wakeupReason == 6) {                 //REASON_EXT_SYS_RST (6)
       memset(&rtcData, 0, sizeof(rtcData));  //reset RTC memory (set all zero)
 #endif
+#if DEBUG
+  Serial.printf("EMERGENCY RESET: %u\n", wakeupReason);
+#endif
       delayBetweenWiFi = 600000;
       ALERTS[0] = '1';  //email DHCP IP
       ALERTS[1] = '0';  //low voltage
@@ -783,7 +786,7 @@ void setupWiFi(uint8_t timeout) {
     //=====================
     //WiFi Access Point Mode
     //=====================
-    uint8_t WIRELESS_HIDE = atoi(NVRAMRead(_WIRELESS_HIDE));
+    WIRELESS_HIDE = atoi(NVRAMRead(_WIRELESS_HIDE));
 
     //WiFi.enableSTA(false);
     //WiFi.enableAP(true);
@@ -835,7 +838,7 @@ void setupWiFi(uint8_t timeout) {
 #endif
     WiFi.disconnect();
 
-    uint8_t NETWORK_DHCP = atoi(NVRAMRead(_NETWORK_DHCP));
+    NETWORK_DHCP = atoi(NVRAMRead(_NETWORK_DHCP));
     if (NETWORK_DHCP == 0) {
       WiFi.config(ip, gateway, subnet, dns);
     }
@@ -1020,7 +1023,9 @@ void setupWiFi(uint8_t timeout) {
     Serial.printf("Current time: %s", ctime(&now));
 #endif
 #endif
+  if (NETWORK_DHCP == 1) {
     WiFi.localIP().toString().toCharArray(NETWORK_IP, sizeof(NETWORK_IP));
+  }
 #if EMAILCLIENT_SMTP
     if (ALERTS[0] == '1')
       smtpSend("DHCP IP", NETWORK_IP, 1);
@@ -1078,9 +1083,27 @@ void setupWebServer() {
         response->printf("%u", waterLevelRead(adc));
       }
     } else if (request->hasParam("wifi")) {
-      uint8_t n = WiFi.scanNetworks();
-      for (uint8_t i = 0; i < n; ++i) {
-        response->println(WiFi.SSID(i));
+      if(request->getParam("wifi")->value() == "dhcp") {
+        thread[0].detach();
+        thread[0].attach(3, []() {
+          //Try WiFi STA Mode (capturing NETWORK_IP)
+          setupWiFi(0);
+          //Temporarily Set WiFi back to AP (until reboot)
+          WIRELESS_MODE = 0;
+          WIRELESS_HIDE = 0;
+          NETWORK_DHCP = 0;
+          strncpy(WIRELESS_SSID, "Plant", sizeof(WIRELESS_SSID));
+          strncpy(WIRELESS_PASSWORD, "", sizeof(WIRELESS_PASSWORD));
+          setupWiFi(0);
+        });
+        response->println("...");
+      }else if(request->getParam("wifi")->value() == "ip") {
+        response->printf("%s", NETWORK_IP);
+      }else{
+        uint8_t n = WiFi.scanNetworks();
+        for (uint8_t i = 0; i < n; ++i) {
+          response->println(WiFi.SSID(i));
+        }
       }
     } else if (request->hasParam("led")) {
       uint8_t led = atoi(request->getParam("led")->value().c_str());
@@ -1149,8 +1172,8 @@ void setupWebServer() {
       if (request->hasParam("reset")) {
         NVRAM_Erase();
         NVRAMWrite(_PNP_ADC, PNP_ADC);
-        thread[1].detach();
-        thread[1].attach(3, []() {
+        //thread[0].detach();
+        thread[0].attach(3, []() {
           ESP.restart();
         });
         response->addHeader(FPSTR(refresh_http), "6;url=/");
@@ -1262,7 +1285,7 @@ void setupWebServer() {
       request->send(200, FPSTR(text_plain), FPSTR(locked_html));
     } else {
       //thread[0].detach();
-      thread[0].attach(1, []() {
+      thread[0].attach(3, []() {
         ESP.restart();
       });
       request->send(200, FPSTR(text_plain), F("..."));

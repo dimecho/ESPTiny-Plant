@@ -71,6 +71,15 @@ function renderScan(aps) {
     item.addEventListener('click', function() { openScanPassword(this); });
     list.appendChild(item);
   });
+  var other = document.createElement('button');
+  other.type = 'button';
+  other.className = 'setup-scan-item';
+  other.textContent = 'Other (Hidden Network)';
+  other.addEventListener('mousedown', function() { this.classList.add('active'); });
+  other.addEventListener('mouseup', function() { this.classList.remove('active'); });
+  other.addEventListener('mouseleave', function() { this.classList.remove('active'); });
+  other.addEventListener('click', function() { openOtherNetwork(this); });
+  list.appendChild(other);
 }
 
 function openScanPassword(item) {
@@ -98,6 +107,7 @@ function openScanPassword(item) {
   btn.addEventListener('click', function() {
     nvramGet(WIFI_SSID, item.getAttribute('data-ssid'));
     if (input.value) nvramGet(WIFI_PASSWORD, input.value);
+    nvramGet(NETWORK_DHCP, 1);
     showStep('step-alerts');
   });
   exp.appendChild(input);
@@ -108,13 +118,66 @@ function openScanPassword(item) {
   input.focus();
 }
 
+function openOtherNetwork(item) {
+  var next = item.nextSibling;
+  if (next && next.classList && next.classList.contains('setup-scan-expand')) {
+    item.parentNode.removeChild(next);
+    item.classList.remove('selected');
+    if (selectedScanItem === item) selectedScanItem = null;
+    return;
+  }
+  if (selectedScanItem) selectedScanItem.classList.remove('selected');
+  var list = item.parentNode;
+  var existing = list.querySelector('.setup-scan-expand');
+  if (existing) list.removeChild(existing);
+  var exp = document.createElement('div');
+  exp.className = 'setup-scan-expand setup-other-expand';
+  var ssidInput = document.createElement('input');
+  ssidInput.type = 'text';
+  ssidInput.className = 'tab-input';
+  ssidInput.placeholder = 'SSID';
+  var passInput = document.createElement('input');
+  passInput.type = 'password';
+  passInput.className = 'tab-input';
+  passInput.placeholder = 'Password';
+  var hint = document.createElement('div');
+  hint.className = 'scan-other-hint hidden';
+  hint.textContent = 'SSID is required';
+  var btn = document.createElement('button');
+  btn.type = 'button';
+  btn.className = 'tab-btn';
+  btn.textContent = 'Connect';
+  btn.addEventListener('click', function() {
+    var ssid = ssidInput.value.trim();
+    if (!ssid) {
+      hint.classList.remove('hidden');
+      ssidInput.focus();
+      return;
+    }
+    nvramGet(WIFI_SSID, ssid);
+    nvramGet(WIFI_PASSWORD, passInput.value);
+    nvramGet(NETWORK_DHCP, 1);
+    showStep('step-alerts');
+  });
+  exp.appendChild(ssidInput);
+  exp.appendChild(passInput);
+  exp.appendChild(hint);
+  exp.appendChild(btn);
+  list.insertBefore(exp, item.nextSibling);
+  item.classList.add('selected');
+  selectedScanItem = item;
+  ssidInput.focus();
+}
+
 function scanWifi() {
   var warn = document.getElementById('scanWarning');
   warn.classList.add('hidden');
+  document.getElementById('scanSpinner').classList.remove('hidden');
   var xhr = new XMLHttpRequest();
   xhr.open('GET', 'api?wifi=scan', true);
   xhr.send();
   xhr.onload = function() {
+    document.getElementById('scanSpinner').classList.add('hidden');
     var aps = parseScanResponse(xhr.responseText, xhr.status);
     if (aps) {
       renderScan(aps);
@@ -123,6 +186,7 @@ function scanWifi() {
     }
   };
   xhr.onerror = function() {
+    document.getElementById('scanSpinner').classList.add('hidden');
     showScanWarning();
   };
 }
@@ -182,26 +246,38 @@ document.getElementById('plantPasswordForm').addEventListener('submit', function
     return;
   }
   document.getElementById('plantPassMismatch').classList.add('hidden');
-  if (pw) nvramGet(DEMO_PASSWORD, pw);
+  nvramGet(DEMO_PASSWORD, pw);
   nvramGet(FIRST_SETUP, 0);
   if (setupNetwork === 'internet') {
     document.getElementById('progressBar').style.animationDuration = '6s';
     document.getElementById('plantPasswordForm').classList.add('hidden');
     document.getElementById('setupWaiting').classList.remove('hidden');
-    setTimeout(function() { window.location.href = 'find.html'; }, 6000);
+    var xhr = new XMLHttpRequest();
+    xhr.open('GET', 'api?wifi=dhcp', true);
+    xhr.send();
+    setTimeout(function() {
+      var xhr = new XMLHttpRequest();
+      xhr.open('GET', 'api?wifi=ip', true);
+      xhr.send();
+      xhr.onload = function() {
+        console.log(xhr.responseText);
+      };
+     }, 6000);
+    //setTimeout(function() { window.location.href = 'find.html'; }, 6000);
   } else {
+    document.getElementById('reconnectMsg').textContent = 'Reconnect to Plant WiFi (SSID: ' + setupSsid + ')';
+    document.getElementById('reconnectMsg').classList.remove('hidden');
+    document.getElementById('plantPasswordForm').classList.add('hidden');
+    document.getElementById('setupWaiting').classList.remove('hidden');
     var xhr = new XMLHttpRequest();
     xhr.open('GET', 'reboot', true);
     xhr.send();
     if (setupSsid === 'Plant' && !setupWifiPass) {
-      window.location.href = 'index.html';
+      document.getElementById('progressBar').style.animationDuration = '4s';
+      setTimeout(function() { window.location.href = 'index.html'; }, 4000);
     } else {
-      document.getElementById('progressBar').style.animationDuration = '12s';
-      document.getElementById('reconnectMsg').textContent = 'Reconnect to Plant WiFi (SSID: ' + setupSsid + ')';
-      document.getElementById('reconnectMsg').classList.remove('hidden');
-      document.getElementById('plantPasswordForm').classList.add('hidden');
-      document.getElementById('setupWaiting').classList.remove('hidden');
-      setTimeout(function() { window.location.href = 'index.html'; }, 12000);
+      document.getElementById('progressBar').style.animationDuration = '20s';
+      setTimeout(function() { window.location.href = 'index.html'; }, 20000);
     }
   }
 });
