@@ -7,15 +7,8 @@
 <script>
 var savedTheme = localStorage.getItem('theme') || 'dark';
 document.documentElement.setAttribute('data-theme', savedTheme);
-
-function applySvgTheme() {
-  try {
-    var win = document.getElementById('svgObject').contentDocument.defaultView;
-    if (win && win.svgApplyTheme) {
-      win.svgApplyTheme(document.documentElement.getAttribute('data-theme') === 'dark');
-    }
-  } catch(e) {}
-}
+var savedFont = localStorage.getItem('fontSize') || 'medium';
+document.documentElement.setAttribute('data-font', savedFont);
 </script>
   <link href="svg/bonsai.css" rel="stylesheet" type="text/css" />
   <script src="js/qrcode.js"></script>
@@ -399,6 +392,7 @@ function applySvgTheme() {
   </div>
 </div>
 
+<script defer src="js/common.js"></script>
 <script defer src="js/index.js"></script>
 
 <div class="soil-modal" id="soilModal">
