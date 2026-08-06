@@ -1,4 +1,3 @@
-var preloader = document.getElementById('preloader-overlay');
 var started = Date.now();
 
 var svgDoc = null;
@@ -28,9 +27,7 @@ document.getElementById('svgObject').addEventListener('load', function onLoad() 
   if (nvramData) applyNvramToSvg(nvramData);
   var elapsed = Date.now() - started;
   var remaining = Math.max(0, 1500 - elapsed);
-  setTimeout(function() {
-    preloader.classList.add('done');
-  }, remaining);
+  finishPreloader(remaining);
   if (!svgDoc) return;
 
   var cards = document.querySelectorAll('.feature-card');
@@ -130,16 +127,7 @@ document.getElementById('svgObject').addEventListener('load', function onLoad() 
           xhr.onload = function() {
             var parser = new DOMParser();
             var doc = parser.parseFromString(xhr.responseText, 'image/svg+xml');
-            var menu = doc.getElementById('menu');
-            if (!menu) {
-              var all = doc.querySelectorAll('*');
-              for (var i = 0; i < all.length; i++) {
-                if (all[i].getAttribute('inkscape:label') === 'menu') {
-                  menu = all[i]; break;
-                }
-              }
-            }
-            if (menu) menu.style.display = 'none';
+            hideSvgMenu(doc);
             var svgEl = doc.getElementsByTagName('svg')[0];
             if (!svgEl) return;
             svgEl.style.width = '100%';
@@ -161,47 +149,6 @@ document.getElementById('svgObject').addEventListener('load', function onLoad() 
     });
   }
 });
-
-var soil_type_labels = ['Moss', 'Loam', 'Dirt', 'Clay', 'Sand', 'Rock'];
-var soil_type_color = ['#3d9919', '#000000', '#58280c', '#7b4626', '#d6ca47', '#b4b0a6'];
-
-//EEPROM Variables
-var WIFI_MODE = 1;
-var WIFI_HIDE = 2;
-var WIFI_PHY_MODE = 3;
-var WIFI_PHY_POWER = 4;
-var WIFI_CHANNEL = 5;
-var WIFI_SSID = 6;
-var WIFI_USERNAME = 7;
-var WIFI_PASSWORD = 8;
-var LOG_ENABLE = 9;
-//==========
-var NETWORK_DHCP = 10;
-var NETWORK_IP = 11;
-var NETWORK_SUBNET = 12;
-var NETWORK_GATEWAY = 13;
-var NETWORK_DNS = 14;
-//==========
-var PLANT_POT_SIZE = 15;
-var PLANT_SOIL_MOISTURE = 16;
-var PLANT_MANUAL_TIMER = 17;
-var PLANT_SOIL_TYPE = 18;
-var PLANT_TYPE = 19;
-var FIRST_SETUP = 20;
-var DEEP_SLEEP = 21;
-//==========
-var EMAIL_ALERT = 22;
-var SMTP_SERVER = 23;
-var SMTP_USERNAME = 24;
-var SMTP_PASSWORD = 25;
-var PLANT_NAME = 26;
-var ALERTS = 27;
-var DEMO_PASSWORD = 28;
-var TIMEZONE_OFFSET = 29;
-var DEMO_AVAILABILITY = 30;
-var PNP_ADC = 31;
-var DEMOLOCK = false;
-var ESP32 = false;
 
 document.querySelectorAll('.soil-box').forEach(function(box) {
   var idx = soil_type_labels.indexOf(box.dataset.soil);
@@ -645,8 +592,6 @@ if (potSizeCard && potSizeNormal && potSizeSliderWrap && potSizeSlider) {
 }
 
 /* Firmware tab */
-function resetFlash() { window.open('/api?reset=1'); }
-
 (function() {
   var PNP_ADC = 31;
   var pnpState = 0; // 0=NPN, 1=PNP
@@ -1012,34 +957,14 @@ function AlertSet(alerts) {
   }
 }
 
-var EMAIL_ALERT = 22;
-var SMTP_SERVER = 23;
-var SMTP_USERNAME = 24;
-var SMTP_PASSWORD = 25;
-var PLANT_NAME = 26;
-var ALERTS = 27;
-
-function saveAlertField(offset, value) {
-  var xhr = new XMLHttpRequest();
-  xhr.open('GET', 'nvram.json?offset=' + offset + '&value=' + encodeURIComponent(value), true);
-  xhr.send();
-}
-
 function saveAlertsSettings() {
-  var set = document.querySelectorAll('#tab-alerts .tab-checkbox');
-  var bits = '';
-  for (var i = 0; i < set.length; i++) {
-    bits += set[i].checked ? '1' : '0';
-  }
-  bits += '0';
+  var bits = buildAlertBits('#tab-alerts .tab-checkbox');
   document.getElementById('Alerts').value = bits;
-
-  saveAlertField(EMAIL_ALERT, document.getElementById('AlertEmail').value);
-  saveAlertField(SMTP_SERVER, document.getElementById('AlertSMTPServer').value);
-  saveAlertField(SMTP_USERNAME, document.getElementById('AlertSMTPUsername').value);
-  saveAlertField(SMTP_PASSWORD, document.getElementById('AlertSMTPPassword').value);
-  saveAlertField(PLANT_NAME, document.getElementById('AlertPlantName').value);
-  saveAlertField(ALERTS, bits);
+  saveAlertFields(bits, {
+    email: 'AlertEmail', server: 'AlertSMTPServer',
+    username: 'AlertSMTPUsername', password: 'AlertSMTPPassword',
+    plant: 'AlertPlantName'
+  });
 }
 
 /* SMTP password toggle */
@@ -1094,9 +1019,9 @@ function AvailabilityWeek(availability) {
 
 function saveSecuritySettings() {
   var avail = AvailabilityWeek([0,0,0,0,0,0,0]);
-  saveAlertField(DEMO_PASSWORD, document.getElementById('DemoPassword').value);
-  saveAlertField(TIMEZONE_OFFSET, document.getElementById('DemoTimezone').value);
-  saveAlertField(DEMO_AVAILABILITY, avail);
+  nvramGet(DEMO_PASSWORD, document.getElementById('DemoPassword').value);
+  nvramGet(TIMEZONE_OFFSET, document.getElementById('DemoTimezone').value);
+  nvramGet(DEMO_AVAILABILITY, avail);
 }
 
 function populateSecurityFromNvram(data) {
@@ -1209,7 +1134,7 @@ if (passkeyBtn && window.isSecureContext) {
     defaultBtn.addEventListener('click', function() {
       var checked = listDiv ? listDiv.querySelector('input[type="checkbox"]:checked') : null;
       if (!checked) { notify('Select a layout first', 'warning'); return; }
-      saveAlertField(19, checked.dataset.index);
+      nvramGet(19, checked.dataset.index);
       notify('Default layout set', 'success');
     });
   }
@@ -1231,33 +1156,7 @@ if (passkeyBtn && window.isSecureContext) {
 })();
 
 /* Theme and font toggles */
-var html = document.documentElement;
-var saved = localStorage.getItem('theme') || 'dark';
-html.setAttribute('data-theme', saved);
-document.getElementById('themeToggle').textContent = saved === 'dark' ? '\u2600' : '\u263E';
-
-var fontSizes = ['small', 'medium', 'large'];
-var savedFont = localStorage.getItem('fontSize') || 'medium';
-html.setAttribute('data-font', savedFont);
-document.getElementById('fontToggle').textContent = savedFont === 'small' ? 'A' : savedFont === 'large' ? 'A\u207A' : 'A';
-
-document.getElementById('themeToggle').addEventListener('click', function() {
-  var current = html.getAttribute('data-theme');
-  var next = current === 'dark' ? 'light' : 'dark';
-  html.setAttribute('data-theme', next);
-  localStorage.setItem('theme', next);
-  this.textContent = next === 'dark' ? '\u2600' : '\u263E';
-  applySvgTheme();
-});
-
-document.getElementById('fontToggle').addEventListener('click', function() {
-  var current = html.getAttribute('data-font') || 'medium';
-  var idx = fontSizes.indexOf(current);
-  var next = fontSizes[(idx + 1) % fontSizes.length];
-  html.setAttribute('data-font', next);
-  localStorage.setItem('fontSize', next);
-  this.textContent = next === 'small' ? 'A' : next === 'large' ? 'A\u207A' : 'A';
-});
+initThemeFont();
 
 /* Soil modal close */
 document.getElementById('soilModalClose').addEventListener('click', function() {
