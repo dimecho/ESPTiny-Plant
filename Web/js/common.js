@@ -155,3 +155,82 @@ function progressTimer(speed, bar, callback)
         document.getElementsByClassName('progress-bar')[bar].style.width = timerUploadCounter + '%';
     }, speed);
 }
+
+function nvramGet(offset, value) {
+    var xhr = new XMLHttpRequest();
+    xhr.open('GET', 'nvram.json?offset=' + offset + '&value=' + encodeURIComponent(value), true);
+    xhr.send();
+}
+
+function buildAlertBits(checkboxSelector) {
+    var set = document.querySelectorAll(checkboxSelector);
+    var bits = '';
+    for (var i = 0; i < set.length; i++) {
+        bits += set[i].checked ? '1' : '0';
+    }
+    bits += '0';
+    return bits;
+}
+
+function saveAlertFields(bits, ids) {
+    nvramGet(EMAIL_ALERT, document.getElementById(ids.email).value);
+    nvramGet(SMTP_SERVER, document.getElementById(ids.server).value);
+    nvramGet(SMTP_USERNAME, document.getElementById(ids.username).value);
+    nvramGet(SMTP_PASSWORD, document.getElementById(ids.password).value);
+    nvramGet(PLANT_NAME, document.getElementById(ids.plant).value);
+    nvramGet(ALERTS, bits);
+}
+
+function applySvgTheme() {
+    try {
+        var win = document.getElementById('svgObject').contentDocument.defaultView;
+        if (win && win.svgApplyTheme) {
+            win.svgApplyTheme(document.documentElement.getAttribute('data-theme') === 'dark');
+        }
+    } catch(e) {}
+}
+
+function initThemeFont() {
+    var html = document.documentElement;
+    var themeToggle = document.getElementById('themeToggle');
+    themeToggle.textContent = savedTheme === 'dark' ? '\u2600' : '\u263E';
+    themeToggle.addEventListener('click', function() {
+        var current = html.getAttribute('data-theme');
+        var next = current === 'dark' ? 'light' : 'dark';
+        html.setAttribute('data-theme', next);
+        localStorage.setItem('theme', next);
+        this.textContent = next === 'dark' ? '\u2600' : '\u263E';
+        applySvgTheme();
+    });
+    var fontSizes = ['small', 'medium', 'large'];
+    var fontToggle = document.getElementById('fontToggle');
+    fontToggle.textContent = savedFont === 'small' ? 'A' : savedFont === 'large' ? 'A\u207A' : 'A';
+    fontToggle.addEventListener('click', function() {
+        var current = html.getAttribute('data-font') || 'medium';
+        var idx = fontSizes.indexOf(current);
+        var next = fontSizes[(idx + 1) % fontSizes.length];
+        html.setAttribute('data-font', next);
+        localStorage.setItem('fontSize', next);
+        this.textContent = next === 'small' ? 'A' : next === 'large' ? 'A\u207A' : 'A';
+    });
+}
+
+function finishPreloader(ms) {
+    setTimeout(function() {
+        var p = document.getElementById('preloader-overlay');
+        if (p) p.classList.add('done');
+    }, ms);
+}
+
+function hideSvgMenu(doc) {
+    var menu = doc.getElementById('menu');
+    if (!menu) {
+        var all = doc.querySelectorAll('*');
+        for (var i = 0; i < all.length; i++) {
+            if (all[i].getAttribute('inkscape:label') === 'menu') {
+                menu = all[i]; break;
+            }
+        }
+    }
+    if (menu) menu.style.display = 'none';
+}
