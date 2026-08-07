@@ -532,6 +532,13 @@ if (soilCard && soilNormal && soilBoxesWrap) {
     if (soilBoxesWrap.classList.contains('active')) return;
     soilNormal.style.display = 'none';
     soilBoxesWrap.classList.add('active');
+    var soilIdx = nvramData ? parseInt(nvramData[PLANT_SOIL_TYPE]) : NaN;
+    if (!isNaN(soilIdx) && soil_type_labels[soilIdx]) {
+      soilBoxesWrap.querySelectorAll('.soil-box').forEach(function(b) {
+        b.classList.toggle('selected', b.dataset.soil === soil_type_labels[soilIdx]);
+        b.classList.toggle('greyed', b.dataset.soil !== soil_type_labels[soilIdx]);
+      });
+    }
   });
   soilBoxesWrap.addEventListener('click', function(e) {
     var box = e.target.closest('.soil-box');
@@ -545,7 +552,7 @@ if (soilCard && soilNormal && soilBoxesWrap) {
       soilSelected = null;
       return;
     }
-    soilSelected = box.dataset.soil;
+    soilSelected = soil_type_labels.indexOf(box.dataset.soil);
     soilBoxesWrap.querySelectorAll('.soil-box').forEach(function(b) {
       b.classList.toggle('selected', b === box);
       b.classList.toggle('greyed', b !== box);
@@ -728,12 +735,15 @@ if (potSizeCard && potSizeNormal && potSizeSliderWrap && potSizeSlider) {
         adcText.textContent = adc_val;
       }
       if (wlCheckbox) wlCheckbox.checked = water_val;
+      if (waterCb) waterCb.checked = water_val;
+      if (wlHidden) wlHidden.value = water_val ? 1 : 0;
       if (wlHidden) wlHidden.value = water_val ? 1 : 0;
       if (mosfetCheckbox) mosfetCheckbox.checked = mosfet_val;
       if (mosfetHidden) mosfetHidden.value = mosfet_val ? 1 : 0;
 
       nvramData = data;
       applyNvramToSvg(data);
+      updateTimerCheckbox(data[PLANT_MANUAL_TIMER]);
       populateAlertsFromNvram({ nvram: data });
       populateSecurityFromNvram({ nvram: data });
 

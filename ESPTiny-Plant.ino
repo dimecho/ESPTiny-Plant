@@ -10,7 +10,7 @@ Remember: Brand new ESP-12 short GPIO0 to GND (flash mode) then UART TX/RX
 #define DEBUG 0
 #define CLOCK_DS1307 0
 #define TIMECLIENT_NTP 0
-#define EMAILCLIENT_SMTP 0
+#define SMTP_ENABLE 1
 #define ASYNCSERVER_DNS 0
 #define SYNCSERVER_mDNS 0
 #define WPA2ENTERPRISE 0
@@ -157,16 +157,21 @@ DS1307 rtc;
 #endif
 #endif
 */
-#if EMAILCLIENT_SMTP
-//IMPORTANT: ESP8266 that don't have external SRAM/PSRAM chip installed choose the MMU option 3, 16KB cache + 48KB IRAM and 2nd Heap (shared)
-//#define DISABLE_PSRAM
-//#define esp_ssl_debug_print esp_ssl_debug_info
-#include <ESP_Mail_Client.h>  //ESP-12E SRAM:64KB
+#if SMTP_ENABLE
+#define ENABLE_SMTP
+#if DEBUG
+#define ENABLE_DEBUG
+#define READYMAIL_DEBUG_PORT Serial
+#endif
+#define READYMAIL_TIME_SOURCE time(nullptr);
+#include <ReadyMail.h>
+#include <ESP_SSLClient.h>
+#include <WiFiClient.h>
 
 //Must be defined globally, otherwise "Fatal exception 28(LoadProhibitedCause)"
-SMTPSession smtp;
-ESP_Mail_Session session;
-SMTP_Message message;
+WiFiClient smtpBasicClient;
+ESP_SSLClient smtpSslClient;
+SMTPClient smtp(smtpSslClient);
 #endif
 
 #if ASYNCSERVER_DNS
@@ -519,6 +524,14 @@ const uint8_t dirt[] = { 1, 1, 1, 1 };
 enum sensorMode { MIN,
                   MAX,
                   AVG };
+#if defined(ESP32)
+wifi_mode_t startupWiFiMode = WIFI_MODE_NULL;  // WIFI_STA=1, WIFI_AP=2, WIFI_AP_STA=3, WIFI_MODE_NULL=0
+wifi_config_t startupWiFiConfig = {};
+#else
+uint8_t startupWiFiMode = 0;                // STATION_MODE=1, SOFTAP_MODE=2, STATIONAP_MODE=3, NULL_MODE=0
+struct station_config startupWiFiSTAConfig;
+struct softap_config startupWiFiAPConfig;
+#endif
 uint16_t sensorRead(uint8_t enablePin, sensorMode mode = MIN);
 /*
 #if (CONFIG_IDF_TARGET_ESP32S2 && ARDUINO_ESP32_MAJOR >= 3)
@@ -531,6 +544,11 @@ temperature_sensor_config_t temp_sensor = {
 #endif
 */
 void setup() {
+#if SMTP_ENABLE
+  smtpSslClient.setClient(&smtpBasicClient);
+  smtpSslClient.setInsecure();
+  smtpSslClient.setBufferSizes(2048, 512);
+#endif
   //pinMode(pumpPin, INPUT_PULLUP);  //Float the pin until set NPN or PNP
 
   //Needed after deepSleep for ESP8266 Core 3.0.x. Otherwise error: pll_cal exceeds 2ms
@@ -716,7 +734,7 @@ void setup() {
   } else if (wakeupReason == ESP_RST_BROWNOUT) {  //ESP_RST_BROWNOUT (9)
     snprintf(logbuffer, sizeof(logbuffer), "v:2.7");
     dataLog(logbuffer);
-#if EMAILCLIENT_SMTP
+#if SMTP_ENABLE
     smtpSend("Low Voltage", "~2.7v", 0);
 #endif
 #endif
@@ -746,38 +764,63 @@ void setup() {
   Serial.printf("Boot calibration (milliseconds):%u\n", millis());
 #endif
 }
-void setupWiFi() {
-  setupWiFi(1);
+void restoreWiFi(uint8_t with_new_config) {
+
+#if defined(ESP32)
+  wifi_mode_t originalWiFiMode = startupWiFiMode;
+  wifi_config_t originalWiFiConfig = startupWiFiConfig;
+  if (with_new_config = 1) {
+    NVRAMConfig();
+    setupWiFi();
+  }
+  //Temporarily set original WiFi (until reboot)
+  esp_wifi_disconnect();
+  //esp_wifi_stop();
+  esp_wifi_set_mode((wifi_mode_t)originalWiFiMode); // fast interface switch
+  if (originalWiFiMode == WIFI_AP) {
+    esp_wifi_set_config(WIFI_IF_AP, &originalWiFiConfig);
+  } else if (originalWiFiMode == WIFI_STA) {
+    esp_wifi_set_config(WIFI_IF_STA, &originalWiFiConfig);
+    esp_wifi_connect();
+  }
+  //esp_wifi_start();
+  //if (originalWiFiMode == WIFI_STA) {
+  //  esp_wifi_connect();
+  //}
+#else  //ESP8266
+  uint8_t originalWiFiMode = startupWiFiMode;
+  struct softap_config originalAPConfig = startupWiFiAPConfig;
+  struct station_config originalSTAConfig = startupWiFiSTAConfig;
+  if (with_new_config = 1) {
+    NVRAMConfig();
+    setupWiFi();
+  }
+  //Temporarily set original WiFi (until reboot)
+  wifi_station_disconnect();
+  wifi_set_opmode(NULL_MODE);  // full radio stop
+  delay(200);
+  if (originalWiFiMode == SOFTAP_MODE) {
+    wifi_set_opmode(SOFTAP_MODE);
+    wifi_softap_set_config(&origApConfig);
+  } else if (originalWiFiMode == STATION_MODE) {
+    wifi_set_opmode(STATION_MODE);
+    wifi_station_set_config(&origStaConfig);
+    wifi_station_connect();
+  }
+#endif
 }
 //This is a power expensive function 80+mA
-void setupWiFi(uint8_t nvram) {
+void setupWiFi() {
 
   delayBetweenWiFi = DEEP_SLEEP * 1000;  //ms
   blinky(200, 3);                        //Alive blink
-
-  if (nvram == 1) {
-    WIRELESS_MODE = atoi(NVRAMRead(_WIRELESS_MODE));
-    WIRELESS_HIDE = atoi(NVRAMRead(_WIRELESS_HIDE));
-    WIRELESS_CHANNEL = atoi(NVRAMRead(_WIRELESS_CHANNEL));
-    WIRELESS_PHY_MODE = atoi(NVRAMRead(_WIRELESS_PHY_MODE));
-    WIRELESS_PHY_POWER = atoi(NVRAMRead(_WIRELESS_PHY_POWER));
-
-    strncpy(WIRELESS_SSID, NVRAMRead(_WIRELESS_SSID), sizeof(WIRELESS_SSID));
-    strncpy(WIRELESS_PASSWORD, NVRAMRead(_WIRELESS_PASSWORD), sizeof(WIRELESS_PASSWORD));
-
-    NETWORK_DHCP = atoi(NVRAMRead(_NETWORK_DHCP));
-    strncpy(NETWORK_IP, NVRAMRead(_NETWORK_IP), sizeof(NETWORK_IP));
-    strncpy(NETWORK_SUBNET, NVRAMRead(_NETWORK_SUBNET), sizeof(NETWORK_SUBNET));
-    strncpy(NETWORK_GATEWAY, NVRAMRead(_NETWORK_GATEWAY), sizeof(NETWORK_GATEWAY));
-    strncpy(NETWORK_DNS, NVRAMRead(_NETWORK_DNS), sizeof(NETWORK_DNS));
-  }
 
   //Forcefull Wakeup
   //-------------------
   //WiFi.setSleepMode(WIRELESS_NONE_SLEEP);
   //WiFi.forceSleepWake();
   //-------------------
-  //WiFi.persistent(false);  //Do not write settings to memory
+  WiFi.persistent(false);  //Do not write settings to memory
 
   IPAddress ip, gateway, subnet, dns;
   ip.fromString(NETWORK_IP);
@@ -785,14 +828,17 @@ void setupWiFi(uint8_t nvram) {
   gateway.fromString(NETWORK_GATEWAY);
   dns.fromString(NETWORK_DNS);
 
+  WiFi.disconnect();  // stop the pending/active connections
+  //WiFi.mode(WIFI_OFF);   // full radio teardown
+
   if (WIRELESS_MODE == 0) {
     //=====================
     //WiFi Access Point Mode
     //=====================
+    WiFi.enableSTA(false);
+    WiFi.enableAP(true);  // no radio teardown
+                          //WiFi.mode(WIFI_AP);
 
-    //WiFi.enableSTA(false);
-    //WiFi.enableAP(true);
-    WiFi.mode(WIFI_AP);
 #if defined(ESP8266)
     WiFi.setPhyMode((WiFiPhyMode_t)WIRELESS_PHY_MODE);
 #else
@@ -804,6 +850,7 @@ void setupWiFi(uint8_t nvram) {
 #if DEBUG
     Serial.println(ok ? "AP OK" : "AP FAILED");
     Serial.println(WIRELESS_SSID);
+    Serial.println(WIRELESS_HIDE);
     Serial.println(WiFi.softAPIP());
     Serial.println(WiFi.macAddress());
     WiFi.printDiag(Serial);
@@ -822,31 +869,27 @@ void setupWiFi(uint8_t nvram) {
     MDNS.begin(PLANT_NAME);
 #endif
 #endif
-    if (nvram == 1) {
-      strncpy(NETWORK_DHCPIP, NETWORK_IP, sizeof(NETWORK_DHCPIP));
-    }
+    strncpy(NETWORK_DHCPIP, NETWORK_IP, sizeof(NETWORK_DHCPIP));
   } else {
     //================
     //WiFi Client Mode
     //================
-    WiFi.mode(WIFI_STA);
-    /*
+    WiFi.enableAP(false);
+    WiFi.enableSTA(true);  // no radio teardown
+    //WiFi.mode(WIFI_STA);
+
+    if (WIRELESS_HIDE == 1) {
+      WiFi.setScanMethod(WIFI_ALL_CHANNEL_SCAN);
+    }
+
 #if defined(ESP8266)
-    WiFi.setAutoConnect(false);
+    WiFi.setPhyMode((WiFiPhyMode_t)WIRELESS_PHY_MODE);
+    //WiFi.setAutoConnect(false);
 #else
     esp_wifi_set_protocol(WIFI_IF_STA, WIRELESS_PHY_MODE);
-    WiFi.setAutoReconnect(false);
+    //WiFi.setAutoReconnect(false);
 #endif
-  WiFi.disconnect();
-    */
-    //0    (for lowest RF power output, supply current ~ 70mA
-    //20.5 (for highest RF power output, supply current ~ 80mA
-    #if defined(ESP8266)
-          WiFi.setOutputPower(WIRELESS_PHY_POWER);
-    #else
-          WiFi.setTxPower((wifi_power_t)WIRELESS_PHY_POWER);
-    #endif
-    
+
 #if defined(ESP8266)
     WiFi.hostname(PLANT_NAME);
 
@@ -964,80 +1007,120 @@ void setupWiFi(uint8_t nvram) {
     WiFi.begin(WIRELESS_SSID, WIRELESS_PASSWORD);
 #endif
 #endif
+
     //No wifi-scan required when RF channel and AP mac-address is provided
     //uint8_t WIRELESS_BSSID[6] = { 0xF8, 0x1E, 0xDF, 0xFE, 0xE9, 0x39 };
     //WiFi.begin(WIRELESS_SSID, WIRELESS_PASSWORD, WIRELESS_CHANNEL, WIRELESS_BSSID, true);
-    /*
-    while (WiFi.waitForConnectResult() != WL_CONNECTED) {
+
+    unsigned long deadline = millis() + 20000;
+    while (WiFi.status() != WL_CONNECTED && millis() < deadline) {
 #if DEBUG
+      //ESP8266
+      /*
       //0 = WL_IDLE_STATUS
       //1 = WL_NO_SSID_AVAIL
       //6 = WL_WRONG_PASSWORD
-      Serial.println(WiFi.status());
+      */
+      //ESP32
+      /*
+      1 = WL_NO_SSID_AVAIL
+      3 = WL_CONNECTED
+      4 = WL_CONNECT_FAILED
+      5 = WL_CONNECTION_LOST
+      6 = WL_DISCONNECTED
+      */
+      Serial.printf("STA Connection State: %d\n", WiFi.status());
       //WiFi.printDiag();
 #endif
-      delay(100);
+      delay(250);
 
-      if (WIRELESS_PHY_POWER > 19) {
-#if DEBUG
-        Serial.println("Connection Failed! Rebooting...");
+      if (WIRELESS_PHY_POWER <= 19) {
+        //0    (for lowest RF power output, supply current ~ 70mA
+        //20.5 (for highest RF power output, supply current ~ 80mA
+#if defined(ESP8266)
+        WiFi.setOutputPower(WIRELESS_PHY_POWER);
+#else
+        WiFi.setTxPower((wifi_power_t)WIRELESS_PHY_POWER);
 #endif
-        //If client mode fails ESP8266 will not be accessible
-        //Set Emergency AP SSID for re-configuration
-        WIRELESS_MODE = 0;
-        WIRELESS_HIDE = 0;
-        NETWORK_DHCP = 0;
-        strncpy(WIRELESS_SSID, "Plant", sizeof(WIRELESS_SSID));
-        strncpy(WIRELESS_PASSWORD, "", sizeof(WIRELESS_PASSWORD));
-        setupWiFi(0);
-        break;
-      }
-      WIRELESS_PHY_POWER++;  //auto tune wifi power (minimum power to reach AP)
-    }
-    NVRAMWrite(_WIRELESS_PHY_POWER, WIRELESS_PHY_POWER);  //save auto tuned wifi power
-    */
-    WiFi.setAutoReconnect(true);
-
-    if (NETWORK_DHCP == 0) {
-      WiFi.config(ip, gateway, subnet, dns);
-    }else{
-      unsigned long dhcpTimeout = millis() + 10000;
-      while (WiFi.localIP() == IPAddress(0, 0, 0, 0) && millis() < dhcpTimeout) {
-        delay(100);
+        WIRELESS_PHY_POWER++;  //auto tune wifi power (minimum power to reach AP)
       }
     }
-    ip = WiFi.localIP();
-    snprintf(NETWORK_DHCPIP, sizeof(NETWORK_DHCPIP), "%u.%u.%u.%u", ip[0], ip[1], ip[2], ip[3]);
+    if (WiFi.status() == WL_CONNECTED) {
 
-    //NTP Client to get time
+#if defined(ESP8266)
+      WiFi.setAutoConnect(true);
+#else
+      WiFi.setAutoReconnect(true);
+#endif
+      NVRAMWrite(_WIRELESS_PHY_POWER, WIRELESS_PHY_POWER);  //save auto tuned wifi power
+
+      if (NETWORK_DHCP == 0) {
+        WiFi.config(ip, gateway, subnet, dns);
+      } else {
+        unsigned long dhcpTimeout = millis() + 10000;
+        while (WiFi.localIP() == IPAddress(0, 0, 0, 0) && millis() < dhcpTimeout) {
+          delay(200);
+#if DEBUG
+          Serial.println("DHCP...");
+#endif
+        }
+      }
+      IPAddress dhcpip = WiFi.localIP();
+      snprintf(NETWORK_DHCPIP, sizeof(NETWORK_DHCPIP), "%u.%u.%u.%u", dhcpip[0], dhcpip[1], dhcpip[2], dhcpip[3]);
+
+      //NTP Client to get time
 #if TIMECLIENT_NTP
-    //Set time via NTP, as required for x.509 validation
-    int tzOffset = -7;
-    const char *tz = NVRAMRead(_TIMEZONE_OFFSET);
-    if (strncmp(tz, "UTC", 3) == 0) {
-      tzOffset = atoi(tz + 3);  // read number after UTC
-      tzOffset = -tzOffset;     // invert sign
-    }
-    configTime(tzOffset * 3600, 0, "pool.ntp.org");  // offset in seconds
+      //Set time via NTP, as required for x.509 validation
+      int tzOffset = -7;
+      const char *tz = NVRAMRead(_TIMEZONE_OFFSET);
+      if (strncmp(tz, "UTC", 3) == 0) {
+        tzOffset = atoi(tz + 3);  // read number after UTC
+        tzOffset = -tzOffset;     // invert sign
+      }
+      configTime(tzOffset * 3600, 0, "pool.ntp.org");  // offset in seconds
 
-    struct tm timeinfo;
-    while (!getLocalTime(&timeinfo)) {
-      delay(500);
+      struct tm timeinfo;
+      while (!getLocalTime(&timeinfo)) {
+        delay(500);
+      }
+#if DEBUG
+      time_t now;
+      time(&now);
+      Serial.printf("Current time: %s", ctime(&now));
+#endif
+#endif
+#if SMTP_ENABLE
+      if (ALERTS[0] == '1')
+        smtpSend("DHCP IP", NETWORK_DHCPIP, 1);
+#endif
+#if DEBUG
+      Serial.println(NETWORK_DHCPIP);
+#endif
+    } else {
+#if DEBUG
+      Serial.println("STA Connection Failed!");
+#endif
+      restoreWiFi(0);
+      strncpy(NETWORK_DHCPIP, "0.0.0.0", sizeof(NETWORK_DHCPIP));
     }
-#if DEBUG
-    time_t now;
-    time(&now);
-    Serial.printf("Current time: %s", ctime(&now));
-#endif
-#endif
-#if EMAILCLIENT_SMTP
-    if (ALERTS[0] == '1')
-      smtpSend("DHCP IP", NETWORK_DHCPIP, 1);
-#endif
-#if DEBUG
-    Serial.println(NETWORK_DHCPIP);
-#endif
   }
+#if defined(ESP32)
+  if (!startupWiFiMode) {
+    startupWiFiMode = WiFi.getMode();
+    if (startupWiFiMode == WIFI_AP) {
+      esp_wifi_get_config(WIFI_IF_AP, &startupWiFiConfig);
+    } else if (startupWiFiMode == WIFI_STA) {
+      esp_wifi_get_config(WIFI_IF_STA, &startupWiFiConfig);
+    }
+  }
+#else
+  startupWiFiMode = wifi_get_opmode();
+  if (startupWiFiMode == SOFTAP_MODE) {
+    wifi_softap_get_config(&startupWiFiAPConfig);
+  } else if (startupWiFiMode == STATION_MODE) {
+    wifi_station_get_config(&startupWiFiSTAConfig);
+  }
+#endif
 }
 
 void setupWebServer() {
@@ -1089,20 +1172,8 @@ void setupWebServer() {
     } else if (request->hasParam("wifi")) {
       if (request->getParam("wifi")->value() == "dhcp") {
         thread[1].detach();
-        thread[1].attach(2, []() {
-          //setupWiFi();
-          if (WiFi.getMode() == WIFI_STA) {
-            thread[1].detach();
-            //Temporarily Set WiFi back to AP (until reboot)
-            WIRELESS_MODE = 0;
-            WIRELESS_HIDE = 0;
-            NETWORK_DHCP = 0;
-            strncpy(WIRELESS_SSID, "Plant", sizeof(WIRELESS_SSID));
-            strncpy(WIRELESS_PASSWORD, "", sizeof(WIRELESS_PASSWORD));
-            setupWiFi(0);
-          } else {
-            setupWiFi();
-          }
+        thread[1].once(2, []() {
+          restoreWiFi(1);
         });
         response->println("...");
       } else if (request->getParam("wifi")->value() == "ip") {
@@ -1187,7 +1258,7 @@ void setupWebServer() {
         response->addHeader(FPSTR(refresh_http), "6;url=/");
         response->print(F("..."));
       } else if (request->hasParam("smtp")) {
-#if EMAILCLIENT_SMTP
+#if SMTP_ENABLE
         thread[0].once(1, []() {
           smtpSend("Test", "OK", 1);
         });
@@ -1320,7 +1391,7 @@ void setupWebServer() {
             }
             */
             NVRAMWrite(i, request->getParam("value")->value().c_str());
-            NVRAMConfig();
+            //NVRAMConfig();
           }
         }
         request->send(200, FPSTR(text_plain), request->getParam("value")->value());
@@ -1431,9 +1502,7 @@ void setupWebServer() {
           n++;
         }
       }
-#if DEBUG
-      Serial.println("NVRAM Forcig Restart");
-#endif
+      NVRAMConfig();
     }
     request->send(response);
   });
@@ -1467,6 +1536,7 @@ void setupWebServer() {
         //}
       }
       response->print(F("</body></html>"));
+      response->addHeader(F("Access-Control-Allow-Origin"), "*");  // Allow all origins
       request->send(response);
     });
   /*
@@ -1585,9 +1655,6 @@ void setupWebServer() {
 #endif
       if (LittleFS.exists(file)) {
       AsyncWebServerResponse *response = request->beginResponse(LittleFS, file, getContentType(file));
-      if (strstr(file, "find") != 0) {
-        response->addHeader(F("Access-Control-Allow-Origin"), "*");  // Allow all origins
-      }
       response->addHeader(F("Content-Encoding"), "gzip");
       request->send(response);
     } else {
@@ -1765,7 +1832,7 @@ void loop() {
       dataLog(logbuffer);
       //TODO: only send below 2.8 volt?
       //{
-#if EMAILCLIENT_SMTP
+#if SMTP_ENABLE
       smtpSend("Low Voltage", String(dvcc) + "v", 0);
 #endif
       //}
@@ -1956,7 +2023,7 @@ void readyWiFiSchedule() {
       Serial.println("WiFi ON");
 #endif
       DEEP_SLEEP = 1;
-      setupWiFi(0);
+      setupWiFi();
       setupWebServer();
     } else {  //outside of working hours
 #if DEBUG
@@ -1995,7 +2062,7 @@ void readySensor(uint16_t moisture) {
       Serial.printf("Empty Reset: %u\n", delayBetweenRefillReset);
 #endif
       dataLog("e:0");
-#if EMAILCLIENT_SMTP
+#if SMTP_ENABLE
       if (ALERTS[4] == '1')
         smtpSend("Flood Protection", (char *)delayBetweenOverfloodReset, 0);
 #endif
@@ -2008,7 +2075,7 @@ void readySensor(uint16_t moisture) {
 #endif
       snprintf(logbuffer, sizeof(logbuffer), "e:%u", rtcData.emptyBottle);
       dataLog(logbuffer);
-#if EMAILCLIENT_SMTP
+#if SMTP_ENABLE
       if (ALERTS[5] == '1')
         smtpSend("Water Empty", (char *)rtcData.emptyBottle, 0);
 #endif
@@ -2040,7 +2107,7 @@ void readyPump(uint16_t moisture) {
       } else {
         blinky(200, 4);
       }
-#if EMAILCLIENT_SMTP
+#if SMTP_ENABLE
       if (ALERTS[2] == '1')
         smtpSend("Low Sensor", (char *)moisture, 0);
 #endif
@@ -2058,7 +2125,7 @@ void readyPump(uint16_t moisture) {
         }
       }
     } else {
-#if EMAILCLIENT_SMTP
+#if SMTP_ENABLE
       if (rtcData.emptyBottle >= 3 && ALERTS[5] == '1') {
         smtpSend("Water Refilled", (char *)moisture, 0);
       }
@@ -2134,7 +2201,7 @@ void runPump(uint16_t duration) {
         duration--;
       }
     });
-#if EMAILCLIENT_SMTP
+#if SMTP_ENABLE
     if (ALERTS[3] == '1')
       smtpSend("Run Pump", (char *)PLANT_POT_SIZE, 0);
 #endif
@@ -2516,6 +2583,21 @@ void NVRAMConfig() {
   strncpy(PNP_ADC, NVRAMRead(_PNP_ADC), sizeof(PNP_ADC));
   //turnNPNorPNP(0);
 
+  WIRELESS_MODE = atoi(NVRAMRead(_WIRELESS_MODE));
+  WIRELESS_HIDE = atoi(NVRAMRead(_WIRELESS_HIDE));
+  WIRELESS_CHANNEL = atoi(NVRAMRead(_WIRELESS_CHANNEL));
+  WIRELESS_PHY_MODE = atoi(NVRAMRead(_WIRELESS_PHY_MODE));
+  WIRELESS_PHY_POWER = atoi(NVRAMRead(_WIRELESS_PHY_POWER));
+
+  strncpy(WIRELESS_SSID, NVRAMRead(_WIRELESS_SSID), sizeof(WIRELESS_SSID));
+  strncpy(WIRELESS_PASSWORD, NVRAMRead(_WIRELESS_PASSWORD), sizeof(WIRELESS_PASSWORD));
+
+  NETWORK_DHCP = atoi(NVRAMRead(_NETWORK_DHCP));
+  strncpy(NETWORK_IP, NVRAMRead(_NETWORK_IP), sizeof(NETWORK_IP));
+  strncpy(NETWORK_SUBNET, NVRAMRead(_NETWORK_SUBNET), sizeof(NETWORK_SUBNET));
+  strncpy(NETWORK_GATEWAY, NVRAMRead(_NETWORK_GATEWAY), sizeof(NETWORK_GATEWAY));
+  strncpy(NETWORK_DNS, NVRAMRead(_NETWORK_DNS), sizeof(NETWORK_DNS));
+
   DEEP_SLEEP = atoi(NVRAMRead(_DEEP_SLEEP)) * 60;
   PLANT_MANUAL_TIMER = atoi(NVRAMRead(_PLANT_MANUAL_TIMER)) * 3600;
   PLANT_POT_SIZE = atoi(NVRAMRead(_PLANT_POT_SIZE));
@@ -2660,11 +2742,25 @@ void onUpload(AsyncWebServerRequest *request, String filename, size_t index, uin
   }
 }
 
-#if EMAILCLIENT_SMTP
+#if SMTP_ENABLE
+void smtpCb(SMTPStatus status) {
+#if DEBUG
+  ReadyMail.printf("ReadyMail[smtp][%d]%s\n", status.state, status.text.c_str());
+#endif
+}
+#endif
+
+#if SMTP_ENABLE
 void smtpSend(const char *subject, const char *body, uint8_t sendnow) {
 
 #if DEBUG
   Serial.printf("Email: %s\n", subject);
+#endif
+
+  time_t now;
+  time(&now);
+#if DEBUG
+  Serial.printf("Unix time: %u\n", now);
 #endif
 
   if (sendnow == 1 || (now - rtcData.alertTime) > delayBetweenAlertEmails) {
@@ -2672,32 +2768,13 @@ void smtpSend(const char *subject, const char *body, uint8_t sendnow) {
   } else {
     return;
   }
-  /*
-  WIRELESS_MODE = NVRAMRead(_WIRELESS_MODE).toInt();
-  if (WIRELESS_MODE == 0)  //cannot send email in AP mode
-    return;
-  */
+
   byte off = 0;
   if (WiFi.getMode() == WIFI_OFF)  //alerts during off cycle
   {
-    setupWiFi(0);  //turn on temporary
+    setupWiFi();  //turn on temporary
     off = 1;
   }
-
-#if TIMECLIENT_NTP
-  time_t now;
-  time(&now);
-  smtp.setSystemTime(now);
-//#else
-//  session.time.ntp_server = F("pool.ntp.org");
-//  session.time.gmt_offset = -8;
-//  session.time.day_light_offset = 0;
-#if DEBUG
-  smtp.debug(1);
-  Serial.printf("Unix time: %u\n", now);
-#endif
-#endif
-
   const char *smtpURL = NVRAMRead(_SMTP_SERVER);
   char smtpServer[64] = { 0 };
   uint16_t smtpPort = 25;
@@ -2712,53 +2789,39 @@ void smtpSend(const char *subject, const char *body, uint8_t sendnow) {
     // No colon found, copy full string as hostname
     strncpy(smtpServer, smtpURL, sizeof(smtpServer));
   }
-  session.server.host_name = smtpServer;
-  session.server.port = smtpPort;
-  session.login.email = NVRAMRead(_SMTP_USERNAME);
-  File oauth = LittleFS.open("/oauth", "r");
-  if (oauth) {
-    session.login.accessToken = oauth.readString();  //XOAUTH2
-  } else {
-    session.login.password = NVRAMRead(_SMTP_PASSWORD);
-  }
-  //session.login.user_domain = F("127.0.0.1");
-  /*
-  if(smtpPort > 25) {
-    session.secure.mode = esp_mail_secure_mode_ssl_tls;
-  }else{
-    session.secure.mode = esp_mail_secure_mode_nonsecure;
-  }
-  */
-  //File mlog = LittleFS.open("/l", "w");
 
-  if (smtp.connect(&session)) {
-    message.sender.name = PLANT_NAME;
-    message.sender.email = NVRAMRead(_SMTP_USERNAME);
-    message.addRecipient("", NVRAMRead(_EMAIL_ALERT));
-    //message.addCc("");
-    //message.addBcc("");
-    message.subject = subject;
-    message.text.content = body;
-    if (ALERTS[7] == '1') {
-      message.priority = esp_mail_smtp_priority::esp_mail_smtp_priority_high;
+  //Port-based SSL/TLS selection (AutoPort.ino pattern)
+  bool ssl = (smtpPort == 465 || smtpPort == 587);
+  smtpSslClient.enableSSL(smtpPort == 465);
+  auto startTLSCallback = [](bool &success) { success = smtpSslClient.connectSSL(); };
+  if (smtpPort == 587) smtp.setStartTLS(startTLSCallback, true);
+  else                 smtp.setStartTLS(NULL, false);
+
+  //Keep the existing nested-if shape so the off==1 WiFi restore below always runs.
+  if (smtp.connect(smtpServer, smtpPort, smtpCb, ssl)) {
+    String email = NVRAMRead(_SMTP_USERNAME);
+    File oauth = LittleFS.open("/oauth", "r");
+    if (oauth) {
+      String token = oauth.readString();
+      oauth.close();
+      smtp.authenticate(email, token, readymail_auth_accesstoken);  //XOAUTH2
     } else {
-      message.priority = esp_mail_smtp_priority::esp_mail_smtp_priority_normal;
+      smtp.authenticate(email, NVRAMRead(_SMTP_PASSWORD), readymail_auth_password);
     }
-#if DEBUG
-    if (!MailClient.sendMail(&smtp, &message, true)) {
-      Serial.println(smtp.errorReason());
+    if (smtp.isAuthenticated()) {
+      SMTPMessage msg;
+      msg.headers.add(rfc822_from, String(PLANT_NAME) + " <" + email + ">");
+      msg.headers.add(rfc822_to, NVRAMRead(_EMAIL_ALERT));
+      msg.headers.add(rfc822_subject, subject);
+      msg.text.body(body);
+      msg.timestamp = now;
+      if (ALERTS[7] == '1') msg.headers.addCustom("X-Priority", "1");  //High
+      else                  msg.headers.addCustom("X-Priority", "3");  //Normal
+
+      smtp.send(msg);
+      smtp.stop();  // release TLS heap before returning / deep sleep
     }
-#else
-    MailClient.sendMail(&smtp, &message, true);
-    //mlog.print(smtp.errorReason());
-#endif
-    smtp.sendingResult.clear();  //clear sending result log
-    //}else{
-    //  mlog.print(String(smtp.statusCode()));
-    //  mlog.print(String(smtp.errorCode()));
-    //  mlog.print(smtp.errorReason());
   }
-  //mlog.close();
 
   if (off == 1)
     WiFi.mode(WIFI_OFF);

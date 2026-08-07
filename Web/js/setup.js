@@ -250,46 +250,68 @@ document.getElementById('plantPasswordForm').addEventListener('submit', function
   document.getElementById('plantPassMismatch').classList.add('hidden');
   nvramGet(DEMO_PASSWORD, pw);
   nvramGet(FIRST_SETUP, 0);
-  if (setupNetwork === 'internet') {
-    document.getElementById('progressBar').style.animationDuration = '6s';
-    document.getElementById('plantPasswordForm').classList.add('hidden');
-    document.getElementById('setupWaiting').classList.remove('hidden');
+
+  document.getElementById('progressBar').style.animationDuration = '10s';
+  document.getElementById('plantPasswordForm').classList.add('hidden');
+  document.getElementById('setupWaiting').classList.remove('hidden');
+  var xhr = new XMLHttpRequest();
+  xhr.open('GET', 'api?wifi=dhcp', true);
+  xhr.onload = function() {
+    if (xhr.status === 200) {
+      startIpPoll();
+    }
+  };
+  xhr.send();
+  function startIpPoll() {
+  var pollDeadline = Date.now() + 30000;
+  function pollIp() {
     var xhr = new XMLHttpRequest();
-    xhr.open('GET', 'api?wifi=dhcp', true);
-    xhr.send();
-    setTimeout(function() {
-      var xhr = new XMLHttpRequest();
-      xhr.open('GET', 'api?wifi=ip', true);
-      xhr.send();
-      xhr.onload = function() {
+    xhr.open('GET', 'api?wifi=ip', true);
+    xhr.onload = function() {
+      if (xhr.status === 200) {
         var ip = (xhr.responseText || '').trim();
         if (ip && ip !== '0.0.0.0') {
-          document.getElementById('ipFoundMsg').textContent = 'IP Found: ' + ip;
-          document.getElementById('ipFoundMsg').classList.remove('hidden');
-          var xhr = new XMLHttpRequest();
-          xhr.open('GET', 'reboot', true);
-          xhr.send();
-          //setTimeout(function() { window.location.href = 'http://' + ip + 'index.html'; }, 6000);
+          if (setupNetwork === 'internet') {
+            document.getElementById('ipFoundMsg').textContent = 'IP Found: ' + ip;
+            document.getElementById('ipFoundMsg').classList.remove('hidden');
+          }else if (setupNetwork === 'local') {
+            document.getElementById('reconnectMsg').textContent = 'Reconnect to Plant WiFi (SSID: ' + setupSsid + ')';
+            document.getElementById('reconnectMsg').classList.remove('hidden');
+          }
+          var rebootXhr = new XMLHttpRequest();
+          rebootXhr.open('GET', 'reboot', true);
+          rebootXhr.send();
+          if (setupSsid === 'Plant' && !setupWifiPass) {
+            document.getElementById('progressBar').style.animationDuration = '6s';
+            setTimeout(function() { window.location.href = 'http://' + ip + '/index.html'; }, 6000);
+          } else {
+            document.getElementById('progressBar').style.animationDuration = '20s';
+            setTimeout(function() { window.location.href = 'http://' + ip + '/index.html'; }, 20000);
+          }
+          return;
+        } else if (ip === '0.0.0.0') {
+          document.getElementById('reconnectMsg').textContent = 'No Connection to WiFi (SSID:' + setupSsid + ') ...Restoring';
+          document.getElementById('reconnectMsg').classList.remove('hidden');
         }
-      };
-     }, 10000);
-    //setTimeout(function() { window.location.href = 'find.html'; }, 6000);
-  } else {
-    document.getElementById('reconnectMsg').textContent = 'Reconnect to Plant WiFi (SSID: ' + setupSsid + ')';
-    document.getElementById('reconnectMsg').classList.remove('hidden');
-    document.getElementById('plantPasswordForm').classList.add('hidden');
-    document.getElementById('setupWaiting').classList.remove('hidden');
-    var xhr = new XMLHttpRequest();
-    xhr.open('GET', 'reboot', true);
+      }
+      if (Date.now() < pollDeadline) {
+        setTimeout(pollIp, 2000);
+      } else {
+        window.location.href = 'find.html';
+      }
+    };
+    xhr.onerror = function() {
+      if (Date.now() < pollDeadline) {
+        setTimeout(pollIp, 2000);
+      } else {
+        window.location.href = 'find.html';
+      }
+    };
     xhr.send();
-    if (setupSsid === 'Plant' && !setupWifiPass) {
-      document.getElementById('progressBar').style.animationDuration = '6s';
-      setTimeout(function() { window.location.href = 'http://192.168.8.8/index.html'; }, 6000);
-    } else {
-      document.getElementById('progressBar').style.animationDuration = '20s';
-      setTimeout(function() { window.location.href = 'http://192.168.8.8/index.html'; }, 20000);
-    }
   }
+  setTimeout(pollIp, 4000);
+  }
+  //setTimeout(function() { window.location.href = 'find.html'; }, 6000);
 });
 
 document.getElementById('alertsSaveBtn').addEventListener('click', function() {
@@ -308,4 +330,102 @@ document.getElementById('alertsSaveBtn').addEventListener('click', function() {
     plant: 'setupAlertPlantName'
   });
   showStep('step-plant-password');
+});
+
+function updateAppPassTip(serverValue) {
+  var v = String(serverValue).toLowerCase();
+  document.getElementById('gmailAppPassTip').classList.toggle('hidden', v.indexOf('gmail') === -1);
+  var isMicrosoft = v.indexOf('outlook') !== -1 || v.indexOf('office365') !== -1;
+  document.getElementById('microsoftAppPassTip').classList.toggle('hidden', !isMicrosoft);
+}
+
+document.getElementById('setupAlertSMTPServer').addEventListener('input', function() {
+  updateAppPassTip(this.value);
+});
+
+var MX_PROVIDERS = [
+  { url: 'https://dns.google/resolve', accept: 'application/dns-json' },
+  { url: 'https://dns.alidns.com/resolve', accept: 'application/dns-json' }
+];
+
+function lookupMx(domain) {
+  return lookupMxFrom(domain, 0);
+}
+
+function lookupMxFrom(domain, index) {
+  if (index >= MX_PROVIDERS.length) return Promise.resolve([]);
+  var provider = MX_PROVIDERS[index];
+  var opts = {};
+  if (provider.accept) opts.headers = { 'Accept': provider.accept };
+  return fetch(provider.url + '?name=' + encodeURIComponent(domain) + '&type=MX', opts)
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      var mx = [];
+      if (data && data.Answer) {
+        for (var i = 0; i < data.Answer.length; i++) {
+          if (data.Answer[i].type === 15) mx.push(data.Answer[i].data);
+        }
+      }
+      if (mx.length === 0) throw new Error('no MX records');
+      return mx;
+    })
+    .catch(function() { return lookupMxFrom(domain, index + 1); });
+}
+
+function isGoogleMx(mxList) {
+  for (var i = 0; i < mxList.length; i++) {
+    var host = String(mxList[i]).toLowerCase().replace(/^\d+\s+/, '').replace(/\.$/, '');
+    if (host === 'google.com' || host === 'googlemail.com' ||
+        host.indexOf('.google.com') !== -1 || host.indexOf('.googlemail.com') !== -1) {
+      return true;
+    }
+  }
+  return false;
+}
+
+function isMicrosoftMx(mxList) {
+  for (var i = 0; i < mxList.length; i++) {
+    var host = String(mxList[i]).toLowerCase().replace(/^\d+\s+/, '').replace(/\.$/, '');
+    if (host === 'outlook.com' || host === 'outlook.office365.com' ||
+        host.indexOf('.outlook.com') !== -1 || host.indexOf('.outlook.office365.com') !== -1 ||
+        host.indexOf('.office365.com') !== -1 || host.indexOf('.microsofthosting.com') !== -1) {
+      return true;
+    }
+  }
+  return false;
+}
+
+var mxTimer = null;
+
+function checkMxAutofill() {
+  var email = document.getElementById('setupAlertEmail').value.trim();
+  var at = email.lastIndexOf('@');
+  if (at < 1 || at === email.length - 1) return;
+  var domain = email.substring(at + 1);
+  var usernameField = document.getElementById('setupAlertSMTPUsername');
+  if (usernameField.value.trim() === '') {
+    usernameField.value = email;
+  }
+  var serverField = document.getElementById('setupAlertSMTPServer');
+  if (serverField.value.trim() !== '') return;
+  lookupMx(domain).then(function(mxList) {
+    if (serverField.value.trim() !== '') return;
+    if (isGoogleMx(mxList)) {
+      serverField.value = 'smtp.gmail.com:587';
+      updateAppPassTip(serverField.value);
+    } else if (isMicrosoftMx(mxList)) {
+      serverField.value = 'smtp.office365.com:587';
+      updateAppPassTip(serverField.value);
+    }
+  });
+}
+
+document.getElementById('setupAlertEmail').addEventListener('input', function() {
+  clearTimeout(mxTimer);
+  mxTimer = setTimeout(checkMxAutofill, 800);
+});
+
+document.getElementById('setupAlertEmail').addEventListener('blur', function() {
+  clearTimeout(mxTimer);
+  checkMxAutofill();
 });

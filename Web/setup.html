@@ -349,11 +349,13 @@ document.documentElement.setAttribute('data-font', savedFont);
     <input type="text" class="tab-input" id="setupAlertSMTPUsername" placeholder="user@example.com">
     <label class="tab-label" for="setupAlertSMTPPassword">SMTP Password</label>
     <input type="password" class="tab-input" id="setupAlertSMTPPassword" placeholder="Password">
+    <div class="alert-warn hidden" id="gmailAppPassTip">Gmail requires an App Password instead of your regular password. Generate one at <a href="https://myaccount.google.com/apppasswords" target="_blank" rel="noopener">https://myaccount.google.com/apppasswords</a>.</div>
+    <div class="alert-warn hidden" id="microsoftAppPassTip">Microsoft 365 requires an App Password instead of your regular password. Generate one at <a href="https://go.microsoft.com/fwlink/?linkid=2274139" target="_blank" rel="noopener">https://go.microsoft.com/fwlink/?linkid=2274139</a>.</div>
     <label class="tab-label" for="setupConfirmSMTPPassword">Confirm SMTP Password</label>
     <input type="password" class="tab-input" id="setupConfirmSMTPPassword" placeholder="Password">
     <div class="alert-warn hidden" id="smtpPassMismatch">Passwords do not match</div>
     <label class="tab-label" for="setupAlertPlantName">Plant Name</label>
-    <input type="text" class="tab-input" id="setupAlertPlantName" placeholder="My Plant">
+    <input type="text" class="tab-input" id="setupAlertPlantName" value="My Plant" placeholder="My Plant">
     <label class="tab-label">Send Email Alerts:</label>
     <input type="hidden" id="setupAlerts" value="">
     <div class="alert-checkbox-grid" id="setupAlertsGrid">

@@ -65,7 +65,8 @@ Additional Libraries
 * https://github.com/ESP32Async/ESPAsyncTCP
 * https://github.com/devyte/ESPAsyncDNSServer
 * https://github.com/me-no-dev/ESPAsyncUDP
-* https://github.com/mobizt/ESP-Mail-Client
+* https://github.com/mobizt/ReadyMail
+* https://github.com/mobizt/ESP_SSLClient
 
 File System (Web Interface)
 
