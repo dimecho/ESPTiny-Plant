@@ -63,7 +63,7 @@
 <body>
   <div class="card">
     <h1>Find Plant</h1>
-    <p class="status" id="status">Rebooting ...</p>
+    <p class="status" id="status">Watering ...</p>
     <button id="stopBtn" type="button" hidden>Stop</button>
     <div id="prompt" hidden>
       <p>Enter your router IP prefix (1-3 octets, e.g. 192.168.1, 10, or 172.20).</p>
@@ -189,25 +189,24 @@
     clearTimeout(timer);
     if (foundGlobal) return;
     setStatus('Looking for the plant ...');
+    const prefixes = [];
     const ip = await getLocalIP(2000);
     if (ip) {
-      let found = await scanPrefix(prefixOf(ip));
-      if (!found && !stopRequested && prefixLenOf(ip) < 3) {
-        found = await scanPrefix(prefixOf(ip, prefixLenOf(ip)));
+      prefixes.push(prefixOf(ip));
+      if (prefixLenOf(ip) < 3) {
+        prefixes.push(prefixOf(ip, prefixLenOf(ip)));
       }
-      if (found) return;
-      scanEndUI();
-      return;
     }
+    prefixes.push('192.168.1', '192.168.0');
     const saved = localStorage.getItem('lastSubnet');
     if (saved && validPrefix(saved)) {
-      const found = await scanPrefix(saved);
-      if (found) return;
-      scanEndUI();
-      return;
+      prefixes.push(saved);
     }
-    setStatus('Enter your router IP');
-    document.getElementById('prompt').hidden = false;
+    for (const prefix of [...new Set(prefixes)]) {
+      if (stopRequested) break;
+      if (await scanPrefix(prefix)) return;
+    }
+    scanEndUI();
   }, 15000);
 
   document.getElementById('scanBtn').addEventListener('click', async () => {

@@ -764,19 +764,23 @@ void setup() {
   Serial.printf("Boot calibration (milliseconds):%u\n", millis());
 #endif
 }
-void restoreWiFi(uint8_t with_new_config) {
-
+void tryANDrestoreWiFi() {
 #if defined(ESP32)
   wifi_mode_t originalWiFiMode = startupWiFiMode;
   wifi_config_t originalWiFiConfig = startupWiFiConfig;
-  if (with_new_config = 1) {
-    NVRAMConfig();
-    setupWiFi();
-  }
+#else
+  uint8_t originalWiFiMode = startupWiFiMode;
+  struct softap_config originalAPConfig = startupWiFiAPConfig;
+  struct station_config originalSTAConfig = startupWiFiSTAConfig;
+#endif
+  NVRAMConfig();
+  setupWiFi();
   //Temporarily set original WiFi (until reboot)
+#if defined(ESP32)
   esp_wifi_disconnect();
   //esp_wifi_stop();
   esp_wifi_set_mode((wifi_mode_t)originalWiFiMode); // fast interface switch
+  delay(200);
   if (originalWiFiMode == WIFI_AP) {
     esp_wifi_set_config(WIFI_IF_AP, &originalWiFiConfig);
   } else if (originalWiFiMode == WIFI_STA) {
@@ -788,14 +792,6 @@ void restoreWiFi(uint8_t with_new_config) {
   //  esp_wifi_connect();
   //}
 #else  //ESP8266
-  uint8_t originalWiFiMode = startupWiFiMode;
-  struct softap_config originalAPConfig = startupWiFiAPConfig;
-  struct station_config originalSTAConfig = startupWiFiSTAConfig;
-  if (with_new_config = 1) {
-    NVRAMConfig();
-    setupWiFi();
-  }
-  //Temporarily set original WiFi (until reboot)
   wifi_station_disconnect();
   wifi_set_opmode(NULL_MODE);  // full radio stop
   delay(200);
@@ -831,19 +827,25 @@ void setupWiFi() {
   WiFi.disconnect();  // stop the pending/active connections
   //WiFi.mode(WIFI_OFF);   // full radio teardown
 
+ #if defined(ESP32)
+    WiFi.setHostname(PLANT_NAME);  //Must be called BEFORE enableSTA: core 3.3.x only applies it at netif-enable time
+    WiFi.setAutoReconnect(false); 
+#else //ESP8266
+    WiFi.hostname(PLANT_NAME);
+    WiFi.setAutoConnect(false);
+#endif
+
+#if DEBUG
+    Serial.printf("[hostname] PLANT_NAME='%s' WiFi.getHostname()='%s'\n", PLANT_NAME, WiFi.getHostname());
+#endif
+
   if (WIRELESS_MODE == 0) {
     //=====================
     //WiFi Access Point Mode
     //=====================
     WiFi.enableSTA(false);
     WiFi.enableAP(true);  // no radio teardown
-                          //WiFi.mode(WIFI_AP);
-
-#if defined(ESP8266)
-    WiFi.setPhyMode((WiFiPhyMode_t)WIRELESS_PHY_MODE);
-#else
-    esp_wifi_set_protocol(WIFI_IF_AP, WIRELESS_PHY_MODE);
-#endif
+    //WiFi.mode(WIFI_AP);
     WiFi.softAPConfig(ip, gateway, subnet);
     bool ok = WiFi.softAP(WIRELESS_SSID, WIRELESS_PASSWORD, WIRELESS_CHANNEL, WIRELESS_HIDE, 3);  //max 3 clients
 
@@ -877,22 +879,10 @@ void setupWiFi() {
     WiFi.enableAP(false);
     WiFi.enableSTA(true);  // no radio teardown
     //WiFi.mode(WIFI_STA);
-
     if (WIRELESS_HIDE == 1) {
       WiFi.setScanMethod(WIFI_ALL_CHANNEL_SCAN);
     }
-
 #if defined(ESP8266)
-    WiFi.setPhyMode((WiFiPhyMode_t)WIRELESS_PHY_MODE);
-    //WiFi.setAutoConnect(false);
-#else
-    esp_wifi_set_protocol(WIFI_IF_STA, WIRELESS_PHY_MODE);
-    //WiFi.setAutoReconnect(false);
-#endif
-
-#if defined(ESP8266)
-    WiFi.hostname(PLANT_NAME);
-
     if (WIRELESS_MODE == 2) {  // WPA2-Enterprise
       typedef enum {
         EAP_TLS,
@@ -981,8 +971,6 @@ void setupWiFi() {
       WiFi.begin(WIRELESS_SSID, WIRELESS_PASSWORD);  //Connect to the WiFi network
     }
 #else  //ESP32
-    WiFi.setHostname(PLANT_NAME);
-
 #if WPA2ENTERPRISE
     if (WIRELESS_MODE == 2) {  // WPA2-Enterprise
       const char *WIRELESS_USERNAME = NVRAMRead(_WIRELESS_USERNAME);
@@ -1008,11 +996,21 @@ void setupWiFi() {
 #endif
 #endif
 
+#if defined(ESP32)
+    WiFi.setBandMode(WIFI_BAND_MODE_2G_ONLY);
+    WiFi.setTxPower(WIFI_POWER_8_5dBm);
+    WiFi.setAutoReconnect(true);
+#else //ESP8266
+    WiFi.setPhyMode((WiFiPhyMode_t)WIRELESS_PHY_MODE);
+    WiFi.setAutoConnect(true);
+#endif
+
     //No wifi-scan required when RF channel and AP mac-address is provided
     //uint8_t WIRELESS_BSSID[6] = { 0xF8, 0x1E, 0xDF, 0xFE, 0xE9, 0x39 };
     //WiFi.begin(WIRELESS_SSID, WIRELESS_PASSWORD, WIRELESS_CHANNEL, WIRELESS_BSSID, true);
 
     unsigned long deadline = millis() + 20000;
+    unsigned long lastConnectAttempt = millis();
     while (WiFi.status() != WL_CONNECTED && millis() < deadline) {
 #if DEBUG
       //ESP8266
@@ -1032,26 +1030,30 @@ void setupWiFi() {
       Serial.printf("STA Connection State: %d\n", WiFi.status());
       //WiFi.printDiag();
 #endif
-      delay(250);
+      delay(500);
 
+#if defined(ESP32)
+      //First connect after an AP->STA radio restart can be rejected with reason 6 (NOT_AUTHED); retry it
+      if (millis() - lastConnectAttempt > 2000) {
+        lastConnectAttempt = millis();
+        esp_wifi_connect();  //no-op if a connect attempt is already in progress
+      }
+#endif
       if (WIRELESS_PHY_POWER <= 19) {
         //0    (for lowest RF power output, supply current ~ 70mA
         //20.5 (for highest RF power output, supply current ~ 80mA
+        /*
 #if defined(ESP8266)
         WiFi.setOutputPower(WIRELESS_PHY_POWER);
 #else
         WiFi.setTxPower((wifi_power_t)WIRELESS_PHY_POWER);
 #endif
+        */
         WIRELESS_PHY_POWER++;  //auto tune wifi power (minimum power to reach AP)
       }
     }
     if (WiFi.status() == WL_CONNECTED) {
 
-#if defined(ESP8266)
-      WiFi.setAutoConnect(true);
-#else
-      WiFi.setAutoReconnect(true);
-#endif
       NVRAMWrite(_WIRELESS_PHY_POWER, WIRELESS_PHY_POWER);  //save auto tuned wifi power
 
       if (NETWORK_DHCP == 0) {
@@ -1100,19 +1102,24 @@ void setupWiFi() {
 #if DEBUG
       Serial.println("STA Connection Failed!");
 #endif
-      restoreWiFi(0);
+      WIRELESS_MODE = 0;
+      WIRELESS_HIDE = 0;
+      NETWORK_DHCP = 0;
+      strncpy(WIRELESS_SSID, "Plant", sizeof(WIRELESS_SSID));
+      strncpy(WIRELESS_PASSWORD, "", sizeof(WIRELESS_PASSWORD));
+      setupWiFi();
       strncpy(NETWORK_DHCPIP, "0.0.0.0", sizeof(NETWORK_DHCPIP));
     }
   }
 #if defined(ESP32)
-  if (!startupWiFiMode) {
+  //if (!startupWiFiMode) {
     startupWiFiMode = WiFi.getMode();
     if (startupWiFiMode == WIFI_AP) {
       esp_wifi_get_config(WIFI_IF_AP, &startupWiFiConfig);
     } else if (startupWiFiMode == WIFI_STA) {
       esp_wifi_get_config(WIFI_IF_STA, &startupWiFiConfig);
     }
-  }
+  //}
 #else
   startupWiFiMode = wifi_get_opmode();
   if (startupWiFiMode == SOFTAP_MODE) {
@@ -1171,9 +1178,8 @@ void setupWebServer() {
       }
     } else if (request->hasParam("wifi")) {
       if (request->getParam("wifi")->value() == "dhcp") {
-        thread[1].detach();
-        thread[1].once(2, []() {
-          restoreWiFi(1);
+        thread[1].once(1, []() {
+          tryANDrestoreWiFi();
         });
         response->println("...");
       } else if (request->getParam("wifi")->value() == "ip") {
@@ -1251,15 +1257,14 @@ void setupWebServer() {
       if (request->hasParam("reset")) {
         NVRAM_Erase();
         NVRAMWrite(_PNP_ADC, PNP_ADC);
-        thread[1].detach();
-        thread[1].once(3, []() {
+        thread[1].once(1, []() {
           ESP.restart();
         });
         response->addHeader(FPSTR(refresh_http), "6;url=/");
         response->print(F("..."));
       } else if (request->hasParam("smtp")) {
 #if SMTP_ENABLE
-        thread[0].once(1, []() {
+        thread[1].once(1, []() {
           smtpSend("Test", "OK", 1);
         });
         response->print(F("..."));
@@ -1363,8 +1368,12 @@ void setupWebServer() {
     if (strlen(DEMO_PASSWORD) > 0) {
       request->send(200, FPSTR(text_plain), FPSTR(locked_html));
     } else {
-      thread[1].detach();
-      thread[1].once(3, []() {
+#if EEPROM_NVS
+      preferences.end();
+#else
+      EEPROM.commit();
+#endif
+      thread[1].once(1, []() {
         ESP.restart();
       });
       request->send(200, FPSTR(text_plain), F("..."));
@@ -1462,7 +1471,6 @@ void setupWebServer() {
         const AsyncWebParameter *modeParam = request->getParam("Mode", true);
         const AsyncWebParameter *dhcpParam = request->getParam("DHCP", true);
         if (modeParam->value() == "0") {
-          thread[1].detach();
           thread[1].once(3, []() {
             ESP.restart();
           });
@@ -1573,7 +1581,6 @@ void setupWebServer() {
       } else {
         response->print(F("Update Success! ..."));
       }
-      thread[1].detach();
       thread[1].once(2, []() {
         ESP.restart();
       });
@@ -2511,8 +2518,8 @@ void NVRAMWrite(uint8_t address, const char *txt) {
   }
   //EEPROM.commit();
 #endif
-  thread[0].detach();
-  thread[0].once(2, []() {
+  thread[1].detach();
+  thread[1].once(2, []() {
 #if EEPROM_NVS
     preferences.end();
 #else

@@ -310,6 +310,9 @@ document.getElementById('plantPasswordForm').addEventListener('submit', function
     xhr.send();
   }
   setTimeout(pollIp, 4000);
+  setTimeout(function() {
+    document.getElementById('wifiReminderMsg').classList.remove('hidden');
+  }, 18000);
   }
   //setTimeout(function() { window.location.href = 'find.html'; }, 6000);
 });

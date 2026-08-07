@@ -557,8 +557,13 @@ if (soilCard && soilNormal && soilBoxesWrap) {
       b.classList.toggle('selected', b === box);
       b.classList.toggle('greyed', b !== box);
     });
+    var soilColor = soil_type_color[soilSelected];
+    var soilCircle = svgDoc.getElementById('soil-circle');
+    if (soilCircle) soilCircle.setAttribute('fill', soilColor);
+    var soilTextSvg = svgDoc.getElementById('soil-text');
+    if (soilTextSvg) soilTextSvg.style.fill = soilColor;
     var xhr = new XMLHttpRequest();
-    xhr.open('GET', 'nvram.json?offset=15&value=' + soilSelected, true);
+    xhr.open('GET', 'nvram.json?offset=' + PLANT_SOIL_TYPE + '&value=' + soilSelected, true);
     xhr.send();
   });
 }
