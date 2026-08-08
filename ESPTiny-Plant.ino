@@ -1400,7 +1400,7 @@ void setupWebServer() {
             }
             */
             NVRAMWrite(i, request->getParam("value")->value().c_str());
-            //NVRAMConfig();
+            NVRAMApply(i, request->getParam("value")->value().c_str());
           }
         }
         request->send(200, FPSTR(text_plain), request->getParam("value")->value());
@@ -2585,7 +2585,19 @@ char *NVRAMRead(uint8_t address) {
 #endif
   return ebuffer;
 }
-
+void NVRAMApply(uint8_t address, const char *value) {
+  switch (address) {
+    case _DEEP_SLEEP:          DEEP_SLEEP = atoi(value) * 60; break;
+    case _PLANT_MANUAL_TIMER:  PLANT_MANUAL_TIMER = atoi(value) * 3600; break;
+    case _PLANT_POT_SIZE:      PLANT_POT_SIZE = atoi(value); break;
+    case _PLANT_SOIL_MOISTURE: PLANT_SOIL_MOISTURE = atoi(value); break;
+    case _PLANT_SOIL_TYPE:     PLANT_SOIL_TYPE = atoi(value); break;
+    case _PLANT_TYPE:          PLANT_TYPE = atoi(value); break;
+    case _ALERTS:              strncpy(ALERTS, value, sizeof(ALERTS)); break;
+    case _PNP_ADC:             strncpy(PNP_ADC, value, sizeof(PNP_ADC)); break;
+    case _DEMO_PASSWORD:       strncpy(DEMO_PASSWORD, value, sizeof(DEMO_PASSWORD)); break;
+  }
+}
 void NVRAMConfig() {
   strncpy(PNP_ADC, NVRAMRead(_PNP_ADC), sizeof(PNP_ADC));
   //turnNPNorPNP(0);

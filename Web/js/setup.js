@@ -82,6 +82,16 @@ function renderScan(aps) {
   list.appendChild(other);
 }
 
+function connectWifi(ssid, pass, hide) {
+  setupSsid = ssid;
+  setupWifiPass = pass;
+  nvramGet(WIFI_SSID, ssid);
+  nvramGet(WIFI_PASSWORD, pass);
+  nvramGet(WIFI_HIDE, hide);
+  nvramGet(NETWORK_DHCP, 1);
+  showStep('step-alerts');
+}
+
 function openScanPassword(item) {
   var next = item.nextSibling;
   if (next && next.className === 'setup-scan-expand') {
@@ -105,11 +115,14 @@ function openScanPassword(item) {
   btn.className = 'tab-btn';
   btn.textContent = 'Connect';
   btn.addEventListener('click', function() {
-    nvramGet(WIFI_SSID, item.getAttribute('data-ssid'));
-    nvramGet(WIFI_PASSWORD, input.value);
-    nvramGet(WIFI_HIDE, 0);
-    nvramGet(NETWORK_DHCP, 1);
-    showStep('step-alerts');
+    connectWifi(item.getAttribute('data-ssid'), input.value, 0);
+  });
+  input.addEventListener('keydown', function(e) {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      e.stopPropagation();
+      connectWifi(item.getAttribute('data-ssid'), input.value, 0);
+    }
   });
   exp.appendChild(input);
   exp.appendChild(btn);
@@ -148,18 +161,29 @@ function openOtherNetwork(item) {
   btn.type = 'button';
   btn.className = 'tab-btn';
   btn.textContent = 'Connect';
-  btn.addEventListener('click', function() {
+  var doConnect = function() {
     var ssid = ssidInput.value.trim();
     if (!ssid) {
       hint.classList.remove('hidden');
       ssidInput.focus();
       return;
     }
-    nvramGet(WIFI_SSID, ssid);
-    nvramGet(WIFI_PASSWORD, passInput.value);
-    nvramGet(WIFI_HIDE, 1);
-    nvramGet(NETWORK_DHCP, 1);
-    showStep('step-alerts');
+    connectWifi(ssid, passInput.value, 1);
+  };
+  btn.addEventListener('click', doConnect);
+  ssidInput.addEventListener('keydown', function(e) {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      e.stopPropagation();
+      doConnect();
+    }
+  });
+  passInput.addEventListener('keydown', function(e) {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      e.stopPropagation();
+      doConnect();
+    }
   });
   exp.appendChild(ssidInput);
   exp.appendChild(passInput);
@@ -239,6 +263,27 @@ document.getElementById('wifiSetupForm').addEventListener('submit', function(e) 
   showStep('step-plant-password');
 });
 
+document.addEventListener('keydown', function(e) {
+  if (e.key === 'Enter') {
+    var step = document.getElementById('step-plant-password');
+    var form = document.getElementById('plantPasswordForm');
+    if (step && step.classList.contains('active') && form && !form.classList.contains('hidden')) {
+      e.preventDefault();
+      form.requestSubmit();
+      return;
+    }
+    var alertsStep = document.getElementById('step-alerts');
+    if (alertsStep && alertsStep.classList.contains('active')) {
+      var active = document.activeElement;
+      var isCheckbox = active && active.classList && active.classList.contains('tab-checkbox');
+      if (!isCheckbox) {
+        e.preventDefault();
+        document.getElementById('alertsSaveBtn').click();
+      }
+    }
+  }
+});
+
 document.getElementById('plantPasswordForm').addEventListener('submit', function(e) {
   e.preventDefault();
   var pw = document.getElementById('setupPlantPassword').value;
@@ -283,15 +328,18 @@ document.getElementById('plantPasswordForm').addEventListener('submit', function
           rebootXhr.send();
           if (setupSsid === 'Plant' && !setupWifiPass) {
             document.getElementById('progressBar').style.animationDuration = '6s';
-            setTimeout(function() { window.location.href = 'http://' + ip + '/index.html'; }, 6000);
+            setTimeout(function() { window.location.href = 'http://' + ip + '/index.html'; }, 10000);
           } else {
             document.getElementById('progressBar').style.animationDuration = '20s';
             setTimeout(function() { window.location.href = 'http://' + ip + '/index.html'; }, 20000);
           }
           return;
         } else if (ip === '0.0.0.0') {
-          document.getElementById('reconnectMsg').textContent = 'No Connection to WiFi (SSID:' + setupSsid + ') ...Restoring';
+          document.getElementById('reconnectMsg').textContent = 'Connection failed to WiFi AP (SSID:' + setupSsid + ')';
+          document.getElementById('reconnectMsg').classList.add('setup-fail-msg');
           document.getElementById('reconnectMsg').classList.remove('hidden');
+          document.getElementById('setupFailActions').classList.remove('hidden');
+          return;
         }
       }
       if (Date.now() < pollDeadline) {
@@ -333,6 +381,14 @@ document.getElementById('alertsSaveBtn').addEventListener('click', function() {
     plant: 'setupAlertPlantName'
   });
   showStep('step-plant-password');
+});
+
+document.getElementById('findPlantBtn').addEventListener('click', function() {
+  window.location.href = 'find.html';
+});
+
+document.getElementById('tryAgainBtn').addEventListener('click', function() {
+  window.location.href = 'setup.html';
 });
 
 function updateAppPassTip(serverValue) {

@@ -5,8 +5,6 @@ var notifyTimer;
 var soil_type_labels = ['Moss', 'Loam', 'Dirt', 'Clay', 'Sand', 'Rock'];
 var soil_type_color = ['#3d9919', '#000000', '#58280c', '#7b4626', '#d6ca47', '#b4b0a6'];
 
-var timerUploadCounter = 0;
-
 //EEPROM Variables
 var WIFI_MODE = 1;
 var WIFI_HIDE = 2;
@@ -140,20 +138,6 @@ function RequireInput(id, value) {
 function resetFlash()
 {
     window.open('/api?reset=1');
-}
-
-function progressTimer(speed, bar, callback)
-{
-    timerUploadCounter = 0;
-
-    var timer = setInterval(function() {
-        timerUploadCounter++;
-        if(timerUploadCounter == 100) {
-            clearInterval(timer);
-            if(callback) callback(timerUploadCounter);
-        }
-        document.getElementsByClassName('progress-bar')[bar].style.width = timerUploadCounter + '%';
-    }, speed);
 }
 
 function nvramGet(offset, value) {

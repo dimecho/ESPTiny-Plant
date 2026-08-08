@@ -314,7 +314,7 @@ document.documentElement.setAttribute('data-font', savedFont);
             </form>
             <button class="fw-btn fw-btn-amber fw-btn-lg" type="button" id="browseFirmware">Flash Firmware</button>
           </div>
-          <div class="fw-progress-wrap"><div class="progress-bar"><div class="progress-fill" id="fwProgress" style="width:0%"></div></div></div>
+          <div class="fw-progress-wrap"><div class="progress-bar"><div class="progress-fill" id="fwProgress"></div></div></div>
           <div class="fw-toggle-row">
             <label id="pnpLabelNPN" class="active">NPN</label>
             <div class="fw-toggle" id="pnpToggle"></div>
@@ -362,7 +362,7 @@ document.documentElement.setAttribute('data-font', savedFont);
       </label>
       <input type="range" class="range-slider" id="testPumpSlider" min="1" max="200" value="1" style="--slider-color:#33994a">
       <div class="test-pump-delay-label">Delay Test in Seconds: <span id="test-pump-delay-timer">1</span></div>
-      <div class="fw-progress-wrap"><div class="progress-bar"><div class="progress-fill" id="testPumpProgress" style="width:0%"></div></div></div>
+      <div class="fw-progress-wrap"><div class="progress-bar"><div class="progress-fill" id="testPumpProgress"></div></div></div>
       <button class="modal-btn modal-btn-save" type="button" id="testPumpStart" style="width:100%">Run Pump Test</button>
     </div>
   </div>
@@ -382,13 +382,30 @@ document.documentElement.setAttribute('data-font', savedFont);
 </div>
 
 <div id="demoLockModal" class="modal-overlay">
-  <div class="modal-content" style="max-width:28rem">
+  <div class="modal-content modal-content--sm">
     <button class="modal-close" id="demoLockClose">&times;</button>
     <form method="POST" action="login" id="demo-lock-form">
       <h5 class="modal-heading">Login</h5>
       <input type="password" id="DemoPassword" name="password" class="tab-input" placeholder="Password" required style="width:100%;margin-bottom:0.75rem">
       <button type="submit" class="modal-btn modal-btn-save" style="width:100%">Login</button>
     </form>
+  </div>
+</div>
+
+<div id="keepEepromModal" class="modal-overlay keep-eeprom-modal">
+  <div class="modal-content modal-content--sm">
+    <button class="modal-close" id="keepEepromClose">&times;</button>
+    <h5 class="modal-heading" id="keepEepromTitle">Flash Check</h5>
+    <div class="flush-water-body">
+      <p class="flush-water-desc" id="keepEepromText"></p>
+      <div class="fw-progress-wrap keep-eeprom-progress">
+        <div class="progress-bar"><div class="progress-fill" id="keepEepromProgress"></div></div>
+      </div>
+      <div class="keep-eeprom-btns" id="keepEepromBtns">
+        <button class="modal-btn modal-btn-cancel" type="button" id="keepEepromNo">No (Default)</button>
+        <button class="modal-btn modal-btn-save" type="button" id="keepEepromYes">Yes</button>
+      </div>
+    </div>
   </div>
 </div>
 

@@ -112,22 +112,20 @@ document.documentElement.setAttribute('data-font', savedFont);
       text-align: center;
       margin: 0;
     }
-    .setup-progress {
-      width: 100%;
-      height: 8px;
-      background: var(--card-border);
-      border-radius: 4px;
-      overflow: hidden;
+    .setup-fail-actions {
+      display: flex;
+      gap: 1rem;
+      justify-content: center;
     }
-    .setup-progress-bar {
-      height: 100%;
-      width: 0;
-      background: #62a29a;
-      animation: setup-progress-fill 6s linear forwards;
+    .setup-fail-msg {
+      color: #fff;
+      background: #d9534f;
+      padding: 0.6rem 0.9rem;
+      border-radius: 6px;
     }
-    @keyframes setup-progress-fill {
-      from { width: 0; }
-      to { width: 100%; }
+    .setup-fail-actions .tab-btn {
+      width: 140px;
+      max-width: 45%;
     }
     .setup-form {
       display: flex;
@@ -325,7 +323,11 @@ document.documentElement.setAttribute('data-font', savedFont);
     <p class="setup-reconnect hidden" id="reconnectMsg"></p>
     <p class="setup-reconnect hidden" id="ipFoundMsg"></p>
     <p class="setup-reconnect hidden" id="wifiReminderMsg">Keep connected to WiFi while setup completes.</p>
-    <div class="setup-progress"><div class="setup-progress-bar" id="progressBar"></div></div>
+    <div class="setup-fail-actions hidden" id="setupFailActions">
+      <button type="button" class="tab-btn" id="findPlantBtn">Find Plant</button>
+      <button type="button" class="tab-btn" id="tryAgainBtn">Try Again</button>
+    </div>
+    <div class="progress-bar"><div class="progress-fill progress-fill-anim" id="progressBar"></div></div>
   </div>
 </div>
 
@@ -376,7 +378,7 @@ document.documentElement.setAttribute('data-font', savedFont);
 <script defer src="js/common.js"></script>
 <script defer src="js/setup.js"></script>
 
-<div class="run-setup-footer"><a href="/update" class="run-setup-link">Update Firmware</a></div>
+<div class="run-setup-footer"><a href="/update" class="run-setup-link">Update Firmware</a> <span class="run-setup-link">|</span> <a href="find.html" download="Find Plant.html" class="run-setup-link" title="Save find.html to your computer to run it offline as a local app">Save Find App</a></div>
 
 </body>
 </html>

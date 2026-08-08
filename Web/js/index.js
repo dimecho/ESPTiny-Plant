@@ -3,6 +3,158 @@ var started = Date.now();
 var svgDoc = null;
 var nvramData = null;
 
+function deleteCookies() {
+  var cookieArray = document.cookie.split(';');
+  for (var i = 0; i < cookieArray.length; i++) {
+    var keyValArr = cookieArray[i].split('=');
+    document.cookie = (keyValArr[0] || '').trim() + '=; expires=Thu, 01 Jan 1970 00:00:00 UTC; SameSite=Lax';
+  }
+}
+
+function currentEepromId() {
+  if (!nvramData || !nvramData[0]) return null;
+  var parts = nvramData[0].split('|');
+  return parts[6] ? parts[6] : null;
+}
+
+function saveAllNvramCookies() {
+  if (!nvramData) return;
+  var skip = [1, 8, 20, 25, 28];
+  for (var i = 1; i < nvramData.length; i++) {
+    if (skip.indexOf(i) === -1) {
+      document.cookie = i + '=' + encodeURIComponent(nvramData[i]) + '; SameSite=Lax';
+    }
+  }
+  if (nvramData[PNP_ADC] != 0) {
+    document.cookie = PNP_ADC + '=' + encodeURIComponent(nvramData[PNP_ADC]) + '; SameSite=Lax';
+  }
+}
+
+function animateProgress(elId, speed, done) {
+  var bar = document.getElementById(elId);
+  if (!bar) { if (done) done(); return; }
+  var counter = 0;
+  bar.style.width = '0%';
+  var timer = setInterval(function() {
+    counter++;
+    bar.style.width = counter + '%';
+    if (counter >= 100) { clearInterval(timer); if (done) done(); }
+  }, speed);
+}
+
+function uploadForm(form, progressElId, done) {
+  var bar = document.getElementById(progressElId);
+  var xhr = new XMLHttpRequest();
+  xhr.open('POST', form.getAttribute('action') || '/update', true);
+  xhr.upload.onprogress = function(e) {
+    if (e.lengthComputable && bar) bar.style.width = Math.round((e.loaded / e.total) * 100) + '%';
+  };
+  xhr.onload = function() {
+    if (bar) bar.style.width = '100%';
+    if (done) done(xhr.status, xhr.responseText);
+  };
+  xhr.onerror = function() {
+    if (done) done(0, 'Network error');
+  };
+  xhr.send(new FormData(form));
+}
+
+function flashUpdateDone(status, text) {
+  var bar = document.getElementById('fwProgress');
+  if (status === 200 && (text || '').indexOf('ERROR') === -1) {
+    if (bar) bar.style.width = '100%';
+    notify('Update Success', 'success');
+    setTimeout(function() { window.location.href = '/'; }, 4000);
+  } else if (status === 401) {
+    if (bar) bar.style.width = '0%';
+    notify('Update blocked: device is locked', 'danger');
+  } else {
+    if (bar) bar.style.width = '0%';
+    notify('Update failed (' + status + ')', 'danger');
+  }
+}
+
+function openKeepEeprom(state) {
+  var m = document.getElementById('keepEepromModal');
+  if (!m) return;
+  if (state === 'restoring') {
+    document.getElementById('keepEepromTitle').textContent = 'Restoring Settings';
+    document.getElementById('keepEepromText').textContent = 'Restoring Settings ...';
+    m.classList.add('is-restoring');
+  } else {
+    document.getElementById('keepEepromTitle').textContent = 'Flash Check';
+    document.getElementById('keepEepromText').textContent = 'After firmware upgrade, keep current settings?';
+    m.classList.remove('is-restoring');
+  }
+  m.classList.add('active');
+  document.body.classList.add('modal-open');
+}
+
+function closeKeepEeprom() {
+  var m = document.getElementById('keepEepromModal');
+  if (m) {
+    m.classList.remove('active');
+    m.classList.remove('is-restoring');
+  }
+  document.body.classList.remove('modal-open');
+}
+
+function restoreCookiesOnLoad() {
+  if (!document.cookie) return;
+  var params = new URLSearchParams(window.location.search);
+  if (params.get('code') && params.get('scope')) return;
+  var cookies = document.cookie.split(';');
+  var restoreCount = 0;
+  for (var i = 0; i < cookies.length; i++) {
+    var parts = cookies[i].split('=');
+    var name = (parts[0] || '').trim();
+    var value = '';
+    try {
+      value = decodeURIComponent(parts.slice(1).join('=') || '');
+    } catch(e) {}
+    var off = parseInt(name, 10);
+    if (!isNaN(off) && off >= 0 && off <= 31 && value !== '') {
+      saveSetting(off, encodeURIComponent(value));
+      restoreCount++;
+    }
+  }
+  if (restoreCount > 0) {
+    openKeepEeprom('restoring');
+    animateProgress('keepEepromProgress', 60, function() {
+      closeKeepEeprom();
+      notify('EEPROM restored', 'success');
+      setTimeout(function() { notify('Passwords must be set again', 'warning'); }, 4000);
+    });
+  }
+  deleteCookies();
+}
+
+restoreCookiesOnLoad();
+
+var keepEepromModal = document.getElementById('keepEepromModal');
+var keepEepromYes = document.getElementById('keepEepromYes');
+var keepEepromNo = document.getElementById('keepEepromNo');
+var keepEepromClose = document.getElementById('keepEepromClose');
+if (keepEepromYes) {
+  keepEepromYes.onclick = function() {
+    saveAllNvramCookies();
+    closeKeepEeprom();
+    uploadForm(document.getElementById('formFirmware'), 'fwProgress', flashUpdateDone);
+  };
+}
+if (keepEepromNo) {
+  keepEepromNo.onclick = function() {
+    closeKeepEeprom();
+    uploadForm(document.getElementById('formFirmware'), 'fwProgress', flashUpdateDone);
+  };
+}
+if (keepEepromClose) keepEepromClose.onclick = closeKeepEeprom;
+if (keepEepromModal) {
+  keepEepromModal.addEventListener('click', function(e) {
+    if (e.target === keepEepromModal) closeKeepEeprom();
+  });
+}
+
 function applyNvramToSvg(data) {
   if (!svgDoc || !data) return;
   var soilIdx = parseInt(data[PLANT_SOIL_TYPE]);
@@ -678,13 +830,65 @@ if (potSizeCard && potSizeNormal && potSizeSliderWrap && potSizeSlider) {
       file.addEventListener('change', function() {
         if (form) {
           form.setAttribute('action', 'http://' + window.location.hostname + '/update');
-          form.submit();
+          uploadForm(form, 'fwProgress', flashUpdateDone);
         }
       });
     }
   }
   setupFileBrowse('browseLittleFS', 'fileLittleFS', 'formLittleFS');
-  setupFileBrowse('browseFirmware', 'fileFirmware', 'formFirmware');
+
+  function setupFirmwareBrowse() {
+    var btn = document.getElementById('browseFirmware');
+    var file = document.getElementById('fileFirmware');
+    var form = document.getElementById('formFirmware');
+    if (!btn || !file || !form) return;
+    btn.addEventListener('click', function() { file.click(); });
+    file.addEventListener('change', function(e) {
+      if (DEMOLOCK) { PlantLogin(); file.value = ''; return; }
+      var f = e.target.files[0];
+      if (!f) return;
+      form.setAttribute('action', 'http://' + window.location.hostname + '/update');
+      var flash = function() {
+        if (!currentEepromId()) { openKeepEeprom(); return; }
+        var reader = new FileReader();
+        reader.onload = function(ev) {
+          var uint8Array = new Uint8Array(ev.target.result);
+          var hexTarget = parseInt(currentEepromId(), 16) >>> 0;
+          var hexFound = false;
+          for (var i = 0; i < uint8Array.length - 3; i++) {
+            var hexValue = (uint8Array[i]) | (uint8Array[i + 1] << 8) | (uint8Array[i + 2] << 16) | (uint8Array[i + 3] << 24);
+            if ((hexValue >>> 0) === hexTarget) { hexFound = true; break; }
+          }
+          deleteCookies();
+          if (hexFound) {
+            if (nvramData && nvramData[PNP_ADC] != 0) {
+              document.cookie = PNP_ADC + '=' + encodeURIComponent(nvramData[PNP_ADC]) + '; SameSite=Lax';
+            }
+            uploadForm(form, 'fwProgress', flashUpdateDone);
+          } else {
+            openKeepEeprom();
+          }
+        };
+        reader.readAsArrayBuffer(f);
+      };
+      if (nvramData) {
+        flash();
+      } else {
+        var nvram = new XMLHttpRequest();
+        nvram.responseType = 'json';
+        nvram.open('GET', 'nvram.json', true);
+        nvram.send();
+        nvram.onload = function() {
+          if (nvram.response && nvram.response['nvram']) {
+            nvramData = nvram.response['nvram'];
+          }
+          flash();
+        };
+        nvram.onerror = function() { flash(); };
+      }
+    });
+  }
+  setupFirmwareBrowse();
 
   var certBtn = document.getElementById('browseCertificate');
   var certFile = document.getElementById('fileCertificate');
@@ -801,15 +1005,6 @@ function notify(msg, type) {
   n.appendChild(t);
   setTimeout(function() { if (t.parentNode) t.parentNode.removeChild(t); }, 3000);
 }
-function progressTimer(speed, bar, callback) {
-  var counter = 0;
-  var tm = setInterval(function() {
-    counter++;
-    if (counter == 100) { clearInterval(tm); if (callback) callback(counter); }
-    var bars = document.getElementsByClassName('progress-fill');
-    if (bars[bar]) bars[bar].style.width = counter + '%';
-  }, speed);
-}
 
 function testPumpRun(tm) {
   notify('Running Pump ...', 'warning');
@@ -817,7 +1012,7 @@ function testPumpRun(tm) {
     tm -= 10;
     notify('... ' + tm + ' Seconds Remaining', 'warning');
   }, 10000);
-  progressTimer((tm * 10), 1, function() {
+  animateProgress('testPumpProgress', (tm * 10), function() {
     clearInterval(timer);
     var log = new XMLHttpRequest();
     log.open('GET', 'log', true);

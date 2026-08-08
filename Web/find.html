@@ -179,7 +179,7 @@
     });
   }
 
-  fetch('/reboot');
+  if (window.location.protocol !== 'file:') fetch('/reboot');
 
   setTimeout(async () => {
     const controller = new AbortController();

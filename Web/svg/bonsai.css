@@ -307,6 +307,7 @@ body.modal-open { overflow:hidden; }
   position:relative;
   backdrop-filter:blur(8px);
 }
+.modal-content--sm { max-width:28rem; }
 .modal-close {
   position:absolute;
   top:8px;
@@ -425,7 +426,9 @@ body.modal-open { overflow:hidden; }
   transition:all 0.15s ease;
   white-space:nowrap;
 }
-.fw-row-flash { justify-content:space-between; }
+.fw-row-flash { justify-content:center; gap:2rem; flex-wrap:nowrap; }
+.fw-row-flash form, .fw-row-end form { display:none; }
+.fw-row-end { justify-content:center; }
 .fw-btn-lg { padding:0.6rem 1.2rem; font-size:0.9rem; }
 .fw-btn-gray { background:#555; color:#fff; }
 .fw-btn-gray:hover { background:#444; }
@@ -460,9 +463,15 @@ body.modal-open { overflow:hidden; }
   width:100%;
 }
 .progress-fill {
+  width:0;
   height:100%;
   background:#33b2c5;
   transition:width 0.3s ease;
+}
+.progress-fill-anim { animation: progress-fill-anim 6s linear forwards; }
+@keyframes progress-fill-anim {
+  from { width: 0; }
+  to { width: 100%; }
 }
 .fw-toggle-row {
   display:flex;
@@ -548,6 +557,13 @@ body.modal-open { overflow:hidden; }
 .flush-water-desc { margin:0; font-size:0.85rem; line-height:1.4; }
 .flush-water-badge { display:inline-block; background:#e6a020; color:#111; font-size:0.7rem; font-weight:700; padding:0.1rem 0.4rem; border-radius:3px; text-transform:uppercase; letter-spacing:0.03em; vertical-align:middle; }
 .flush-water-btns { display:flex; gap:0.5rem; }
+
+/* Keep EEPROM modal */
+.keep-eeprom-progress { display:none; }
+.keep-eeprom-modal.is-restoring .keep-eeprom-progress { display:block; }
+.keep-eeprom-modal.is-restoring .keep-eeprom-btns { display:none; }
+.keep-eeprom-btns { display:flex; gap:0.5rem; }
+.keep-eeprom-btns .modal-btn { flex:1; }
 
 /* Test Pump tooltip */
 .test-pump-tip-wrap { display:inline-flex; position:relative; cursor:help; margin-left:0.25rem; font-size:0.75rem; border:1px solid var(--border-color); border-radius:50%; width:1rem; height:1rem; text-align:center; line-height:1rem; }
